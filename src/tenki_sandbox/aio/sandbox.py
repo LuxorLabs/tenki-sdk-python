@@ -1,0 +1,561 @@
+from __future__ import annotations
+
+import asyncio
+import dataclasses
+import time
+from datetime import datetime, timedelta, timezone
+
+from .._convert import exposed_port, sandbox_info
+from .._pb import pb
+from .._time import duration, seconds
+from ..client import _normalize_tags
+from ..errors import map_rpc_error
+from ..models import CommandResult, ExposedPort, SandboxInfo, VolumeMount
+from ..sandbox import _is_unimplemented
+from .data_plane import AsyncDataPlaneCredentialManager, AsyncGrpcDataPlaneRPC
+from .fs import AsyncSandboxFS
+from .git import AsyncSandboxGit
+from .process import AsyncProcess
+
+
+class AsyncSandbox:
+    def __init__(
+        self,
+        client,
+        info: SandboxInfo,
+        *,
+        owns_client: bool = False,
+        data_plane_endpoint: str = "",
+        data_plane_credential=None,
+        data_plane_route_status=None,
+    ) -> None:
+        self._client = client
+        self._info = info
+        self._owns_client = owns_client
+        self._detached = False
+        self._data_plane_lock = asyncio.Lock()
+        self._data_plane_credentials: AsyncDataPlaneCredentialManager | None = None
+        self._data_plane_rpc: AsyncGrpcDataPlaneRPC | None = None
+        self._data_plane_verified = False
+        # A FAILED route carries a stale/dead endpoint; leave _data_plane_rpc
+        # unset so first use re-bootstraps via CreateSessionCredential (mirrors
+        # the sync client). Binding it would route every fs/exec/dial to a dead
+        # endpoint with no recovery.
+        self._bind_data_plane(
+            data_plane_endpoint, data_plane_credential, data_plane_route_status
+        )
+        self.fs = AsyncSandboxFS(self._session_rpc, info.id)
+        self.git = AsyncSandboxGit(self)
+
+    def _bind_data_plane(
+        self, endpoint: str = "", credential=None, route_status=None
+    ) -> None:
+        # Synchronous bind for construction: no existing rpc to close and no loop
+        # yet. `_apply_data_plane_response` is the async equivalent used later.
+        if route_status == pb.DATA_PLANE_ROUTE_STATUS_FAILED:
+            return
+        endpoint = (endpoint or "").strip()
+        if not endpoint:
+            return
+        self._data_plane_credentials = AsyncDataPlaneCredentialManager(self, credential)
+        self._data_plane_rpc = AsyncGrpcDataPlaneRPC(
+            endpoint, self._data_plane_credentials
+        )
+        self._data_plane_verified = route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED
+
+    async def _apply_data_plane_response(
+        self, endpoint: str = "", credential=None, route_status=None
+    ) -> None:
+        # Re-apply an endpoint/route observed while waiting (WaitSession frames).
+        # Skips FAILED and may replace an existing rpc, so it awaits close().
+        if route_status == pb.DATA_PLANE_ROUTE_STATUS_FAILED:
+            return
+        endpoint = (endpoint or "").strip()
+        if not endpoint:
+            return
+        async with self._data_plane_lock:
+            if self._data_plane_rpc is not None:
+                await self._data_plane_rpc.close()
+            if self._data_plane_credentials is not None:
+                self._data_plane_credentials.stop()
+            self._data_plane_credentials = AsyncDataPlaneCredentialManager(
+                self, credential
+            )
+            self._data_plane_rpc = AsyncGrpcDataPlaneRPC(
+                endpoint, self._data_plane_credentials
+            )
+            self._data_plane_verified = (
+                route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED
+            )
+
+    async def _session_rpc(self):
+        return (await self._ensure_data_plane()) or self._client._rpc
+
+    async def _verify_serving(self) -> None:
+        # An eagerly-bound but unverified endpoint may not be routable yet; probe
+        # once (retries edge-not-ready) before first use, like the sync client.
+        if self._data_plane_verified or self._data_plane_rpc is None:
+            return
+        ensure_serving = getattr(self._data_plane_rpc, "ensure_serving", None)
+        if ensure_serving is not None:
+            await ensure_serving(self.id)
+        self._data_plane_verified = True
+
+    async def _ensure_data_plane(self):
+        # CreateSessionResponse returns the endpoint empty pre-provision; bootstrap
+        # via CreateSessionCredential on first data-plane use (mirrors the Go SDK).
+        if self._data_plane_rpc is not None:
+            await self._verify_serving()
+            if self._data_plane_credentials is not None:
+                # Recover renewal if the manager was constructed without a loop.
+                self._data_plane_credentials.ensure_scheduled()
+            return self._data_plane_rpc
+        async with self._data_plane_lock:
+            if self._data_plane_rpc is not None:
+                await self._verify_serving()
+                return self._data_plane_rpc
+            try:
+                resp = await self._client._rpc.create_session_credential(
+                    pb.CreateSessionCredentialRequest(session_id=self.id)
+                )
+            except AttributeError:
+                return None
+            except Exception as err:
+                raise map_rpc_error(err) from err
+            endpoint = resp.data_plane_endpoint.strip()
+            if not endpoint:
+                return None
+            credentials = AsyncDataPlaneCredentialManager(
+                self, resp.credential if resp.HasField("credential") else None
+            )
+            rpc = AsyncGrpcDataPlaneRPC(endpoint, credentials)
+            try:
+                await rpc.ensure_serving(self.id)
+            except Exception as err:
+                credentials.stop()
+                await rpc.close()
+                raise map_rpc_error(err) from err
+            self._data_plane_credentials = credentials
+            self._data_plane_rpc = rpc
+            self._data_plane_verified = True
+            return self._data_plane_rpc
+
+    async def _reset_data_plane(self) -> None:
+        async with self._data_plane_lock:
+            if self._data_plane_credentials is not None:
+                self._data_plane_credentials.stop()
+                self._data_plane_credentials = None
+            if self._data_plane_rpc is not None:
+                await self._data_plane_rpc.close()
+                self._data_plane_rpc = None
+            self._data_plane_verified = False
+
+    @classmethod
+    async def create(cls, **kwargs) -> "AsyncSandbox":
+        from .client import AsyncClient
+
+        client_kwargs = {
+            key: kwargs.pop(key)
+            for key in [
+                "auth_token",
+                "base_url",
+                "gateway_url",
+                "cookie_name",
+                "timeout",
+            ]
+            if key in kwargs
+        }
+        client = AsyncClient(**client_kwargs)
+        return await client.create(**kwargs, _owns_client=True)
+
+    @property
+    def id(self) -> str:
+        return self._info.id
+
+    @property
+    def info(self) -> SandboxInfo:
+        return self._info
+
+    @property
+    def state(self) -> str:
+        return self._info.state
+
+    @property
+    def name(self) -> str:
+        return self._info.name
+
+    async def __aenter__(self) -> "AsyncSandbox":
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        if not self._detached:
+            await self.close()
+        if self._owns_client:
+            await self._client.close()
+
+    def detach(self) -> None:
+        self._detached = True
+
+    async def refresh(self) -> SandboxInfo:
+        self._info = (await self._client.get(self.id)).info
+        return self._info
+
+    async def wait_ready(self, timeout: float = 180) -> None:
+        try:
+            await self._wait_ready_stream(timeout)
+            return
+        except Exception as err:
+            if not _is_unimplemented(err):
+                if hasattr(err, "code"):
+                    raise map_rpc_error(err) from err
+                raise
+        await self._wait_ready_poll(timeout)
+
+    async def _wait_ready_stream(self, timeout: float) -> None:
+        async for resp in self._client._rpc.wait_session(
+            pb.WaitSessionRequest(session_id=self.id), timeout=timeout
+        ):
+            self._info = sandbox_info(resp.session)
+            await self._apply_data_plane_response(
+                resp.data_plane_endpoint,
+                resp.credential if resp.HasField("credential") else None,
+                resp.route_status,
+            )
+            if self.state == "RUNNING":
+                return
+            if self.state in {"TERMINATING", "TERMINATED"}:
+                raise RuntimeError(f"sandbox entered terminal state: {self.state}")
+        if self.state == "RUNNING":
+            return
+        if self.state in {"TERMINATING", "TERMINATED"}:
+            raise RuntimeError(f"sandbox entered terminal state: {self.state}")
+        raise TimeoutError(f"timeout waiting for sandbox {self.id}")
+
+    async def _wait_ready_poll(self, timeout: float) -> None:
+        deadline = time.monotonic() + timeout
+        while True:
+            await self.refresh()
+            if self.state == "RUNNING":
+                return
+            if self.state in {"TERMINATING", "TERMINATED"}:
+                raise RuntimeError(f"sandbox entered terminal state: {self.state}")
+            if time.monotonic() >= deadline:
+                break
+            await asyncio.sleep(0.5)
+        raise TimeoutError(f"timeout waiting for sandbox {self.id}")
+
+    async def start(
+        self,
+        *argv: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout: float | int | object | None = None,
+        stdin: bytes | str | None = None,
+        privileged: bool = False,
+    ) -> AsyncProcess:
+        # The guest agent silently fails to spawn when cwd is relative.
+        if cwd is not None and not cwd.startswith("/"):
+            raise ValueError(
+                f"cwd must be an absolute path under the workdir (e.g. /home/tenki/...), got {cwd!r}"
+            )
+        rpc = await self._ensure_data_plane()
+        if rpc is None:
+            raise RuntimeError("sandbox data-plane endpoint unavailable")
+        return await AsyncProcess.start(
+            rpc,
+            self.id,
+            argv,
+            cwd=cwd,
+            env=env,
+            timeout=timeout,
+            stdin=stdin,
+            privileged=privileged,
+        )
+
+    async def exec(
+        self,
+        *argv: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout: float | int | object | None = None,
+        input: bytes | str | None = None,
+        check: bool = False,
+        privileged: bool = False,
+    ) -> CommandResult:
+        proc = await self.start(
+            *argv, cwd=cwd, env=env, timeout=timeout, stdin=input, privileged=privileged
+        )
+        if input is None:
+            await proc.close_stdin()
+        result = await proc.wait(
+            timeout=seconds(timeout) + 5 if timeout is not None else None
+        )
+        if check:
+            result.check()
+        return result
+
+    async def shell(self, command: str, **kwargs) -> CommandResult:
+        return await self.exec("bash", "-lc", command, **kwargs)
+
+    async def close(self) -> None:
+        # Tear down under the lock and null the fields (like resume()), so a
+        # closed channel is never left referenced for a later data-plane call.
+        await self._reset_data_plane()
+        try:
+            resp = await self._client._rpc.terminate_session(
+                pb.TerminateSessionRequest(session_id=self.id)
+            )
+            if resp.session:
+                self._info = sandbox_info(resp.session)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    terminate = close
+
+    async def close_if_open(self) -> None:
+        if self.state not in {"TERMINATING", "TERMINATED"}:
+            await self.close()
+
+    async def update(
+        self,
+        *,
+        name: str | None = None,
+        tags: list[str] | None = None,
+        sticky: bool | None = None,
+    ) -> None:
+        req = pb.UpdateSessionRequest(session_id=self.id)
+        if name is not None:
+            req.name = name
+        if tags is not None:
+            normalized = _normalize_tags(tags)
+            if normalized:
+                req.tags.extend(normalized)
+            else:
+                req.clear_tags = True
+        if sticky is not None:
+            req.sticky = sticky
+        try:
+            resp = await self._client._rpc.update_session(req)
+            if resp.session:
+                self._info = sandbox_info(resp.session)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def update_tags(self, *tags: str) -> None:
+        await self.update(tags=list(tags))
+
+    async def update_ssh_authorized_keys(self, keys: list[str]) -> None:
+        req = pb.UpdateSSHAuthorizedKeysRequest(session_id=self.id)
+        req.ssh_authorized_keys.extend(keys)
+        try:
+            await self._client._rpc.update_ssh_authorized_keys(req)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def pause(self) -> None:
+        try:
+            resp = await self._client._rpc.pause_session(
+                pb.PauseSessionRequest(session_id=self.id)
+            )
+            self._info = sandbox_info(resp.session)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+        await self._reset_data_plane()
+
+    async def resume(self) -> None:
+        try:
+            resp = await self._client._rpc.resume_session(
+                pb.ResumeSessionRequest(session_id=self.id)
+            )
+            self._info = sandbox_info(resp.session)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+        # The session may resume on a different host; re-bootstrap on next use.
+        await self._reset_data_plane()
+
+    async def extend(self, additional: float | int | object) -> None:
+        dur = duration(additional)
+        try:
+            resp = await self._client._rpc.extend_session(
+                pb.ExtendSessionRequest(session_id=self.id, additional_duration=dur)
+            )
+            self._info = sandbox_info(resp.session)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def expose_port(
+        self,
+        port: int,
+        *,
+        ttl: float | int | object | None = None,
+        slug: str | None = None,
+    ) -> ExposedPort:
+        req = pb.ExposePortRequest(session_id=self.id, port=port)
+        ttl_seconds = seconds(ttl)
+        if ttl_seconds and ttl_seconds > 0:
+            expires_at = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
+            req.expires_at.FromDatetime(expires_at)
+        if slug:
+            req.slug = slug
+        try:
+            return exposed_port(await self._client._rpc.expose_port(req))
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def unexpose_port(self, port: int) -> None:
+        try:
+            await self._client._rpc.unexpose_port(
+                pb.UnexposePortRequest(session_id=self.id, port=port)
+            )
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def list_exposed_ports(self) -> list[ExposedPort]:
+        try:
+            resp = await self._client._rpc.list_exposed_ports(
+                pb.ListExposedPortsRequest(session_id=self.id)
+            )
+            return [
+                ExposedPort(
+                    port=item.port,
+                    url=item.preview_url,
+                    expires_at=(
+                        item.expires_at.ToDatetime(tzinfo=timezone.utc)
+                        if item.HasField("expires_at")
+                        else None
+                    ),
+                    preview_url_id=(
+                        item.preview_url_id if item.HasField("preview_url_id") else ""
+                    ),
+                    slug=item.slug if item.HasField("slug") else "",
+                )
+                for item in resp.ports
+            ]
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def attach_volume(
+        self, volume_id: str, mount_path: str, *, read_only: bool = False
+    ) -> None:
+        try:
+            await self._client._rpc.attach_volume(
+                pb.AttachVolumeRequest(
+                    session_id=self.id,
+                    volume=pb.VolumeMount(
+                        volume_id=volume_id, mount_path=mount_path, readonly=read_only
+                    ),
+                )
+            )
+            mounts = list(self._info.volume_mounts)
+            mounts.append(
+                VolumeMount(
+                    volume_id=volume_id, mount_path=mount_path, read_only=read_only
+                )
+            )
+            self._info = dataclasses.replace(self._info, volume_mounts=tuple(mounts))
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def detach_volume(
+        self, volume_id: str, *, force: bool = False, wait: float = 120
+    ) -> None:
+        try:
+            await self._client._rpc.detach_volume(
+                pb.DetachVolumeRequest(
+                    session_id=self.id, volume_id=volume_id, force_detach=force
+                )
+            )
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+        deadline = time.monotonic() + wait
+        while wait > 0 and time.monotonic() < deadline:
+            await self.refresh()
+            if all(mount.volume_id != volume_id for mount in self._info.volume_mounts):
+                return
+            await asyncio.sleep(0.5)
+        mounts = tuple(
+            mount for mount in self._info.volume_mounts if mount.volume_id != volume_id
+        )
+        self._info = dataclasses.replace(self._info, volume_mounts=mounts)
+
+    async def snapshot(self, *, name: str | None = None, wait: bool = True):
+        if wait:
+            return await self._client.snapshots.create_and_wait(self.id, name=name)
+        return await self._client.snapshots.create(self.id, name=name)
+
+    async def _git_operation(self, operation: str, args: dict[str, str]) -> str:
+        try:
+            resp = await self._client._rpc.git_operation(
+                pb.GitOperationRequest(
+                    session_id=self.id, operation=operation, args=args
+                )
+            )
+            return resp.output
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def issue_ssh_cert(
+        self, public_key: str, *, ttl: float | None = None
+    ) -> "SSHCert":
+        from ..models import SSHCert  # noqa: F401
+
+        return await self._client.issue_ssh_cert(self.id, public_key, ttl=ttl)
+
+    async def ssh(self, *, gateway_url: str | None = None) -> "AsyncSSHConn":
+        return await self._client.ssh(self.id, gateway_url=gateway_url)
+
+    async def dial(
+        self, unix_socket_path: str, *, connect_timeout: float | None = None
+    ) -> "AsyncDialConn":
+        from .dial import open_dial_conn
+
+        rpc = await self._session_rpc()
+        timeout_ms = int(connect_timeout * 1000) if connect_timeout is not None else 0
+        return await open_dial_conn(
+            rpc, self.id, unix_socket_path, connect_timeout_ms=timeout_ms
+        )
+
+    async def expose_host_port(
+        self,
+        host_addr: str,
+        *,
+        sandbox_bind_address: str = "",
+        sandbox_port: int = 0,
+        host_dial_target_label: str = "",
+    ) -> "AsyncHostPortTunnel":
+        from .tunnel import open_host_port_tunnel
+
+        rpc = await self._session_rpc()
+        return await open_host_port_tunnel(
+            rpc,
+            self.id,
+            host_addr,
+            sandbox_bind_address=sandbox_bind_address,
+            sandbox_port=sandbox_port,
+            host_dial_target_label=host_dial_target_label,
+        )
+
+    async def expose_host_port_resilient(
+        self,
+        host_addr: str,
+        *,
+        sandbox_bind_address: str = "",
+        sandbox_port: int = 0,
+        host_dial_target_label: str = "",
+        initial_backoff: float = 0.25,
+        max_backoff: float = 10.0,
+    ) -> "AsyncResilientHostPortTunnel":
+        from .tunnel import open_resilient_host_port_tunnel
+
+        rpc = await self._session_rpc()
+        return await open_resilient_host_port_tunnel(
+            rpc,
+            self.id,
+            host_addr,
+            sandbox_bind_address=sandbox_bind_address,
+            sandbox_port=sandbox_port,
+            host_dial_target_label=host_dial_target_label,
+            initial_backoff=initial_backoff,
+            max_backoff=max_backoff,
+        )
