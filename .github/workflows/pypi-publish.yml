@@ -1,19 +1,17 @@
 name: Publish
 
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       dry_run:
         description: Run checks and package build without publishing
         type: boolean
         default: true
-      skip_publish:
-        description: Tag only — never publish to the registry (safe tag test / backfill)
-        type: boolean
-        default: false
 
 permissions:
-  contents: write
+  contents: read
   id-token: write
 
 concurrency:
@@ -64,24 +62,5 @@ jobs:
           fi
 
       - name: Publish to PyPI
-        if: ${{ steps.version.outputs.published == 'false' && inputs.dry_run == false && inputs.skip_publish == false }}
+        if: ${{ steps.version.outputs.published == 'false' && (github.event_name == 'push' || inputs.dry_run == false) }}
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
-
-      - name: Tag release
-        if: ${{ inputs.dry_run == false }}
-        run: |
-          set -euo pipefail
-
-          # Tag the exact published commit, at publish time. Immutable: only
-          # push when the tag is new (backfills a missing tag on re-run).
-          VERSION=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
-          tag="v${VERSION}"
-          if git ls-remote --tags origin "refs/tags/${tag}" | awk '{print $2}' | grep -qxF "refs/tags/${tag}"; then
-            echo "tag ${tag} already exists, skipping"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${tag}" -m "${tag}"
-          # Tolerate a concurrent run that pushed the same tag first.
-          git push origin "refs/tags/${tag}" 2>/dev/null || git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1
