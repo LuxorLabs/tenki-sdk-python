@@ -1,0 +1,65 @@
+name: Test
+
+on:
+  push:
+    paths:
+      - ".github/workflows/test.yml"
+      - "examples/**"
+      - "pyproject.toml"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+  pull_request:
+    paths:
+      - ".github/workflows/test.yml"
+      - "examples/**"
+      - "pyproject.toml"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  protobuf-compatibility:
+    name: protobuf ${{ matrix.protobuf }}
+    runs-on: tenki-standard-small-2c-4g
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - protobuf: "5.29.5"
+            warning_args: "-W error"
+          - protobuf: "6.31.1"
+            warning_args: ""
+          - protobuf: "6.33.6"
+            warning_args: "-W error"
+          - protobuf: "7.35.1"
+            warning_args: "-W error"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e . \
+            "protobuf==${{ matrix.protobuf }}" \
+            "pytest>=8.0" \
+            "pytest-asyncio>=0.23" \
+            "websockets>=12"
+
+      - name: Test
+        run: python ${{ matrix.warning_args }} -m pytest
