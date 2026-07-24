@@ -11,7 +11,7 @@ from ..ssh import (
 
 _SSH_UNAVAILABLE_MSG = (
     "Async SSH transport requires 'websockets'. "
-    "Install it: pip install 'tenki-sandbox[async]'"
+    "Install it: pip install 'tenki[async]'"
 )
 
 

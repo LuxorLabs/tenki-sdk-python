@@ -1,10 +1,14 @@
-# Tenki Sandbox Python SDK
+# Tenki Python SDK
 
-Python SDK for Tenki Sandbox: cloud sandboxes for AI agents and code execution.
+Python SDK for Tenki: cloud sandboxes (microVMs) for AI agents and code execution.
 
 ```bash
-pip install tenki-sandbox
+pip install tenki
 ```
+
+> The SDK is published as `tenki`. Existing code that does
+> `import tenki_sandbox` keeps working (that module ships inside `tenki`), but
+> new code should use `import tenki`.
 
 ## Protobuf compatibility
 
@@ -24,7 +28,7 @@ filterwarnings = [
 ```
 
 ```python
-from tenki_sandbox import Sandbox
+from tenki import Sandbox
 
 # create() waits by default via a single server-held request and returns an
 # exec-ready sandbox with data-plane access primed (wait=False to skip).
@@ -51,7 +55,7 @@ asyncio server (FastAPI, aiohttp, etc.).
 
 ```python
 import asyncio
-from tenki_sandbox import AsyncSandbox
+from tenki import AsyncSandbox
 
 
 async def main():
@@ -77,7 +81,7 @@ asyncio.run(main())
 The sync `Client` / `Sandbox` remain available for non-async consumers. SSH,
 `dial`, and host-port tunnels are also async: `AsyncSandbox.ssh()` returns an
 `AsyncSSHConn` (raw async `read`/`write`/`close`, matching the TS/Go SDKs; needs
-the `tenki-sandbox[async]` extra for `websockets`), `dial()` returns an
+the `tenki[async]` extra for `websockets`), `dial()` returns an
 `AsyncDialConn`, and `expose_host_port()` / `expose_host_port_resilient()` return
 async tunnels with `await tunnel.terminated.wait()` and `on_terminated` callbacks.
 
@@ -193,7 +197,7 @@ Notes:
 ## Resource APIs
 
 ```python
-from tenki_sandbox import Client, GiB
+from tenki import Client, GiB
 
 client = Client()
 
@@ -228,7 +232,7 @@ value). Builds freeze the normalized spec + `spec_hash` server-side and return
 a private digest-addressed `Image`, the normal sandbox launch source.
 
 ```python
-from tenki_sandbox import Client, TemplateSpec
+from tenki import Client, TemplateSpec
 
 client = Client()
 
