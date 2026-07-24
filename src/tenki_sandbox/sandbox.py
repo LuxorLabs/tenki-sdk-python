@@ -45,6 +45,7 @@ class Sandbox:
         self._data_plane_credentials = None
         self._data_plane_rpc = None
         self._data_plane_verified = False
+        self._data_plane_warm_started = False
         self._apply_data_plane_response(
             data_plane_endpoint, data_plane_credential, data_plane_route_status
         )
@@ -75,6 +76,23 @@ class Sandbox:
             self._data_plane_verified = (
                 route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED
             )
+            warm_target = None if self._data_plane_verified else self._data_plane_rpc
+        if warm_target is not None:
+            self._start_data_plane_warm(warm_target)
+
+    def _start_data_plane_warm(self, rpc) -> None:
+        # Open the connection so the first real op skips the handshake; the probe may be rejected for want of a credential, so this must not set _data_plane_verified.
+        if self._data_plane_warm_started:
+            return
+        self._data_plane_warm_started = True
+
+        def _warm() -> None:
+            try:
+                rpc.stat(pb.StatRequest(session_id=self.id, path="/home/tenki"))
+            except Exception:
+                pass
+
+        threading.Thread(target=_warm, name="tenki-dp-warm", daemon=True).start()
 
     def _ensure_data_plane(self):
         # CreateSessionResponse returns the endpoint empty pre-provision; bootstrap
