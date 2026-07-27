@@ -18,7 +18,7 @@ from ..client import (
     build_issue_ssh_cert_request,
 )
 from ..constants import ENV_GATEWAY_URL
-from ..errors import map_rpc_error
+from ..errors import WaitReadyFailedError, map_rpc_error
 from ..models import Identity, Image, Template, WorkspaceUsageLimit
 from ._transport import AsyncGrpcSandboxRPC
 from .preview_url import AsyncPreviewUrls
@@ -151,7 +151,15 @@ class AsyncClient:
         # The server-held create (wait_ready) can return RUNNING directly; only
         # open a WaitSession stream if it hasn't settled yet (mirrors sync).
         if wait and sandbox.state != "RUNNING":
-            await sandbox.wait_ready(_create_wait_timeout(timeout, from_template_spec))
+            try:
+                await sandbox.wait_ready(_create_wait_timeout(timeout, from_template_spec))
+            except Exception as err:
+                if sandbox.state in {"TERMINATING", "TERMINATED"}:
+                    raise
+                raise WaitReadyFailedError(
+                    f"sandbox {sandbox.id} created but not ready within wait budget",
+                    sandbox,
+                ) from err
         return sandbox
 
     async def get(self, sandbox_id: str) -> AsyncSandbox:

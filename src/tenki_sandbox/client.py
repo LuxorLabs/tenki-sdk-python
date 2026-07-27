@@ -15,7 +15,7 @@ from ._transport import (
     resolve_gateway_url,
 )
 from .constants import ENV_GATEWAY_URL
-from .errors import map_rpc_error
+from .errors import WaitReadyFailedError, map_rpc_error
 from .models import Identity, Image, Template, WorkspaceUsageLimit
 from .preview_url import PreviewUrls
 from .registry import Registry
@@ -141,7 +141,15 @@ class Client:
             data_plane_route_status=resp.route_status,
         )
         if wait and sandbox.state != "RUNNING":
-            sandbox.wait_ready(_create_wait_timeout(timeout, from_template_spec))
+            try:
+                sandbox.wait_ready(_create_wait_timeout(timeout, from_template_spec))
+            except Exception as err:
+                if sandbox.state in {"TERMINATING", "TERMINATED"}:
+                    raise
+                raise WaitReadyFailedError(
+                    f"sandbox {sandbox.id} created but not ready within wait budget",
+                    sandbox,
+                ) from err
         return sandbox
 
     def get(self, sandbox_id: str) -> Sandbox:

@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from tenki_sandbox import AsyncClient, AsyncSandbox, MissingAuthTokenError
+from tenki_sandbox import (
+    AsyncClient,
+    AsyncSandbox,
+    MissingAuthTokenError,
+    WaitReadyFailedError,
+)
 from tenki_sandbox._pb import pb
 
 from _async_fakes import FakeControlRPC
@@ -43,6 +48,32 @@ async def test_async_create_waits_via_stream():
     sandbox = await client.create(workspace_id="ws-1", wait=True, timeout=5)
     assert sandbox.state == "RUNNING"
     assert rpc.requests["wait_session"]
+
+
+async def test_async_create_wait_failure_preserves_closable_sandbox():
+    rpc = FakeControlRPC()
+    rpc.wait_states = [pb.SESSION_STATE_CREATING]
+
+    with pytest.raises(WaitReadyFailedError) as exc_info:
+        await AsyncClient(rpc=rpc).create(
+            workspace_id="ws-1", wait=True, timeout=0
+        )
+
+    assert exc_info.value.sandbox.id == "session-1"
+    await exc_info.value.sandbox.close()
+    assert rpc.requests["terminate_session"][-1].session_id == "session-1"
+
+
+async def test_async_create_terminal_wait_failure_is_not_wrapped():
+    rpc = FakeControlRPC()
+    rpc.wait_states = [pb.SESSION_STATE_TERMINATED]
+
+    with pytest.raises(RuntimeError, match="terminal state") as exc_info:
+        await AsyncClient(rpc=rpc).create(
+            workspace_id="ws-1", wait=True, timeout=0
+        )
+
+    assert not isinstance(exc_info.value, WaitReadyFailedError)
 
 
 async def test_async_create_skips_wait_stream_when_already_running():

@@ -38,6 +38,7 @@ from .errors import (
     VolumeInUseError,
     VolumeNotFoundError,
     VolumeSyncPendingError,
+    WaitReadyFailedError,
 )
 from .models import (
     CommandResult,
@@ -111,6 +112,7 @@ __all__ = [
     "VolumeNotFoundError",
     "VolumeInUseError",
     "VolumeSyncPendingError",
+    "WaitReadyFailedError",
     "SnapshotNotDurableError",
     "SnapshotNotFoundError",
     "TemplateNotFoundError",

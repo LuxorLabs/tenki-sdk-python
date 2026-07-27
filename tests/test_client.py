@@ -9,6 +9,7 @@ from tenki_sandbox import (
     MissingAuthTokenError,
     Sandbox,
     TemplateRuntimeFailedError,
+    WaitReadyFailedError,
 )
 from tenki_sandbox._pb import pb, template_pb
 from tenki_sandbox._transport import auth_metadata, grpc_target, resolve_gateway_url
@@ -256,6 +257,28 @@ def test_pause_and_resume_reset_data_plane():
     assert sandbox._data_plane_verified is False
 
 
+def test_create_wait_failure_preserves_closable_sandbox():
+    rpc = FakeRPC()
+    rpc.wait_states = [pb.SESSION_STATE_CREATING]
+
+    with pytest.raises(WaitReadyFailedError) as exc_info:
+        Client(rpc=rpc).create(workspace_id="ws-1", wait=True, timeout=0)
+
+    assert exc_info.value.sandbox.id == "session-1"
+    exc_info.value.sandbox.close()
+    assert rpc.requests["terminate_session"][-1].session_id == "session-1"
+
+
+def test_create_terminal_wait_failure_is_not_wrapped():
+    rpc = FakeRPC()
+    rpc.wait_states = [pb.SESSION_STATE_TERMINATED]
+
+    with pytest.raises(RuntimeError, match="terminal state") as exc_info:
+        Client(rpc=rpc).create(workspace_id="ws-1", wait=True, timeout=0)
+
+    assert not isinstance(exc_info.value, WaitReadyFailedError)
+
+
 def test_wait_ready_uses_stream_until_running():
     rpc = FakeRPC()
     rpc.wait_states = [pb.SESSION_STATE_CREATING, pb.SESSION_STATE_RUNNING]
@@ -315,6 +338,7 @@ def test_public_error_exports_are_importable():
         "TemplateBuildFailedError",
         "TemplateBuildInProgressError",
         "TemplateRuntimeFailedError",
+        "WaitReadyFailedError",
         "InvalidStateError",
         "StreamClosedError",
         "CapabilityUnavailableError",

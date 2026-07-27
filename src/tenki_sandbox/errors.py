@@ -141,6 +141,14 @@ class TemplateRuntimeFailedError(SandboxError):
         self.reason = message
 
 
+class WaitReadyFailedError(SandboxError):
+    """A readiness wait failed after the server admitted the sandbox."""
+
+    def __init__(self, message: str, sandbox=None) -> None:
+        super().__init__(message)
+        self.sandbox = sandbox
+
+
 class StreamClosedError(SandboxError):
     pass
 
