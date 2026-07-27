@@ -88,7 +88,10 @@ class Sandbox:
 
         def _warm() -> None:
             try:
-                rpc.stat(pb.StatRequest(session_id=self.id, path="/home/tenki"))
+                rpc.stat(
+                    pb.StatRequest(session_id=self.id, path="/home/tenki"),
+                    metadata=(("x-tenki-dataplane-probe", "warmup"),),
+                )
             except Exception:
                 pass
 
