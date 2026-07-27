@@ -175,6 +175,7 @@ class AsyncClient:
         workspace_id: str | None = None,
         tags: list[str] | None = None,
         sticky: bool | None = None,
+        include_terminated: bool = False,
     ) -> list[AsyncSandbox]:
         try:
             sandboxes: list[AsyncSandbox] = []
@@ -184,6 +185,7 @@ class AsyncClient:
                     page_size=100,
                     page_token=page_token,
                     tags=_normalize_tags(tags or []),
+                    include_terminated=include_terminated,
                 )
                 if workspace_id and workspace_id.strip():
                     req.workspace_id = workspace_id.strip()
