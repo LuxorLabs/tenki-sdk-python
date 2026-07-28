@@ -38,6 +38,7 @@ async def test_async_create_without_wait_maps_options():
     assert req.name == "job"
     assert req.cpu_cores == 4
     assert req.registry_ref == "pub/polyglot:prod"
+    assert req.wait_ready is False
     assert list(req.tags) == ["nightly", "gpu"]
 
 
@@ -47,7 +48,18 @@ async def test_async_create_waits_via_stream():
     client = AsyncClient(rpc=rpc)
     sandbox = await client.create(workspace_id="ws-1", wait=True, timeout=5)
     assert sandbox.state == "RUNNING"
+    assert rpc.requests["create_session"][-1].wait_ready is False
     assert rpc.requests["wait_session"]
+
+
+async def test_async_runtime_wait_keeps_server_held_create():
+    rpc = FakeControlRPC()
+
+    await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=True, wait_for_runtime=True, timeout=5)
+
+    req = rpc.requests["create_session"][-1]
+    assert req.wait_ready is True
+    assert req.wait_for_runtime is True
 
 
 async def test_async_create_wait_failure_preserves_closable_sandbox():
@@ -77,7 +89,6 @@ async def test_async_create_terminal_wait_failure_is_not_wrapped():
 
 
 async def test_async_create_skips_wait_stream_when_already_running():
-    # Server-held create returns RUNNING directly; no redundant WaitSession.
     rpc = FakeControlRPC()
     rpc.create_state = pb.SESSION_STATE_RUNNING
     sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=True, timeout=5)

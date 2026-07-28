@@ -128,10 +128,9 @@ class AsyncClient:
             volumes=volumes,
             github_token=github_token,
             sticky=sticky,
-            # wait=True rides the server-held single-RPC create; the client-side
-            # wait_ready() below only runs for older servers or waits past the
-            # server hold. Mirrors the sync and TS SDKs.
-            wait_ready=wait,
+            # Normal readiness waits client-side so WaitSession can expose and
+            # prewarm the data plane while provisioning continues.
+            wait_ready=wait and wait_for_runtime,
             wait_for_runtime=wait_for_runtime,
         )
 
@@ -148,8 +147,6 @@ class AsyncClient:
             data_plane_credential=resp.credential if resp.HasField("credential") else None,
             data_plane_route_status=resp.route_status,
         )
-        # The server-held create (wait_ready) can return RUNNING directly; only
-        # open a WaitSession stream if it hasn't settled yet (mirrors sync).
         if wait and sandbox.state != "RUNNING":
             try:
                 await sandbox.wait_ready(_create_wait_timeout(timeout, from_template_spec))

@@ -92,6 +92,7 @@ def test_create_maps_pythonic_options_without_wait():
     assert req.env["GH_TOKEN"] == "ghp_test"
     assert list(req.tags) == ["nightly", "gpu"]
     assert req.registry_ref == "pub/polyglot:prod"
+    assert req.wait_ready is False
     assert req.wait_for_runtime is True
     assert req.volumes[0].readonly is True
 
@@ -287,8 +288,19 @@ def test_wait_ready_uses_stream_until_running():
     sandbox = client.create(workspace_id="ws-1", wait=True, timeout=2)
 
     assert sandbox.state == "RUNNING"
+    assert rpc.requests["create_session"][-1].wait_ready is False
     assert len(rpc.requests["wait_session"]) == 1
     assert len(rpc.requests["get_session"]) == 0
+
+
+def test_runtime_wait_keeps_server_held_create():
+    rpc = FakeRPC()
+
+    Client(rpc=rpc).create(workspace_id="ws-1", wait=True, wait_for_runtime=True, timeout=2)
+
+    req = rpc.requests["create_session"][-1]
+    assert req.wait_ready is True
+    assert req.wait_for_runtime is True
 
 
 def test_wait_ready_primes_data_plane_from_stream():

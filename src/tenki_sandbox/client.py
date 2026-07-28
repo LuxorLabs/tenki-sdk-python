@@ -121,9 +121,9 @@ class Client:
             volumes=volumes,
             github_token=github_token,
             sticky=sticky,
-            # wait=True rides the server-held single-RPC create; the client-side
-            # wait below only runs for older servers or waits past the hold.
-            wait_ready=wait,
+            # Normal readiness waits client-side so WaitSession can expose and
+            # prewarm the data plane while provisioning continues.
+            wait_ready=wait and wait_for_runtime,
             wait_for_runtime=wait_for_runtime,
         )
 
