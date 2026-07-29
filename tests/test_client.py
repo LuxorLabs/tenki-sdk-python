@@ -12,7 +12,13 @@ from tenki_sandbox import (
     WaitReadyFailedError,
 )
 from tenki_sandbox._pb import pb, template_pb
-from tenki_sandbox._transport import auth_metadata, grpc_target, resolve_gateway_url
+from tenki_sandbox._transport import (
+    GrpcConfig,
+    GrpcSandboxRPC,
+    auth_metadata,
+    grpc_target,
+    resolve_gateway_url,
+)
 from tenki_sandbox.client import _create_wait_timeout
 from tenki_sandbox.models import VolumeMount
 
@@ -36,6 +42,34 @@ def test_auth_metadata_and_grpc_target_are_provider_friendly():
     assert grpc_target("https://api.tenki.cloud") == ("api.tenki.cloud:443", True)
     assert grpc_target("http://localhost:8090") == ("localhost:8090", False)
     assert grpc_target("localhost:8090") == ("localhost:8090", True)
+
+
+def test_sync_transport_starts_channel_connection(monkeypatch):
+    import grpc
+
+    from tenki_sandbox._internal.proto.tenki.sandbox.v1 import sandbox_pb2_grpc
+
+    channel = object()
+
+    class ReadyFuture:
+        cancelled = False
+
+        def cancel(self):
+            self.cancelled = True
+
+    ready_future = ReadyFuture()
+    monkeypatch.setattr(grpc, "insecure_channel", lambda _target: channel)
+    monkeypatch.setattr(grpc, "channel_ready_future", lambda candidate: ready_future)
+    monkeypatch.setattr(sandbox_pb2_grpc, "SandboxServiceStub", lambda candidate: object())
+
+    rpc = GrpcSandboxRPC(
+        GrpcConfig(base_url="http://localhost:8090", auth_token="tk_test")
+    )
+
+    assert rpc._channel is channel
+    assert rpc._ready_future is ready_future
+    rpc.close()
+    assert ready_future.cancelled is True
 
 
 def test_gateway_url_derivation_preserves_port_and_overrides():

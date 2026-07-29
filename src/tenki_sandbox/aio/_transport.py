@@ -48,6 +48,12 @@ class AsyncGrpcSandboxRPC:
         self._timeout = config.timeout
         self._channel = None
         self._stub = None
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            pass
+        else:
+            self._ensure_stub()
 
     def _ensure_stub(self):
         # grpc.aio channels bind to the running event loop, so create lazily on
@@ -61,6 +67,7 @@ class AsyncGrpcSandboxRPC:
                 self._channel = grpc.aio.insecure_channel(self._target)
             else:
                 self._channel = grpc.aio.secure_channel(self._target, grpc.ssl_channel_credentials())
+            self._channel.get_state(try_to_connect=True)
             self._stub = sandbox_pb2_grpc.SandboxServiceStub(self._channel)
         return self._stub
 

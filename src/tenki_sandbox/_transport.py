@@ -239,12 +239,14 @@ class GrpcSandboxRPC:
             self._channel = grpc.insecure_channel(target)
         else:
             self._channel = grpc.secure_channel(target, grpc.ssl_channel_credentials())
+        self._ready_future = grpc.channel_ready_future(self._channel)
         self._stub = sandbox_pb2_grpc.SandboxServiceStub(self._channel)
         self._http_base = http_base_url(config.base_url)
         self._metadata = auth_metadata(config.auth_token, config.cookie_name)
         self._timeout = config.timeout
 
     def close(self) -> None:
+        self._ready_future.cancel()
         close = getattr(self._channel, "close", None)
         if callable(close):
             close()

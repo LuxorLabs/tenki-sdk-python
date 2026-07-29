@@ -34,6 +34,35 @@ def _rpc():
     return rpc
 
 
+async def test_async_transport_starts_channel_connection(monkeypatch):
+    import grpc
+
+    from tenki_sandbox._internal.proto.tenki.sandbox.v1 import sandbox_pb2_grpc
+
+    class Channel:
+        connecting = False
+        closed = False
+
+        def get_state(self, try_to_connect=False):
+            self.connecting = try_to_connect
+
+        async def close(self, _grace):
+            self.closed = True
+
+    channel = Channel()
+    monkeypatch.setattr(grpc.aio, "insecure_channel", lambda _target: channel)
+    monkeypatch.setattr(sandbox_pb2_grpc, "SandboxServiceStub", lambda candidate: object())
+
+    rpc = AsyncGrpcSandboxRPC(
+        GrpcConfig(base_url="http://localhost:8090", auth_token="tk_test")
+    )
+
+    assert rpc._channel is channel
+    assert channel.connecting is True
+    await rpc.close()
+    assert channel.closed is True
+
+
 async def test_unary_method_is_coroutine_and_passes_auth_metadata():
     rpc = _rpc()
     assert inspect.iscoroutinefunction(rpc.create_session)
