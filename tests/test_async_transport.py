@@ -89,7 +89,7 @@ async def test_streaming_rpc_does_not_inherit_client_timeout():
     # A client-wide timeout is a unary deadline; long-lived streams must not get
     # it or a persistent tunnel dies with DEADLINE_EXCEEDED after `timeout`.
     rpc = AsyncGrpcSandboxRPC(
-        GrpcConfig(base_url="http://localhost:8090", auth_token="tk", timeout=30)
+        GrpcConfig(base_url="http://localhost:8090", auth_token="tk_test", timeout=30)
     )
     rpc._stub = _FakeStub()
 

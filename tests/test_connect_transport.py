@@ -74,7 +74,7 @@ def connect_server():
 
 
 def test_issue_ssh_cert_uses_connect_protocol(connect_server):
-    rpc = GrpcSandboxRPC(GrpcConfig(base_url=connect_server, auth_token="tok-123"))
+    rpc = GrpcSandboxRPC(GrpcConfig(base_url=connect_server, auth_token="tk_test"))
     req = ssh_pb.IssueSandboxSSHCertRequest(session_id="sid-1", public_key="ssh-ed25519 AAAA")
     resp = rpc.issue_ssh_cert(req)
     assert resp.ssh_cert == "ssh-ed25519-cert c"
@@ -84,7 +84,7 @@ def test_issue_ssh_cert_uses_connect_protocol(connect_server):
     assert seen["path"] == f"{SSH_SERVICE}/IssueSandboxSSHCert"
     assert seen["content_type"] == "application/proto"
     assert seen["connect_version"] == "1"
-    assert seen["authorization"] == "Bearer tok-123"
+    assert seen["authorization"] == "Bearer tk_test"
     parsed = ssh_pb.IssueSandboxSSHCertRequest()
     parsed.ParseFromString(seen["body"])
     assert parsed.session_id == "sid-1"
@@ -92,7 +92,7 @@ def test_issue_ssh_cert_uses_connect_protocol(connect_server):
 
 def test_falls_back_to_legacy_service_path(connect_server):
     _Handler.legacy_only = True
-    rpc = GrpcSandboxRPC(GrpcConfig(base_url=connect_server, auth_token="tok-123"))
+    rpc = GrpcSandboxRPC(GrpcConfig(base_url=connect_server, auth_token="tk_test"))
     resp = rpc.issue_ssh_cert(ssh_pb.IssueSandboxSSHCertRequest(session_id="sid-1", public_key="k"))
     assert resp.ssh_cert == "ssh-ed25519-cert c"
     paths = [s["path"] for s in _Handler.seen]
@@ -103,7 +103,7 @@ def test_falls_back_to_legacy_service_path(connect_server):
 
 
 def test_connect_error_maps_to_sdk_error(connect_server):
-    rpc = GrpcSandboxRPC(GrpcConfig(base_url=connect_server, auth_token="tok-123"))
+    rpc = GrpcSandboxRPC(GrpcConfig(base_url=connect_server, auth_token="tk_test"))
     with pytest.raises(UnauthorizedError, match="bad token"):
         rpc.list_active_ssh_gateways(ssh_pb.ListActiveSSHGatewaysRequest())
 
@@ -129,7 +129,7 @@ class _TimeoutStub:
 def test_sync_streaming_rpc_does_not_inherit_client_timeout():
     # The client-wide timeout is a unary deadline; long-lived streams must not
     # inherit it or a control-plane tunnel dies with DEADLINE_EXCEEDED.
-    rpc = GrpcSandboxRPC(GrpcConfig(base_url="http://localhost:8090", auth_token="tk", timeout=30))
+    rpc = GrpcSandboxRPC(GrpcConfig(base_url="http://localhost:8090", auth_token="tk_test", timeout=30))
     rpc._stub = _TimeoutStub()
 
     rpc.create_session(pb.CreateSessionRequest())  # unary keeps the deadline

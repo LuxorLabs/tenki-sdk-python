@@ -102,7 +102,7 @@ async def test_async_ssh_clean_close_is_eof(monkeypatch):
         return fake
 
     monkeypatch.setattr("websockets.connect", fake_connect)
-    conn = await open_ssh_conn(None, "s", "wss://gw", "tk", gateway_address_explicit=True)
+    conn = await open_ssh_conn(None, "s", "wss://gw", "tk_test", gateway_address_explicit=True)
     assert await conn.read() == b"out"
     assert await conn.read() == b""  # normal closure -> clean EOF
 
@@ -117,7 +117,7 @@ async def test_async_ssh_abnormal_close_raises(monkeypatch):
         return fake
 
     monkeypatch.setattr("websockets.connect", fake_connect)
-    conn = await open_ssh_conn(None, "s", "wss://gw", "tk", gateway_address_explicit=True)
+    conn = await open_ssh_conn(None, "s", "wss://gw", "tk_test", gateway_address_explicit=True)
     assert await conn.read() == b"partial"
     with pytest.raises(SSHUnavailableError):
         await conn.read()
@@ -133,7 +133,7 @@ async def test_async_ssh_drops_text_frames(monkeypatch):
 
     monkeypatch.setattr("websockets.connect", fake_connect)
 
-    conn = await open_ssh_conn(None, "sess-1", "wss://gw.example", "tk", gateway_address_explicit=True)
+    conn = await open_ssh_conn(None, "sess-1", "wss://gw.example", "tk_test", gateway_address_explicit=True)
     assert await conn.read() == b"bin1"
     assert await conn.read() == b"bin2"  # text frame skipped, not b"text-drop-me"
     assert await conn.read() == b""  # EOF
@@ -150,7 +150,7 @@ async def test_async_ssh_connect_error_maps_status(monkeypatch):
 
     monkeypatch.setattr("websockets.connect", fake_connect)
     with pytest.raises(UnauthorizedError):
-        await open_ssh_conn(None, "sess-1", "wss://gw.example", "tk", gateway_address_explicit=True)
+        await open_ssh_conn(None, "sess-1", "wss://gw.example", "tk_test", gateway_address_explicit=True)
 
 
 # -------------------------------------------------------------------------- dial

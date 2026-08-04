@@ -30,20 +30,17 @@ class Client:
         auth_token: str | None = None,
         base_url: str | None = None,
         gateway_url: str | None = None,
-        cookie_name: str = "tenki_session",
         timeout: float | None = None,
         rpc=None,
     ) -> None:
         self.base_url = resolve_base_url(base_url)
         self.gateway_url = resolve_gateway_url(gateway_url, self.base_url)
         self._gateway_explicit = bool((gateway_url or os.getenv(ENV_GATEWAY_URL) or "").strip())
-        self.cookie_name = cookie_name
-        self.auth_token = resolve_auth_token(auth_token) if rpc is None else (auth_token or "test")
+        self.auth_token = resolve_auth_token(auth_token) if rpc is None or auth_token is not None else "tk_test"
         self._rpc = rpc or GrpcSandboxRPC(
             GrpcConfig(
                 base_url=self.base_url,
                 auth_token=self.auth_token,
-                cookie_name=cookie_name,
                 timeout=timeout,
             )
         )
@@ -214,7 +211,6 @@ class Client:
             self.auth_token,
             override_gateway_url=gateway_url,
             gateway_address_explicit=self._gateway_explicit or bool(gateway_url),
-            cookie_name=self.cookie_name,
         )
 
     def issue_ssh_cert(

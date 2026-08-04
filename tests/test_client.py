@@ -5,10 +5,12 @@ import pytest
 import tenki_sandbox
 from tenki_sandbox import (
     Client,
+    InvalidAuthTokenError,
     InvalidResourceConfigError,
     MissingAuthTokenError,
     Sandbox,
     TemplateRuntimeFailedError,
+    UnauthorizedError,
     WaitReadyFailedError,
 )
 from tenki_sandbox._pb import pb, template_pb
@@ -31,14 +33,23 @@ def test_client_requires_auth_without_injected_rpc(monkeypatch):
         Client()
 
 
+@pytest.mark.parametrize("auth_token", ["ory_st_test", "cookie:session-token"])
+@pytest.mark.parametrize("rpc", [None, object()])
+def test_client_rejects_invalid_auth_tokens(auth_token, rpc):
+    with pytest.raises(InvalidAuthTokenError):
+        Client(auth_token=auth_token, rpc=rpc)
+
+
+def test_invalid_auth_token_is_unauthorized_error():
+    assert issubclass(InvalidAuthTokenError, UnauthorizedError)
+
+
 def test_auth_metadata_and_grpc_target_are_provider_friendly():
     client = (
         ("x-tenki-client-family", "python_sdk"),
         ("x-tenki-client-generation", "workspace_v1"),
     )
-    assert auth_metadata("tk_test") == (("authorization", "Bearer tk_test"),) + client
-    assert auth_metadata("ory_st_test") == (("x-session-token", "ory_st_test"),) + client
-    assert auth_metadata("   ") == client
+    assert auth_metadata(" tk_test ") == (("authorization", "Bearer tk_test"),) + client
     assert grpc_target("https://api.tenki.cloud") == ("api.tenki.cloud:443", True)
     assert grpc_target("http://localhost:8090") == ("localhost:8090", False)
     assert grpc_target("localhost:8090") == ("localhost:8090", True)
@@ -386,6 +397,7 @@ def test_public_error_exports_are_importable():
         "TemplateRuntimeFailedError",
         "WaitReadyFailedError",
         "InvalidStateError",
+        "InvalidAuthTokenError",
         "StreamClosedError",
         "CapabilityUnavailableError",
         "PrimitiveTimeoutError",

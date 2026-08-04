@@ -24,6 +24,13 @@ class UnauthorizedError(SandboxError):
     pass
 
 
+class InvalidAuthTokenError(UnauthorizedError):
+    def __init__(self) -> None:
+        super().__init__(
+            "invalid auth token: expected an API key or service token starting with tk_"
+        )
+
+
 class PermissionDeniedError(SandboxError):
     pass
 

@@ -167,7 +167,6 @@ def open_ssh_conn(
     *,
     override_gateway_url: str | None = None,
     gateway_address_explicit: bool = False,
-    cookie_name: str = "tenki_session",
 ) -> SSHConn:
     """Build the WS URL, dial, return SSHConn. Raises SSHUnavailableError on failure."""
     try:
@@ -189,7 +188,7 @@ def open_ssh_conn(
         raise SSHUnavailableError("gateway address not configured")
 
     from ._transport import auth_metadata as _auth_meta
-    headers = {k: v for k, v in _auth_meta(auth_token, cookie_name)}
+    headers = {k: v for k, v in _auth_meta(auth_token)}
 
     ws = _ws_lib.WebSocket()
     try:

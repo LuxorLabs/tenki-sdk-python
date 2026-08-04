@@ -163,7 +163,6 @@ class Sandbox:
                 "auth_token",
                 "base_url",
                 "gateway_url",
-                "cookie_name",
                 "timeout",
             ]
             if key in kwargs

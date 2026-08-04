@@ -149,7 +149,7 @@ def test_template_workflow_filesystem_memory_and_forced_fallback():
     sessions = []
     image_ids: list[str] = []
 
-    with Client(cookie_name=os.environ.get("TENKI_COOKIE_NAME", "tenki_session")) as client:
+    with Client() as client:
         try:
             for mode in ("filesystem", "memory"):
                 memory = mode == "memory"

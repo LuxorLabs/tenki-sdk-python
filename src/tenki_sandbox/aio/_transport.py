@@ -44,7 +44,7 @@ class AsyncGrpcSandboxRPC:
         self._target = target or config.base_url
         self._secure = secure
         self._http_base = http_base_url(config.base_url)
-        self._metadata = auth_metadata(config.auth_token, config.cookie_name)
+        self._metadata = auth_metadata(config.auth_token)
         self._timeout = config.timeout
         self._channel = None
         self._stub = None

@@ -5,6 +5,7 @@ import pytest
 from tenki_sandbox import (
     AsyncClient,
     AsyncSandbox,
+    InvalidAuthTokenError,
     MissingAuthTokenError,
     WaitReadyFailedError,
 )
@@ -18,6 +19,13 @@ def test_async_client_requires_auth_without_injected_rpc(monkeypatch):
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
     with pytest.raises(MissingAuthTokenError):
         AsyncClient()
+
+
+@pytest.mark.parametrize("auth_token", ["ory_st_test", "cookie:session-token"])
+@pytest.mark.parametrize("rpc", [None, object()])
+def test_async_client_rejects_invalid_auth_tokens(auth_token, rpc):
+    with pytest.raises(InvalidAuthTokenError):
+        AsyncClient(auth_token=auth_token, rpc=rpc)
 
 
 async def test_async_create_without_wait_maps_options():

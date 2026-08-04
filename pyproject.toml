@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tenki"
-version = "0.5.4"
+version = "0.6.0"
 description = "Tenki Cloud Python SDK — cloud sandboxes (microVMs) for AI agents and code execution"
 readme = "README.md"
 requires-python = ">=3.10"

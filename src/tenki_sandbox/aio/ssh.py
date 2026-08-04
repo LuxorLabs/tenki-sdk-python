@@ -138,7 +138,6 @@ async def open_ssh_conn(
     *,
     override_gateway_url: str | None = None,
     gateway_address_explicit: bool = False,
-    cookie_name: str = "tenki_session",
 ) -> AsyncSSHConn:
     """Build the WS URL, dial, return AsyncSSHConn. Raises SSHUnavailableError on failure."""
     try:
@@ -161,7 +160,7 @@ async def open_ssh_conn(
 
     from .._transport import auth_metadata as _auth_meta
 
-    headers = {k: v for k, v in _auth_meta(auth_token, cookie_name)}
+    headers = {k: v for k, v in _auth_meta(auth_token)}
     header_kwarg = _ws_header_kwarg(websockets.connect)
 
     try:

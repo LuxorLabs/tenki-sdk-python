@@ -93,6 +93,18 @@ Auth resolution:
 2. `TENKI_AUTH_TOKEN`
 3. `TENKI_API_KEY`
 
+Credentials must be a Tenki API key or service token starting with `tk_`. Missing
+credentials raise `MissingAuthTokenError`; nonempty credentials with any other
+prefix raise `InvalidAuthTokenError`. Requests authenticate with an
+`Authorization: Bearer` header.
+
+### Migrating to v0.6.0
+
+Version 0.6.0 removes the `cookie_name` client and sandbox option and support
+for Ory session tokens and browser cookie values. Pass a `tk_` API key or
+service token through `auth_token`; the SDK sends it as an
+`Authorization: Bearer` credential.
+
 `TENKI_API_ENDPOINT` overrides the API URL; legacy `TENKI_API_URL` is also accepted.
 
 ## Process API

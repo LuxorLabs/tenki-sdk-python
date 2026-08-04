@@ -13,16 +13,21 @@ from .constants import (
     ENV_AUTH_TOKEN,
     ENV_GATEWAY_URL,
 )
-from .errors import MissingAuthTokenError, map_rpc_error
+from .errors import InvalidAuthTokenError, MissingAuthTokenError, map_rpc_error
+
+
+def _validate_auth_token(auth_token: str) -> str:
+    token = auth_token.strip()
+    if not token:
+        raise MissingAuthTokenError()
+    if not token.startswith("tk_"):
+        raise InvalidAuthTokenError()
+    return token
 
 
 def resolve_auth_token(auth_token: str | None) -> str:
-    token = (
-        auth_token or os.getenv(ENV_AUTH_TOKEN) or os.getenv(ENV_API_KEY) or ""
-    ).strip()
-    if not token:
-        raise MissingAuthTokenError()
-    return token
+    token = auth_token or os.getenv(ENV_AUTH_TOKEN) or os.getenv(ENV_API_KEY) or ""
+    return _validate_auth_token(token)
 
 
 def resolve_base_url(base_url: str | None) -> str:
@@ -110,20 +115,12 @@ class _ConnectError(Exception):
         return self._message
 
 
-def auth_metadata(
-    auth_token: str, cookie_name: str = "tenki_session"
-) -> tuple[tuple[str, str], ...]:
+def auth_metadata(auth_token: str) -> tuple[tuple[str, str], ...]:
     client = (
         ("x-tenki-client-family", "python_sdk"),
         ("x-tenki-client-generation", "workspace_v1"),
     )
-    token = auth_token.strip()
-    if not token:
-        return client
-    if token.startswith("ory_st_"):
-        return (("x-session-token", token),) + client
-    if token.startswith("cookie:"):
-        return (("cookie", f"{cookie_name}={token.removeprefix('cookie:')}"),) + client
+    token = _validate_auth_token(auth_token)
     return (("authorization", f"Bearer {token}"),) + client
 
 
@@ -131,7 +128,6 @@ def auth_metadata(
 class GrpcConfig:
     base_url: str
     auth_token: str
-    cookie_name: str = "tenki_session"
     timeout: float | None = None
 
 
@@ -242,7 +238,7 @@ class GrpcSandboxRPC:
         self._ready_future = grpc.channel_ready_future(self._channel)
         self._stub = sandbox_pb2_grpc.SandboxServiceStub(self._channel)
         self._http_base = http_base_url(config.base_url)
-        self._metadata = auth_metadata(config.auth_token, config.cookie_name)
+        self._metadata = auth_metadata(config.auth_token)
         self._timeout = config.timeout
 
     def close(self) -> None:
