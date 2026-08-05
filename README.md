@@ -27,6 +27,9 @@ filterwarnings = [
 ]
 ```
 
+For local SDK tests, run `./scripts/test.sh`; it installs test dependencies in
+a versioned user cache when needed.
+
 ```python
 from tenki import Sandbox
 
