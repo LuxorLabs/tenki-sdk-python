@@ -53,6 +53,8 @@ class SandboxInfo:
     name: str = ""
     state: str = "UNSPECIFIED"
     workspace_id: str = ""
+    inbound_enabled: bool = False
+    outbound_enabled: bool = False
     cpu_cores: int = 0
     memory_mb: int = 0
     disk_size_gb: int = 0

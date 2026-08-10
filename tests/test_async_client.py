@@ -250,7 +250,7 @@ async def test_async_get_usage():
     req = rpc.requests["get_workspace_sandbox_usage"][-1]
     assert req.workspace_id == ""
     assert [(l.key, l.unit, l.current, l.max) for l in limits] == [
-        ("active_sessions", "count", 2, 10),
+        ("max_concurrent_jobs", "count", 2, 10),
         ("snapshot_storage", "bytes", 1024, None),  # unset max -> None (unlimited)
     ]
 

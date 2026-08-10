@@ -96,6 +96,8 @@ def sandbox_info(proto) -> SandboxInfo:
         name=proto.name,
         state=session_state(proto.state),
         workspace_id=proto.workspace_id,
+        inbound_enabled=proto.inbound_enabled,
+        outbound_enabled=proto.outbound_enabled,
         cpu_cores=proto.cpu_cores,
         memory_mb=proto.memory_mb,
         disk_size_gb=proto.disk_size_gb,

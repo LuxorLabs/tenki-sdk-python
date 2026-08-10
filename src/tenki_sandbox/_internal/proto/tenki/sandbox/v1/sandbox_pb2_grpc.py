@@ -270,26 +270,6 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageResponse.FromString,
                 _registered_method=True)
-        self.GetWorkspaceSandboxSettings = channel.unary_unary(
-                '/tenki.sandbox.v1.SandboxService/GetWorkspaceSandboxSettings',
-                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxSettingsRequest.SerializeToString,
-                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxSettingsResponse.FromString,
-                _registered_method=True)
-        self.UpdateWorkspaceSandboxSettings = channel.unary_unary(
-                '/tenki.sandbox.v1.SandboxService/UpdateWorkspaceSandboxSettings',
-                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSandboxSettingsRequest.SerializeToString,
-                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSandboxSettingsResponse.FromString,
-                _registered_method=True)
-        self.GetWorkspaceSnapshotRetentionSettings = channel.unary_unary(
-                '/tenki.sandbox.v1.SandboxService/GetWorkspaceSnapshotRetentionSettings',
-                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSnapshotRetentionSettingsRequest.SerializeToString,
-                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSnapshotRetentionSettingsResponse.FromString,
-                _registered_method=True)
-        self.UpdateWorkspaceSnapshotRetentionSettings = channel.unary_unary(
-                '/tenki.sandbox.v1.SandboxService/UpdateWorkspaceSnapshotRetentionSettings',
-                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSnapshotRetentionSettingsRequest.SerializeToString,
-                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSnapshotRetentionSettingsResponse.FromString,
-                _registered_method=True)
         self.UpdateSnapshot = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/UpdateSnapshot',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateSnapshotRequest.SerializeToString,
@@ -719,30 +699,6 @@ class SandboxServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetWorkspaceSandboxSettings(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def UpdateWorkspaceSandboxSettings(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def GetWorkspaceSnapshotRetentionSettings(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def UpdateWorkspaceSnapshotRetentionSettings(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def UpdateSnapshot(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1140,26 +1096,6 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.GetWorkspaceSandboxUsage,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageResponse.SerializeToString,
-            ),
-            'GetWorkspaceSandboxSettings': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetWorkspaceSandboxSettings,
-                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxSettingsRequest.FromString,
-                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxSettingsResponse.SerializeToString,
-            ),
-            'UpdateWorkspaceSandboxSettings': grpc.unary_unary_rpc_method_handler(
-                    servicer.UpdateWorkspaceSandboxSettings,
-                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSandboxSettingsRequest.FromString,
-                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSandboxSettingsResponse.SerializeToString,
-            ),
-            'GetWorkspaceSnapshotRetentionSettings': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetWorkspaceSnapshotRetentionSettings,
-                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSnapshotRetentionSettingsRequest.FromString,
-                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSnapshotRetentionSettingsResponse.SerializeToString,
-            ),
-            'UpdateWorkspaceSnapshotRetentionSettings': grpc.unary_unary_rpc_method_handler(
-                    servicer.UpdateWorkspaceSnapshotRetentionSettings,
-                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSnapshotRetentionSettingsRequest.FromString,
-                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSnapshotRetentionSettingsResponse.SerializeToString,
             ),
             'UpdateSnapshot': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateSnapshot,
@@ -2636,114 +2572,6 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/GetWorkspaceSandboxUsage',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def GetWorkspaceSandboxSettings(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/tenki.sandbox.v1.SandboxService/GetWorkspaceSandboxSettings',
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxSettingsRequest.SerializeToString,
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxSettingsResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def UpdateWorkspaceSandboxSettings(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/tenki.sandbox.v1.SandboxService/UpdateWorkspaceSandboxSettings',
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSandboxSettingsRequest.SerializeToString,
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSandboxSettingsResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def GetWorkspaceSnapshotRetentionSettings(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/tenki.sandbox.v1.SandboxService/GetWorkspaceSnapshotRetentionSettings',
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSnapshotRetentionSettingsRequest.SerializeToString,
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSnapshotRetentionSettingsResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def UpdateWorkspaceSnapshotRetentionSettings(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/tenki.sandbox.v1.SandboxService/UpdateWorkspaceSnapshotRetentionSettings',
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSnapshotRetentionSettingsRequest.SerializeToString,
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspaceSnapshotRetentionSettingsResponse.FromString,
             options,
             channel_credentials,
             insecure,

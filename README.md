@@ -50,6 +50,11 @@ with Sandbox.create(cpu_cores=2, memory_mb=4096) as sb:
 
 The API key determines the Workspace automatically; ordinary Sandbox calls do not require a Workspace ID.
 
+`allow_inbound` and `allow_outbound` both default to `True` on `create()`, so a new sandbox reaches the
+internet and can expose ports without passing either argument. Both are create-time settings and cannot be
+changed on an existing sandbox; `sandbox.info.inbound_enabled` / `sandbox.info.outbound_enabled` report what
+a sandbox was created with.
+
 ## Async (asyncio)
 
 `AsyncClient` / `AsyncSandbox` expose the same surface with native `async`/`await`,
@@ -101,6 +106,12 @@ credentials raise `MissingAuthTokenError`; nonempty credentials with any other
 prefix raise `InvalidAuthTokenError`. Requests authenticate with an
 `Authorization: Bearer` header.
 
+### Migrating to v0.7.0
+
+Version 0.7.0 removes the generated workspace settings and pause-retention RPCs.
+Use `get_usage()` for read-only workspace usage and limit data. Its shared
+concurrency entry now uses the `max_concurrent_jobs` key.
+
 ### Migrating to v0.6.0
 
 Version 0.6.0 removes the `cookie_name` client and sandbox option and support
@@ -130,6 +141,62 @@ for chunk in proc.stdout:
     print(chunk.decode(), end="")
 proc.wait().check()
 ```
+
+Signals are enqueued, not awaited: neither call waits for the process to die —
+matching `subprocess.Popen.kill()` — and `wait()` is what blocks until it is
+actually dead:
+
+```python
+proc = sb.start("sleep", "3600")
+proc.signal("SIGTERM")  # returns once the frame is queued
+result = proc.wait()  # returns once the process has exited
+print(result.signal)  # "terminated"
+```
+
+The two differ before the process has started. `signal()` waits for the guest to
+acknowledge the spawn first, so on a slow start it blocks for up to 30s and
+raises `TimeoutError` if the acknowledgement never arrives. `kill()` skips that
+wait and always returns immediately, which makes it the safer call during
+startup.
+
+`result.signal` carries the guest's own name for the signal, not the name you
+passed: SIGTERM reports `"terminated"` and SIGKILL reports `"killed"`. Compare
+against those values, not against `"TERM"`/`"KILL"`.
+
+`kill()` takes no argument and always sends SIGKILL; use `signal(name)` for
+anything else. `signal()` accepts `KILL`, `TERM`, `INT`, `HUP`, `USR1` and
+`USR2` (with or without the `SIG` prefix) and raises `ValueError` for anything
+else — note the Go and TypeScript SDKs silently downgrade an unknown signal to
+SIGTERM instead. One name escapes the check: `signal("unspecified")` is accepted
+and sends the protobuf zero value, which the guest maps to no signal at all, so
+it is a silent no-op rather than a `ValueError`. Do not port that no-op to the
+other SDKs — Go and TypeScript map `unspecified` to SIGTERM like any other
+unrecognized name, so there it **terminates** the process.
+
+After a normal exit both calls are no-ops rather than errors. The one exception:
+if the handle already failed with a stream error, `signal()` re-raises that
+error, while `kill()` stays silent unconditionally.
+
+`wait(timeout=...)` sends SIGKILL and raises `TimeoutError` when the timeout
+expires. Once the process is running the handle stays usable, so you can call
+`wait()` again for the exit result. Do not rely on that during startup: if the
+timeout expires while the run stream is still being established, the SIGKILL it
+sends also cancels the establishment retry, and every later `wait()` raises the
+underlying stream error instead of returning a result.
+
+The asyncio client mirrors this exactly: `await proc.signal(...)` and
+`await proc.kill()` resolve at enqueue, `await proc.wait()` at exit.
+
+Process lifetime is bound to the Run stream, not to the handle. Once that stream
+tears down — the connection breaks, or the edge times the idle connection out
+(~30s) — the platform sends SIGTERM, escalates to SIGKILL after 5s and reaps
+within 10s.
+
+Dropping the handle does **not** close the stream on its own: the pump thread
+keeps reading until the process exits or the stream fails. An abandoned process
+can keep running, and one that keeps writing output keeps its own stream alive
+indefinitely. To stop a process, signal it and `wait()` rather than abandoning
+it. There is no reattach.
 
 Use `shell()` when you want shell parsing:
 

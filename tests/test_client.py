@@ -13,6 +13,7 @@ from tenki_sandbox import (
     UnauthorizedError,
     WaitReadyFailedError,
 )
+from tenki_sandbox._convert import sandbox_info
 from tenki_sandbox._pb import pb, template_pb
 from tenki_sandbox._transport import (
     GrpcConfig,
@@ -198,6 +199,23 @@ def test_create_preserves_inbound_policy_presence():
     assert defaulted.allow_inbound is True
 
     assert not pb.CreateSessionRequest().HasField("allow_inbound")
+
+
+def test_sandbox_info_reports_server_network_policy():
+    info = sandbox_info(
+        pb.SandboxSession(id="s", inbound_enabled=True, outbound_enabled=False)
+    )
+    assert info.inbound_enabled is True
+    assert info.outbound_enabled is False
+
+
+def test_create_surfaces_network_policy_on_info():
+    client = Client(rpc=FakeRPC())
+
+    info = client.create(workspace_id="ws-1", wait=False).info
+
+    assert info.inbound_enabled is True
+    assert info.outbound_enabled is True
 
 
 def test_create_rejects_multiple_restore_sources():
@@ -591,4 +609,6 @@ def _session(state=pb.SESSION_STATE_RUNNING, sid="session-1"):
         owner_id="self",
         name="test",
         workspace_id="ws-1",
+        inbound_enabled=True,
+        outbound_enabled=True,
     )

@@ -132,7 +132,7 @@ class FakeControlRPC:
         return pb.GetWorkspaceSandboxUsageResponse(
             limits=[
                 pb.WorkspaceSandboxUsageLimit(
-                    key="active_sessions",
+                    key="max_concurrent_jobs",
                     label="Active sessions",
                     unit=pb.SANDBOX_USAGE_UNIT_COUNT,
                     current=2,
