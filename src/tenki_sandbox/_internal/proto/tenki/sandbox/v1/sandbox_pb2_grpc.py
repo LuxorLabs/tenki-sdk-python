@@ -270,6 +270,16 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageResponse.FromString,
                 _registered_method=True)
+        self.GetWorkspacePreviewDomains = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/GetWorkspacePreviewDomains',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspacePreviewDomainsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspacePreviewDomainsResponse.FromString,
+                _registered_method=True)
+        self.UpdateWorkspacePreviewDomains = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/UpdateWorkspacePreviewDomains',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspacePreviewDomainsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspacePreviewDomainsResponse.FromString,
+                _registered_method=True)
         self.UpdateSnapshot = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/UpdateSnapshot',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateSnapshotRequest.SerializeToString,
@@ -699,6 +709,21 @@ class SandboxServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetWorkspacePreviewDomains(self, request, context):
+        """Workspace wildcard preview domains (one wildcard certificate per
+        workspace per region, self-managed at the regional edge). Enabling is
+        limited to Pro-tier workspaces and triggers certificate issuance.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateWorkspacePreviewDomains(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def UpdateSnapshot(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1096,6 +1121,16 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.GetWorkspaceSandboxUsage,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageResponse.SerializeToString,
+            ),
+            'GetWorkspacePreviewDomains': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetWorkspacePreviewDomains,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspacePreviewDomainsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspacePreviewDomainsResponse.SerializeToString,
+            ),
+            'UpdateWorkspacePreviewDomains': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateWorkspacePreviewDomains,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspacePreviewDomainsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspacePreviewDomainsResponse.SerializeToString,
             ),
             'UpdateSnapshot': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateSnapshot,
@@ -2572,6 +2607,60 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/GetWorkspaceSandboxUsage',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetWorkspacePreviewDomains(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/GetWorkspacePreviewDomains',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspacePreviewDomainsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspacePreviewDomainsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateWorkspacePreviewDomains(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/UpdateWorkspacePreviewDomains',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspacePreviewDomainsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateWorkspacePreviewDomainsResponse.FromString,
             options,
             channel_credentials,
             insecure,

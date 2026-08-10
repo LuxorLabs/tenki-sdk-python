@@ -80,6 +80,13 @@ class ExposedPort:
     expires_at: datetime | None = None
     preview_url_id: str = ""
     slug: str = ""
+    # Whether this exposure uses the workspace wildcard domain scheme.
+    wildcard: bool = False
+    # Readiness of the backing workspace wildcard certificate:
+    # UNSPECIFIED / PENDING / READY / FAILED / DISABLED.
+    wildcard_status: str = "UNSPECIFIED"
+    # Actionable reason when wildcard_status is FAILED; empty otherwise.
+    wildcard_status_reason: str = ""
 
 
 @dataclass(frozen=True)
@@ -95,6 +102,14 @@ class PreviewUrl:
     created_at: datetime | None = None
     updated_at: datetime | None = None
     last_accessed_at: datetime | None = None
+    # Whether this preview URL uses the workspace wildcard domain scheme.
+    wildcard: bool = False
+    # Readiness of the workspace wildcard domain backing this preview URL;
+    # meaningful only when wildcard is True. One of UNSPECIFIED, PENDING,
+    # READY, FAILED, DISABLED.
+    wildcard_status: str = "UNSPECIFIED"
+    # Actionable reason when wildcard_status is FAILED; empty otherwise.
+    wildcard_status_reason: str = ""
 
 
 @dataclass(frozen=True)

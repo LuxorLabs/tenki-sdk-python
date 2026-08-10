@@ -409,22 +409,11 @@ class AsyncSandbox:
             resp = await self._client._rpc.list_exposed_ports(
                 pb.ListExposedPortsRequest(session_id=self.id)
             )
-            return [
-                ExposedPort(
-                    port=item.port,
-                    url=item.preview_url,
-                    expires_at=(
-                        item.expires_at.ToDatetime(tzinfo=timezone.utc)
-                        if item.HasField("expires_at")
-                        else None
-                    ),
-                    preview_url_id=(
-                        item.preview_url_id if item.HasField("preview_url_id") else ""
-                    ),
-                    slug=item.slug if item.HasField("slug") else "",
-                )
-                for item in resp.ports
-            ]
+            # The shared converter also carries the wildcard fields; rebuilding
+            # ExposedPort by hand here silently dropped them, so listing an
+            # exposure reported wildcard=False/UNSPECIFIED for the same port
+            # expose_port had just described correctly.
+            return [exposed_port(item) for item in resp.ports]
         except Exception as err:
             raise map_rpc_error(err) from err
 

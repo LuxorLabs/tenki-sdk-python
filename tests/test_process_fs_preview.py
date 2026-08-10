@@ -292,6 +292,19 @@ class FakeRPC:
         self.expose_requests.append(req)
         return pb.ExposePortResponse(port=req.port, preview_url=f"https://{req.slug}.sandbox.tenki.test", slug=req.slug)
 
+    def list_exposed_ports(self, req):
+        return pb.ListExposedPortsResponse(
+            ports=[
+                pb.PortExposure(
+                    port=8080,
+                    preview_url="https://tok.ws.us.sandbox.tenki.test",
+                    wildcard=True,
+                    wildcard_status=pb.WildcardStatus.WILDCARD_STATUS_READY,
+                ),
+                pb.PortExposure(port=9090, preview_url="https://flat.sandbox.tenki.test"),
+            ]
+        )
+
 
 class RunRpcError(grpc.RpcError):
     def __init__(self, code, details):
@@ -443,3 +456,21 @@ def create_test_sandbox(rpc):
     sandbox._data_plane_rpc = rpc
     sandbox.fs._rpc = rpc
     return sandbox
+
+
+def test_list_exposed_ports_carries_wildcard_fields():
+    """Listing must report the same wildcard readiness expose_port returned.
+
+    The list path used to rebuild ExposedPort by hand and silently dropped the
+    wildcard fields, so the same exposure read back as flat/UNSPECIFIED.
+    """
+    sandbox = create_test_sandbox(FakeRPC())
+
+    ports = sandbox.list_exposed_ports()
+
+    assert [p.port for p in ports] == [8080, 9090]
+    wildcard, flat = ports
+    assert wildcard.wildcard is True
+    assert wildcard.wildcard_status == "READY"
+    assert flat.wildcard is False
+    assert flat.wildcard_status == "UNSPECIFIED"

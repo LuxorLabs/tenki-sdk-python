@@ -154,7 +154,25 @@ def exposed_port(resp) -> ExposedPort:
         else None,
         preview_url_id=resp.preview_url_id,
         slug=resp.slug,
+        wildcard=resp.wildcard if resp.HasField("wildcard") else False,
+        wildcard_status=_wildcard_status_name(resp),
+        wildcard_status_reason=resp.wildcard_status_reason
+        if resp.HasField("wildcard_status_reason")
+        else "",
     )
+
+
+def _wildcard_status_name(proto) -> str:
+    if not proto.HasField("wildcard_status"):
+        return "UNSPECIFIED"
+    try:
+        name = pb.WildcardStatus.Name(proto.wildcard_status)
+    except ValueError:
+        # Proto3 enums are open: a newer server can send a value this SDK does
+        # not know, which protobuf preserves numerically but Name() rejects.
+        # An older client must degrade to UNSPECIFIED, not crash.
+        return "UNSPECIFIED"
+    return name.removeprefix("WILDCARD_STATUS_")
 
 
 def preview_url(proto) -> PreviewUrl:
@@ -176,6 +194,11 @@ def preview_url(proto) -> PreviewUrl:
         last_accessed_at=datetime_from_proto(proto.last_accessed_at)
         if proto.HasField("last_accessed_at")
         else None,
+        wildcard=proto.wildcard if proto.HasField("wildcard") else False,
+        wildcard_status=_wildcard_status_name(proto),
+        wildcard_status_reason=proto.wildcard_status_reason
+        if proto.HasField("wildcard_status_reason")
+        else "",
     )
 
 
