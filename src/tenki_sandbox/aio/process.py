@@ -5,7 +5,14 @@ from typing import AsyncIterator, Sequence
 
 from .._pb import pb
 from .._time import duration_ms
-from ..errors import CapabilityUnavailableError, PrimitiveTimeoutError, map_rpc_error
+from ..errors import (
+    CapabilityUnavailableError,
+    PrimitiveTimeoutError,
+    SessionTerminatedError,
+    is_session_terminated_reason,
+    map_rpc_error,
+    session_termination_cause,
+)
 from ..models import CommandResult
 from ..process import _is_retryable_run_establishment_error
 
@@ -188,6 +195,11 @@ class AsyncProcess:
                                 raise PrimitiveTimeoutError(exit.reason)
                             if exit.reason.startswith("capability_unavailable"):
                                 raise CapabilityUnavailableError(exit.reason)
+                            if is_session_terminated_reason(exit.reason):
+                                raise SessionTerminatedError(
+                                    exit.reason,
+                                    termination_cause=session_termination_cause(exit.reason),
+                                )
                             self._result = CommandResult(
                                 argv=self.argv,
                                 exit_code=exit.exit_code,
@@ -213,7 +225,10 @@ class AsyncProcess:
         except Exception as err:
             self._error = (
                 map_rpc_error(err)
-                if not isinstance(err, (CapabilityUnavailableError, PrimitiveTimeoutError))
+                if not isinstance(
+                    err,
+                    (CapabilityUnavailableError, PrimitiveTimeoutError, SessionTerminatedError),
+                )
                 else err
             )
             self.stdout.fail(self._error)

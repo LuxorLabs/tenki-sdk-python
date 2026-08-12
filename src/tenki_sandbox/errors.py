@@ -49,7 +49,21 @@ class FileNotFoundError(SandboxError, builtins.FileNotFoundError):  # noqa: A001
 
 
 class SessionTerminatedError(SandboxError):
-    pass
+    """Raised when the session is gone: already terminated when the call was
+    made, or torn down by the platform mid-stream.
+
+    ``termination_cause`` carries the machine-readable cause when the platform
+    reported one on a torn-down stream (e.g. ``guest_agent_liveness``); it is
+    ``None`` for a session that was already terminated. ``retryable`` is always
+    true — the command did not finish, so retrying on a fresh session is the
+    recovery.
+    """
+
+    retryable = True
+
+    def __init__(self, *args: object, termination_cause: str | None = None) -> None:
+        super().__init__(*args)
+        self.termination_cause = termination_cause
 
 
 class InvalidStateError(SandboxError):
@@ -205,6 +219,23 @@ class CapabilityUnavailableError(SandboxError):
 
 class PrimitiveTimeoutError(CapabilityUnavailableError):
     pass
+
+
+# Platform-teardown exit reasons, formatted ``session_terminated:<cause>[: detail]``
+# by node-agent. See the matching block in errors.ts / run.go.
+SESSION_TERMINATED_REASON_PREFIX = "session_terminated"
+
+
+def is_session_terminated_reason(reason: str) -> bool:
+    return reason.startswith(SESSION_TERMINATED_REASON_PREFIX)
+
+
+def session_termination_cause(reason: str) -> str:
+    """Extracts the cause token from a ``session_terminated:<cause>[: detail]`` reason."""
+    prefix = f"{SESSION_TERMINATED_REASON_PREFIX}:"
+    if not reason.startswith(prefix):
+        return ""
+    return reason[len(prefix) :].split(":", 1)[0].strip()
 
 
 # Git failure classification — see the matching block in errors.ts / errors.go.

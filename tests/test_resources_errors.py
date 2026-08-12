@@ -15,8 +15,11 @@ from tenki_sandbox._convert import template_build
 from tenki_sandbox.errors import (
     GitOperationFailedError,
     InvalidStateError,
+    SessionTerminatedError,
     VolumeSyncPendingError,
+    is_session_terminated_reason,
     map_rpc_error,
+    session_termination_cause,
 )
 
 
@@ -116,6 +119,33 @@ def test_template_create_rejects_invalid_resources():
 def test_rpc_error_mapping_uses_grpc_code_names():
     assert isinstance(map_rpc_error(FakeRpcError("PERMISSION_DENIED", "nope")), PermissionDeniedError)
     assert isinstance(map_rpc_error(FakeRpcError("RESOURCE_EXHAUSTED", "quota exceeded")), QuotaExceededError)
+
+
+@pytest.mark.parametrize(
+    ("reason", "want_terminated", "want_cause"),
+    [
+        ("", False, ""),
+        ("capability_unavailable: foo", False, ""),
+        ("session_terminated", True, ""),
+        ("session_terminated:guest_agent_liveness", True, "guest_agent_liveness"),
+        ("session_terminated:guest_agent_liveness: silent for 2m0s", True, "guest_agent_liveness"),
+        ("session_terminated:guest_shutdown: powered off", True, "guest_shutdown"),
+    ],
+)
+def test_session_terminated_reason_classification(reason, want_terminated, want_cause):
+    assert is_session_terminated_reason(reason) is want_terminated
+    assert session_termination_cause(reason) == want_cause
+
+
+def test_session_terminated_error_carries_cause_and_is_retryable():
+    err = SessionTerminatedError(
+        "session_terminated:guest_agent_liveness", termination_cause="guest_agent_liveness"
+    )
+
+    assert err.termination_cause == "guest_agent_liveness"
+    assert err.retryable is True
+    # A session terminated before the call has no platform-reported cause.
+    assert SessionTerminatedError("session already terminated").termination_cause is None
 
 
 _PREFIX = "check the repository, ref and access token: "
