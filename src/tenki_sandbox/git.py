@@ -15,10 +15,12 @@ class SandboxGit:
             args["directory"] = directory
         return self._sandbox._git_operation("clone", args)
 
-    def checkout(self, ref: str, *, create: bool = False) -> str:
+    def checkout(self, ref: str, *, create: bool = False, directory: str | None = None) -> str:
         args = {"ref": ref}
         if create:
             args["create"] = "true"
+        if directory:
+            args["directory"] = directory
         return self._sandbox._git_operation("checkout", args)
 
     def diff(
@@ -28,6 +30,7 @@ class SandboxGit:
         base: str | None = None,
         head: str | None = None,
         path: str | None = None,
+        directory: str | None = None,
     ) -> str:
         args = {}
         if range:
@@ -38,9 +41,18 @@ class SandboxGit:
             args["head"] = head
         if path:
             args["path"] = path
+        if directory:
+            args["directory"] = directory
         return self._sandbox._git_operation("diff", args)
 
-    def log(self, *, max_count: int | None = None, range: str | None = None, path: str | None = None) -> str:
+    def log(
+        self,
+        *,
+        max_count: int | None = None,
+        range: str | None = None,
+        path: str | None = None,
+        directory: str | None = None,
+    ) -> str:
         args = {}
         if max_count:
             args["max_count"] = str(max_count)
@@ -48,6 +60,8 @@ class SandboxGit:
             args["range"] = range
         if path:
             args["path"] = path
+        if directory:
+            args["directory"] = directory
         return self._sandbox._git_operation("log", args)
 
     def fetch_pr(self, pr_number: int, *, remote: str = "origin", branch_prefix: str = "pr", directory: str | None = None) -> str:

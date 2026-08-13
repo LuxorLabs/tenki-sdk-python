@@ -17,10 +17,12 @@ class AsyncSandboxGit:
             args["directory"] = directory
         return await self._sandbox._git_operation("clone", args)
 
-    async def checkout(self, ref: str, *, create: bool = False) -> str:
+    async def checkout(self, ref: str, *, create: bool = False, directory: str | None = None) -> str:
         args = {"ref": ref}
         if create:
             args["create"] = "true"
+        if directory:
+            args["directory"] = directory
         return await self._sandbox._git_operation("checkout", args)
 
     async def diff(
@@ -30,6 +32,7 @@ class AsyncSandboxGit:
         base: str | None = None,
         head: str | None = None,
         path: str | None = None,
+        directory: str | None = None,
     ) -> str:
         args = {}
         if range:
@@ -40,9 +43,18 @@ class AsyncSandboxGit:
             args["head"] = head
         if path:
             args["path"] = path
+        if directory:
+            args["directory"] = directory
         return await self._sandbox._git_operation("diff", args)
 
-    async def log(self, *, max_count: int | None = None, range: str | None = None, path: str | None = None) -> str:
+    async def log(
+        self,
+        *,
+        max_count: int | None = None,
+        range: str | None = None,
+        path: str | None = None,
+        directory: str | None = None,
+    ) -> str:
         args = {}
         if max_count:
             args["max_count"] = str(max_count)
@@ -50,6 +62,8 @@ class AsyncSandboxGit:
             args["range"] = range
         if path:
             args["path"] = path
+        if directory:
+            args["directory"] = directory
         return await self._sandbox._git_operation("log", args)
 
     async def fetch_pr(
