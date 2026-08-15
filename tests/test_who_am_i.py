@@ -10,15 +10,9 @@ from tenki_sandbox._pb import pb
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _proto_workspace(workspace_id="ws-1", name="acme", projects=()) -> pb.WhoAmIWorkspace:
-    ws = pb.WhoAmIWorkspace(workspace_id=workspace_id, name=name)
-    for proj in projects:
-        ws.projects.append(proj)
-    return ws
 
-
-def _proto_project(project_id="proj-1", name="backend") -> pb.WhoAmIProject:
-    return pb.WhoAmIProject(project_id=project_id, name=name)
+def _proto_workspace(workspace_id="ws-1", name="acme"):
+    return pb.WhoAmIWorkspace(workspace_id=workspace_id, name=name)
 
 
 class FakeRPC:
@@ -38,6 +32,7 @@ def _simple_resp(owner_type="USER", owner_id="user-1") -> pb.WhoAmIResponse:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 def test_who_am_i_calls_rpc():
     rpc = FakeRPC(_simple_resp())
@@ -74,28 +69,6 @@ def test_who_am_i_workspaces():
     assert ident.workspaces[0].id == "ws-1"
     assert ident.workspaces[0].name == "acme"
     assert ident.workspaces[1].id == "ws-2"
-
-
-def test_who_am_i_ignores_legacy_nested_projects():
-    ws = _proto_workspace(projects=[
-        _proto_project("proj-1", "backend"),
-        _proto_project("proj-2", "frontend"),
-    ])
-    resp = pb.WhoAmIResponse(owner_type="USER", owner_id="u-1")
-    resp.workspaces.append(ws)
-    ident = Client(rpc=FakeRPC(resp)).who_am_i()
-    assert ident.workspaces[0] == IdentityWorkspace(id="ws-1", name="acme")
-    assert not hasattr(ident.workspaces[0], "projects")
-
-
-def test_who_am_i_multiple_workspaces_ignores_legacy_projects():
-    ws1 = _proto_workspace("ws-1", "acme", [_proto_project("p-1", "api")])
-    ws2 = _proto_workspace("ws-2", "beta", [_proto_project("p-2", "web"), _proto_project("p-3", "mobile")])
-    resp = pb.WhoAmIResponse(owner_type="USER", owner_id="u-1")
-    resp.workspaces.extend([ws1, ws2])
-    ident = Client(rpc=FakeRPC(resp)).who_am_i()
-    assert [workspace.id for workspace in ident.workspaces] == ["ws-1", "ws-2"]
-    assert all(not hasattr(workspace, "projects") for workspace in ident.workspaces)
 
 
 def test_identity_is_frozen():

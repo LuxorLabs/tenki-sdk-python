@@ -50,11 +50,6 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListWorkspaceSandboxesRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListWorkspaceSandboxesResponse.FromString,
                 _registered_method=True)
-        self.ListProjectSandboxes = channel.unary_unary(
-                '/tenki.sandbox.v1.SandboxService/ListProjectSandboxes',
-                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSandboxesRequest.SerializeToString,
-                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSandboxesResponse.FromString,
-                _registered_method=True)
         self.UpdateSession = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/UpdateSession',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateSessionRequest.SerializeToString,
@@ -74,11 +69,6 @@ class SandboxServiceStub(object):
                 '/tenki.sandbox.v1.SandboxService/ListVolumes',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListVolumesRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListVolumesResponse.FromString,
-                _registered_method=True)
-        self.ListProjectVolumes = channel.unary_unary(
-                '/tenki.sandbox.v1.SandboxService/ListProjectVolumes',
-                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectVolumesRequest.SerializeToString,
-                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectVolumesResponse.FromString,
                 _registered_method=True)
         self.UpdateVolume = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/UpdateVolume',
@@ -260,11 +250,6 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListWorkspaceSnapshotsRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListWorkspaceSnapshotsResponse.FromString,
                 _registered_method=True)
-        self.ListProjectSnapshots = channel.unary_unary(
-                '/tenki.sandbox.v1.SandboxService/ListProjectSnapshots',
-                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSnapshotsRequest.SerializeToString,
-                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSnapshotsResponse.FromString,
-                _registered_method=True)
         self.GetWorkspaceSandboxUsage = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/GetWorkspaceSandboxUsage',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageRequest.SerializeToString,
@@ -304,11 +289,6 @@ class SandboxServiceStub(object):
                 '/tenki.sandbox.v1.SandboxService/ListTemplates',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplatesRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplatesResponse.FromString,
-                _registered_method=True)
-        self.ListProjectTemplates = channel.unary_unary(
-                '/tenki.sandbox.v1.SandboxService/ListProjectTemplates',
-                request_serializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListProjectTemplatesRequest.SerializeToString,
-                response_deserializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListProjectTemplatesResponse.FromString,
                 _registered_method=True)
         self.UpdateTemplate = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/UpdateTemplate',
@@ -445,12 +425,6 @@ class SandboxServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def ListProjectSandboxes(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def UpdateSession(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -470,12 +444,6 @@ class SandboxServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def ListVolumes(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def ListProjectVolumes(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -697,12 +665,6 @@ class SandboxServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def ListProjectSnapshots(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
     def GetWorkspaceSandboxUsage(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -749,12 +711,6 @@ class SandboxServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def ListTemplates(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
-    def ListProjectTemplates(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -902,11 +858,6 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListWorkspaceSandboxesRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListWorkspaceSandboxesResponse.SerializeToString,
             ),
-            'ListProjectSandboxes': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListProjectSandboxes,
-                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSandboxesRequest.FromString,
-                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSandboxesResponse.SerializeToString,
-            ),
             'UpdateSession': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateSession,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateSessionRequest.FromString,
@@ -926,11 +877,6 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.ListVolumes,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListVolumesRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListVolumesResponse.SerializeToString,
-            ),
-            'ListProjectVolumes': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListProjectVolumes,
-                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectVolumesRequest.FromString,
-                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectVolumesResponse.SerializeToString,
             ),
             'UpdateVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateVolume,
@@ -1112,11 +1058,6 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListWorkspaceSnapshotsRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListWorkspaceSnapshotsResponse.SerializeToString,
             ),
-            'ListProjectSnapshots': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListProjectSnapshots,
-                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSnapshotsRequest.FromString,
-                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSnapshotsResponse.SerializeToString,
-            ),
             'GetWorkspaceSandboxUsage': grpc.unary_unary_rpc_method_handler(
                     servicer.GetWorkspaceSandboxUsage,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetWorkspaceSandboxUsageRequest.FromString,
@@ -1156,11 +1097,6 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.ListTemplates,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplatesRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplatesResponse.SerializeToString,
-            ),
-            'ListProjectTemplates': grpc.unary_unary_rpc_method_handler(
-                    servicer.ListProjectTemplates,
-                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListProjectTemplatesRequest.FromString,
-                    response_serializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListProjectTemplatesResponse.SerializeToString,
             ),
             'UpdateTemplate': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateTemplate,
@@ -1430,33 +1366,6 @@ class SandboxService(object):
             _registered_method=True)
 
     @staticmethod
-    def ListProjectSandboxes(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/tenki.sandbox.v1.SandboxService/ListProjectSandboxes',
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSandboxesRequest.SerializeToString,
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSandboxesResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
     def UpdateSession(request,
             target,
             options=(),
@@ -1554,33 +1463,6 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/ListVolumes',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListVolumesRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListVolumesResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def ListProjectVolumes(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/tenki.sandbox.v1.SandboxService/ListProjectVolumes',
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectVolumesRequest.SerializeToString,
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectVolumesResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -2564,33 +2446,6 @@ class SandboxService(object):
             _registered_method=True)
 
     @staticmethod
-    def ListProjectSnapshots(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/tenki.sandbox.v1.SandboxService/ListProjectSnapshots',
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSnapshotsRequest.SerializeToString,
-            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListProjectSnapshotsResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
     def GetWorkspaceSandboxUsage(request,
             target,
             options=(),
@@ -2796,33 +2651,6 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/ListTemplates',
             tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplatesRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplatesResponse.FromString,
-            options,
-            channel_credentials,
-            insecure,
-            call_credentials,
-            compression,
-            wait_for_ready,
-            timeout,
-            metadata,
-            _registered_method=True)
-
-    @staticmethod
-    def ListProjectTemplates(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(
-            request,
-            target,
-            '/tenki.sandbox.v1.SandboxService/ListProjectTemplates',
-            tenki_dot_sandbox_dot_v1_dot_template__pb2.ListProjectTemplatesRequest.SerializeToString,
-            tenki_dot_sandbox_dot_v1_dot_template__pb2.ListProjectTemplatesResponse.FromString,
             options,
             channel_credentials,
             insecure,
