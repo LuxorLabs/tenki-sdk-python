@@ -116,12 +116,8 @@ class _ConnectError(Exception):
 
 
 def auth_metadata(auth_token: str) -> tuple[tuple[str, str], ...]:
-    client = (
-        ("x-tenki-client-family", "python_sdk"),
-        ("x-tenki-client-generation", "workspace_v1"),
-    )
     token = _validate_auth_token(auth_token)
-    return (("authorization", f"Bearer {token}"),) + client
+    return (("authorization", f"Bearer {token}"),)
 
 
 @dataclass

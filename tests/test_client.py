@@ -46,11 +46,7 @@ def test_invalid_auth_token_is_unauthorized_error():
 
 
 def test_auth_metadata_and_grpc_target_are_provider_friendly():
-    client = (
-        ("x-tenki-client-family", "python_sdk"),
-        ("x-tenki-client-generation", "workspace_v1"),
-    )
-    assert auth_metadata(" tk_test ") == (("authorization", "Bearer tk_test"),) + client
+    assert auth_metadata(" tk_test ") == (("authorization", "Bearer tk_test"),)
     assert grpc_target("https://api.tenki.cloud") == ("api.tenki.cloud:443", True)
     assert grpc_target("http://localhost:8090") == ("localhost:8090", False)
     assert grpc_target("localhost:8090") == ("localhost:8090", True)
