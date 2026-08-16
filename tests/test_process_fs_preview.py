@@ -34,11 +34,11 @@ def test_start_passes_cwd_through():
 
     proc = sandbox.start("python3", "-m", "http.server", cwd="www")
     assert proc.wait().ok
-    result = sandbox.exec("ls", cwd="/home/tenki/project")
+    result = sandbox.exec("ls", cwd="/home/tenki/app")
     assert result.ok
 
     assert rpc.run_starts[0].cwd == "www"
-    assert rpc.run_starts[1].cwd == "/home/tenki/project"
+    assert rpc.run_starts[1].cwd == "/home/tenki/app"
 
 
 def test_exec_missing_cwd_maps_file_not_found_and_passes_through():

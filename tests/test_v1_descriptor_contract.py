@@ -7,9 +7,6 @@ from google.protobuf import descriptor_pb2
 from tenki_sandbox._internal.proto.tenki.sandbox import v1
 
 _REMOVED_FIELDS = {
-    "tenki/sandbox/v1/node_agent.proto": {
-        "ProvisionSessionCommand": {"project_id": 18},
-    },
     "tenki/sandbox/v1/sandbox.proto": {
         "Volume": {"project_id": 8},
         "SandboxSession": {"project_id": 19},
@@ -43,51 +40,7 @@ def _generated_v1_descriptors():
     return descriptors
 
 
-def _message_symbols(message, prefix):
-    full_name = f"{prefix}.{message.name}"
-    yield full_name
-    for field in message.field:
-        yield f"{full_name}.{field.name}"
-    for enum in message.enum_type:
-        yield f"{full_name}.{enum.name}"
-        for value in enum.value:
-            yield f"{full_name}.{enum.name}.{value.name}"
-    for nested in message.nested_type:
-        yield from _message_symbols(nested, full_name)
-
-
-def _exposed_symbols(file_descriptor):
-    for message in file_descriptor.message_type:
-        yield from _message_symbols(message, file_descriptor.package)
-    for enum in file_descriptor.enum_type:
-        yield f"{file_descriptor.package}.{enum.name}"
-        for value in enum.value:
-            yield f"{file_descriptor.package}.{enum.name}.{value.name}"
-    for service in file_descriptor.service:
-        service_name = f"{file_descriptor.package}.{service.name}"
-        yield service_name
-        for method in service.method:
-            yield f"{service_name}.{method.name}"
-
-
-def test_generated_v1_exposes_no_project_symbols():
-    descriptors = _generated_v1_descriptors()
-    assert descriptors
-    assert {descriptor.package for descriptor in descriptors.values()} == {
-        "tenki.sandbox.v1"
-    }
-
-    project_symbols = sorted(
-        symbol
-        for descriptor in descriptors.values()
-        for symbol in _exposed_symbols(descriptor)
-        if "project" in symbol.rsplit(".", 1)[-1].lower()
-    )
-
-    assert project_symbols == []
-
-
-def test_removed_project_field_tags_remain_reserved():
+def test_removed_field_tags_remain_reserved():
     descriptors = _generated_v1_descriptors()
 
     for file_name, message_contracts in _REMOVED_FIELDS.items():

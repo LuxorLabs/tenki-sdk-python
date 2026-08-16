@@ -104,11 +104,11 @@ async def test_async_start_passes_cwd_through():
     sandbox = await _sandbox(rpc)
     proc = await sandbox.start("python3", cwd="www")
     assert (await proc.wait()).ok
-    result = await sandbox.exec("ls", cwd="/home/tenki/project")
+    result = await sandbox.exec("ls", cwd="/home/tenki/app")
     assert result.ok
 
     assert rpc.run_starts[0].cwd == "www"
-    assert rpc.run_starts[1].cwd == "/home/tenki/project"
+    assert rpc.run_starts[1].cwd == "/home/tenki/app"
 
 
 async def test_async_exec_missing_cwd_maps_file_not_found_and_passes_through():

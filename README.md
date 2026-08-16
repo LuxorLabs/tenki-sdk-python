@@ -126,7 +126,7 @@ service token through `auth_token`; the SDK sends it as an
 `exec` collects stdout/stderr and returns a result:
 
 ```python
-result = sb.exec("npm", "test", cwd="project", timeout=60, env={"CI": "1"})
+result = sb.exec("npm", "test", cwd="app", timeout=60, env={"CI": "1"})
 print(result.stdout_text)
 result.check()
 ```
