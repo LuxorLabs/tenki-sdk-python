@@ -61,4 +61,4 @@ jobs:
 
       - name: Publish to PyPI
         if: ${{ steps.version.outputs.published == 'false' && (github.event_name == 'push' || inputs.dry_run == false) }}
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+        uses: pypa/gh-action-pypi-publish@a892a5a61159132606e93a2fa6f4358831b04d26 # v1.14.2
