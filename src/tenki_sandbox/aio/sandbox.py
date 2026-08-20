@@ -281,9 +281,7 @@ class AsyncSandbox:
         )
         if input is None:
             await proc.close_stdin()
-        result = await proc.wait(
-            timeout=seconds(timeout) + 5 if timeout is not None else None
-        )
+        result = await proc.wait()
         if check:
             result.check()
         return result

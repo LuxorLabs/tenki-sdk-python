@@ -152,6 +152,13 @@ class AsyncProcess:
         await self._outbound.put(pb.RunRequest(signal=pb.RunSignal(signal=enum_value)))
 
     async def wait(self, timeout: float | None = None) -> CommandResult:
+        """Block until the command finishes.
+
+        ``timeout`` bounds how long this call waits, not the command itself: on
+        expiry the process is killed and ``TimeoutError`` is raised. The command's
+        own execution budget is ``AsyncSandbox.exec(timeout=...)``, which the
+        guest-agent enforces and reports as ``CommandResult.timed_out``.
+        """
         try:
             await asyncio.wait_for(self._done.wait(), timeout=timeout)
         except asyncio.TimeoutError:
@@ -209,6 +216,7 @@ class AsyncProcess:
                                 duration_ms=int(exit.duration_ms),
                                 reason=exit.reason or None,
                                 errno=exit.errno or None,
+                                timed_out=bool(exit.timed_out),
                             )
                             return
                     raise RuntimeError("sandbox run stream closed before exit")

@@ -178,6 +178,13 @@ class Process:
             self._outbound.put(pb.RunRequest(signal=pb.RunSignal(signal=enum_value)))
 
     def wait(self, timeout: float | None = None) -> CommandResult:
+        """Block until the command finishes.
+
+        ``timeout`` bounds how long this call blocks, not the command itself: on
+        expiry the process is killed and ``TimeoutError`` is raised. The command's
+        own execution budget is ``Sandbox.exec(timeout=...)``, which the
+        guest-agent enforces and reports as ``CommandResult.timed_out``.
+        """
         if not self._done.wait(timeout=timeout):
             self.kill()
             raise TimeoutError("timed out waiting for command")
@@ -232,6 +239,7 @@ class Process:
                                 duration_ms=int(exit.duration_ms),
                                 reason=exit.reason or None,
                                 errno=exit.errno or None,
+                                timed_out=bool(exit.timed_out),
                             )
                             return
                     raise RuntimeError("sandbox run stream closed before exit")

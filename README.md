@@ -204,6 +204,54 @@ Use `shell()` when you want shell parsing:
 sb.shell("python3 -m http.server 3000 >/tmp/server.log 2>&1 &")
 ```
 
+### Timeouts
+
+Commands are unbounded by default — omit `timeout` or pass `0`. A positive
+`timeout` is sent to the guest-agent, which enforces it: on expiry it signals the
+process (`SIGTERM`, escalating to `SIGKILL`) and reports the run as timed out.
+
+That is **not** an exception — it comes back as an ordinary `CommandResult` with
+`timed_out` set and `ok` false, carrying the output captured before the budget
+expired:
+
+```python
+result = sb.exec("npm", "ci", timeout=120)
+if result.timed_out:
+    # result.reason is "timeout", or "grace_timeout" when the guest could not
+    # reap the process. Partial output usually shows where it stalled.
+    print(result.reason, result.stdout_text)
+```
+
+Passing `check=True` raises `CommandFailedError` for a timed-out run, since
+`ok` is false.
+
+The guest caps the request at its own configured maximum command timeout, and
+older guest-agents accept `timeout` but ignore it, leaving the run unbounded.
+
+`Process.wait(timeout=...)` is a separate, local bound: it limits how long _your
+call_ blocks and raises the builtin `TimeoutError`, saying nothing about the
+command's own fate.
+
+### Background processes and long-running services
+
+Note the redirect in the `shell()` example above — it is required, not stylistic.
+A command returns when its **stdout and stderr reach EOF**, not when the shell
+exits. A backgrounded process inherits both streams and holds them open, so this
+waits for the server rather than the shell:
+
+```python
+sb.shell("python3 -m http.server 3000 &")  # hangs
+```
+
+Redirecting only stdout is not enough — stderr still holds the stream open — and
+`nohup` does not help, because it blocks `SIGHUP` rather than stream inheritance.
+This is standard POSIX behavior, the same as `subprocess.run(...,
+capture_output=True)`.
+
+To keep hold of a service instead, use `sb.start(...)` and read from the returned
+process; for services you always want running, start them from a template start
+command.
+
 Process `cwd` values follow the guest contract: relative paths are normalized
 under the sandbox guest workdir (`/home/tenki` by default), absolute paths are
 used unchanged, and missing or non-directory targets fail before the process

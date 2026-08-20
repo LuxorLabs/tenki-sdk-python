@@ -20,10 +20,12 @@ class CommandResult:
     duration_ms: int | None = None
     reason: str | None = None
     errno: int | None = None
+    #: Execution budget spent. May be set alongside ``exit_code == 0``.
+    timed_out: bool = False
 
     @property
     def ok(self) -> bool:
-        return self.exit_code == 0 and not self.signal
+        return self.exit_code == 0 and not self.signal and not self.timed_out
 
     @property
     def stdout_text(self) -> str:

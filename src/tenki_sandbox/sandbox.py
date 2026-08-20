@@ -284,9 +284,7 @@ class Sandbox:
         )
         if input is None:
             proc.close_stdin()
-        result = proc.wait(
-            timeout=seconds(timeout) + 5 if timeout is not None else None
-        )
+        result = proc.wait()
         if check:
             result.check()
         return result
