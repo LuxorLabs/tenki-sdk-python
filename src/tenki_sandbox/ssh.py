@@ -152,8 +152,10 @@ def _ssh_url_from_gateways(gateways, session_id: str) -> str:
 
 def _discover_ssh_gateway(rpc, session_id: str) -> str:
     """Call ListActiveSSHGateways -> WS URL of first healthy bridged gateway, or ""."""
+    if not session_id.strip():
+        return ""
     try:
-        resp = rpc.list_active_ssh_gateways(ssh_pb.ListActiveSSHGatewaysRequest())
+        resp = rpc.list_active_ssh_gateways(ssh_pb.ListActiveSSHGatewaysRequest(session_id=session_id))
     except Exception:
         return ""
     return _ssh_url_from_gateways(resp.gateways, session_id)

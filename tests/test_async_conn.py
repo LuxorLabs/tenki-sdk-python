@@ -7,7 +7,7 @@ import pytest
 from tenki_sandbox import SSHUnavailableError, UnauthorizedError
 from tenki_sandbox._pb import pb
 from tenki_sandbox.aio.dial import AsyncDialConn, open_dial_conn
-from tenki_sandbox.aio.ssh import AsyncSSHConn, open_ssh_conn
+from tenki_sandbox.aio.ssh import AsyncSSHConn, _discover_ssh_gateway, open_ssh_conn
 from tenki_sandbox.aio.tunnel import open_host_port_tunnel, open_resilient_host_port_tunnel
 
 
@@ -33,6 +33,22 @@ class _FakeWS:
 
     async def close(self):
         self.closed = True
+
+
+class _FakeSSHDiscoveryRPC:
+    def __init__(self):
+        self.calls = []
+
+    async def list_active_ssh_gateways(self, request):
+        self.calls.append(request)
+        return type("Response", (), {"gateways": []})()
+
+
+@pytest.mark.parametrize("session_id", ["", "   "])
+async def test_async_empty_session_skips_ssh_discovery(session_id):
+    rpc = _FakeSSHDiscoveryRPC()
+    assert await _discover_ssh_gateway(rpc, session_id) == ""
+    assert rpc.calls == []
 
 
 async def test_async_ssh_read_write_close(monkeypatch):

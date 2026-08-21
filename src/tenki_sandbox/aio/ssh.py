@@ -96,8 +96,10 @@ class AsyncSSHConn:
 
 async def _discover_ssh_gateway(rpc, session_id: str) -> str:
     """ListActiveSSHGateways -> WS URL of first healthy bridged gateway, or ""."""
+    if not session_id.strip():
+        return ""
     try:
-        resp = await rpc.list_active_ssh_gateways(ssh_pb.ListActiveSSHGatewaysRequest())
+        resp = await rpc.list_active_ssh_gateways(ssh_pb.ListActiveSSHGatewaysRequest(session_id=session_id))
     except Exception:
         return ""
     return _ssh_url_from_gateways(resp.gateways, session_id)

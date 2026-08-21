@@ -116,11 +116,18 @@ class FakeSSHRPC:
 
 
 class TestDiscoverSshGateway:
+    @pytest.mark.parametrize("session_id", ["", "   "])
+    def test_empty_session_skips_discovery(self, session_id):
+        rpc = FakeSSHRPC(resp=FakeListResp([]))
+        assert _discover_ssh_gateway(rpc, session_id) == ""
+        assert rpc.calls == []
+
     def test_healthy_gateway_with_bridge_returns_url(self):
         gw = FakeGateway(healthy=True, ws_bridge_endpoint="wss://bridge.example")
         rpc = FakeSSHRPC(resp=FakeListResp([gw]))
         url = _discover_ssh_gateway(rpc, "sid-1")
         assert url == "wss://bridge.example/v1/ssh/sid-1"
+        assert rpc.calls[0].session_id == "sid-1"
 
     def test_unhealthy_gateway_skipped(self):
         gw = FakeGateway(healthy=False, ws_bridge_endpoint="wss://bridge.example")
