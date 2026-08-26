@@ -277,6 +277,11 @@ under the sandbox guest workdir (`/home/tenki` by default), absolute paths are
 used unchanged, and missing or non-directory targets fail before the process
 starts.
 
+`cwd` sets the spawned process's directory. A login shell (`bash -lc`) sources
+the guest's startup files first, so a `cd` in `~/.bashrc` or `~/.profile` runs
+before your command and wins over `cwd`; use `bash -c` when the directory must
+hold.
+
 ## Sandbox lifetime
 
 Long-lived sandboxes are a parameter choice at `create()`, not a separate API:

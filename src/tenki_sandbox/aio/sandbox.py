@@ -332,6 +332,12 @@ class AsyncSandbox:
         return result
 
     async def shell(self, command: str, **kwargs) -> CommandResult:
+        """Run ``command`` through a login shell.
+
+        A login shell sources the guest's startup files, so a ``cd`` in
+        ``~/.bashrc`` or ``~/.profile`` runs before ``command`` and wins over
+        ``cwd``. Call ``exec("bash", "-c", command)`` when the directory must hold.
+        """
         return await self.exec("bash", "-lc", command, **kwargs)
 
     async def close(self) -> None:
