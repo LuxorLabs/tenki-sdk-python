@@ -19,6 +19,7 @@ from .fs import SandboxFS
 from .git import SandboxGit
 from .models import CommandResult, ExposedPort, SandboxInfo, VolumeMount
 from .process import Process
+from .warning import SandboxWarning, emit_warnings, sandbox_warnings_from_proto
 
 
 class _SessionRPC:
@@ -37,6 +38,7 @@ class Sandbox:
         client,
         info: SandboxInfo,
         *,
+        warnings: tuple[SandboxWarning, ...] = (),
         owns_client: bool = False,
         data_plane_endpoint: str = "",
         data_plane_credential=None,
@@ -44,6 +46,7 @@ class Sandbox:
     ) -> None:
         self._client = client
         self._info = info
+        self.warnings = warnings
         self._owns_client = owns_client
         self._detached = False
         self._data_plane_lock = threading.Lock()
@@ -169,6 +172,7 @@ class Sandbox:
                 "base_url",
                 "gateway_url",
                 "timeout",
+                "warning_handler",
             ]
             if key in kwargs
         }
@@ -364,6 +368,7 @@ class Sandbox:
         name: str | None = None,
         tags: list[str] | None = None,
         sticky: bool | None = None,
+        max_duration: float | int | object | None = None,
     ) -> None:
         req = pb.UpdateSessionRequest(session_id=self.id)
         if name is not None:
@@ -376,10 +381,20 @@ class Sandbox:
                 req.clear_tags = True
         if sticky is not None:
             req.sticky = sticky
+        if max_duration is not None:
+            max_duration_proto = duration(max_duration)
+            if max_duration_proto.seconds + max_duration_proto.nanos / 1_000_000_000 <= 0:
+                raise ValueError("max_duration must be greater than zero")
+            if sticky is None:
+                raise ValueError("sticky must be set when max_duration is provided")
+            req.max_duration.CopyFrom(max_duration_proto)
         try:
             resp = self._client._rpc.update_session(req)
             if resp.session:
                 self._info = sandbox_info(resp.session)
+            warnings = sandbox_warnings_from_proto(resp.warnings)
+            self.warnings = warnings
+            emit_warnings(warnings, self._client._warning_handler, stacklevel=4)
         except Exception as err:
             raise map_rpc_error(err) from err
 

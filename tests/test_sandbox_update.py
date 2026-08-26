@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import warnings
+
 import pytest
 
-from tenki_sandbox import Client
+from tenki_sandbox import Client, SandboxWarningCode, SandboxWarningNotification
 from tenki_sandbox._pb import pb
 
 
@@ -20,6 +22,7 @@ class FakeRPC:
     def __init__(self):
         self.update_request = None
         self.ssh_keys_request = None
+        self.update_warnings = []
 
     def create_session(self, req):
         return pb.CreateSessionResponse(session=_make_session())
@@ -29,7 +32,12 @@ class FakeRPC:
 
     def update_session(self, req):
         self.update_request = req
-        return pb.UpdateSessionResponse(session=_make_session(name=req.name or "my-box"))
+        response = pb.UpdateSessionResponse(
+            session=_make_session(name=req.name or "my-box")
+        )
+        for code, message in self.update_warnings:
+            response.warnings.add(code=code, message=message)
+        return response
 
     def update_ssh_authorized_keys(self, req):
         self.ssh_keys_request = req
@@ -89,11 +97,86 @@ def test_update_sticky():
     assert rpc.update_request.sticky is True
 
 
+def test_update_maps_max_duration_with_sticky_false():
+    rpc = FakeRPC()
+    sandbox = Client(rpc=rpc).get("sess-1")
+
+    sandbox.update(sticky=False, max_duration=90.5)
+
+    assert rpc.update_request.HasField("sticky")
+    assert rpc.update_request.sticky is False
+    assert rpc.update_request.max_duration.seconds == 90
+    assert rpc.update_request.max_duration.nanos == 500_000_000
+
+
+@pytest.mark.parametrize("max_duration", [0, -1])
+def test_update_rejects_nonpositive_max_duration_before_rpc(max_duration):
+    rpc = FakeRPC()
+    sandbox = Client(rpc=rpc).get("sess-1")
+
+    with pytest.raises(ValueError, match="max_duration must be greater than zero"):
+        sandbox.update(sticky=False, max_duration=max_duration)
+
+    assert rpc.update_request is None
+
+
+def test_update_requires_sticky_with_max_duration_before_rpc():
+    rpc = FakeRPC()
+    sandbox = Client(rpc=rpc).get("sess-1")
+
+    with pytest.raises(
+        ValueError, match="sticky must be set when max_duration is provided"
+    ):
+        sandbox.update(max_duration=90)
+
+    assert rpc.update_request is None
+
+
 def test_update_mutates_info():
     rpc = FakeRPC()
     sandbox = Client(rpc=rpc).get("sess-1")
     sandbox.update(name="updated")
     assert sandbox.name == "updated"
+
+
+def test_update_retains_warnings_and_is_safe_with_warnings_as_errors():
+    rpc = FakeRPC()
+    rpc.update_warnings = [
+        (pb.SANDBOX_WARNING_CODE_MAX_DURATION_CAPPED, "max duration capped")
+    ]
+    sandbox = Client(rpc=rpc).get("sess-1")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", SandboxWarningNotification)
+        sandbox.update(sticky=False)
+
+    assert sandbox.warnings[-1].code == SandboxWarningCode.MAX_DURATION_CAPPED
+    assert sandbox.warnings[-1].message == "max duration capped"
+
+
+def test_update_ignores_custom_warning_handler_errors(caplog):
+    rpc = FakeRPC()
+    rpc.update_warnings = [
+        (pb.SANDBOX_WARNING_CODE_MAX_DURATION_CAPPED, "max duration capped")
+    ]
+
+    def warning_handler(_warning):
+        raise RuntimeError("handler failed")
+
+    sandbox = Client(rpc=rpc, warning_handler=warning_handler).get("sess-1")
+    with caplog.at_level("ERROR", logger="tenki_sandbox"):
+        sandbox.update(sticky=False)
+
+    assert sandbox.warnings[-1].code == SandboxWarningCode.MAX_DURATION_CAPPED
+    assert "sandbox warning handler failed" in caplog.messages
+
+
+def test_sandbox_warning_codes_include_update_codes():
+    assert (
+        SandboxWarningCode.STICKY_OVERRIDES_IDLE_TIMEOUT
+        == "STICKY_OVERRIDES_IDLE_TIMEOUT"
+    )
+    assert SandboxWarningCode.MAX_DURATION_CAPPED == "MAX_DURATION_CAPPED"
 
 
 def test_update_tags_alias():

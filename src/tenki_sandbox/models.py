@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Literal, Mapping
 
 from .errors import CommandFailedError
@@ -73,6 +73,13 @@ class SandboxInfo:
     source_template_id: str | None = None
     runtime_state: str = "UNSPECIFIED"
     runtime_error: str | None = None
+    idle_timeout_minutes: int | None = None
+    last_activity_at: datetime | None = None
+    paused_at: datetime | None = None
+    pause_snapshot_id: str | None = None
+    pause_retention: timedelta | None = None
+    last_resume_error: str = ""
+    terminal_error: str = ""
 
 
 @dataclass(frozen=True)

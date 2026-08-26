@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import warnings
 
 import pytest
 
@@ -11,6 +12,8 @@ from tenki_sandbox import (
     MissingAuthTokenError,
     PauseFailedError,
     PauseWaitCancelledError,
+    SandboxWarningCode,
+    SandboxWarningNotification,
     WaitReadyFailedError,
 )
 from tenki_sandbox._pb import pb
@@ -52,6 +55,105 @@ async def test_async_create_without_wait_maps_options():
     assert req.registry_ref == "pub/polyglot:prod"
     assert req.wait_ready is False
     assert list(req.tags) == ["nightly", "gpu"]
+
+
+async def test_async_create_retains_and_emits_warnings_once():
+    rpc = _rpc_with_create_warning(FakeControlRPC())
+    emitted = []
+
+    sandbox = await AsyncClient(rpc=rpc, warning_handler=emitted.append).create(wait=False)
+
+    assert sandbox.warnings[0].code == SandboxWarningCode.STICKY_OVERRIDES_MAX_DURATION
+    assert emitted == list(sandbox.warnings)
+
+
+async def test_async_create_default_warning_handler_is_safe_with_warnings_as_errors():
+    rpc = _rpc_with_create_warning(FakeControlRPC())
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", SandboxWarningNotification)
+        sandbox = await AsyncClient(rpc=rpc).create(wait=False)
+
+    assert sandbox.warnings[0].message == "sticky overrides max_duration"
+
+
+async def test_async_create_default_warning_handler_uses_the_caller_module_for_filters():
+    rpc = _rpc_with_create_warning(FakeControlRPC())
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.filterwarnings(
+            "ignore", category=SandboxWarningNotification, module=__name__
+        )
+        await AsyncClient(rpc=rpc).create(wait=False)
+
+    assert not captured
+
+
+async def test_async_sandbox_create_default_warning_handler_uses_the_caller_module_and_owns_client(
+    monkeypatch,
+):
+    rpc = _rpc_with_create_warning(FakeControlRPC())
+    client = AsyncClient(rpc=rpc)
+    monkeypatch.setattr("tenki_sandbox.aio.client.AsyncClient", lambda **_kwargs: client)
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.filterwarnings(
+            "ignore", category=SandboxWarningNotification, module=__name__
+        )
+        async with await AsyncSandbox.create(wait=False) as sandbox:
+            assert sandbox._client is client
+            assert sandbox._owns_client
+            assert sandbox.warnings[0].message == "sticky overrides max_duration"
+
+    assert not captured
+    assert rpc.closed
+
+
+async def test_async_sandbox_create_ignores_custom_warning_handler_errors(
+    monkeypatch, caplog
+):
+    rpc = _rpc_with_create_warning(FakeControlRPC())
+
+    def warning_handler(_warning):
+        raise RuntimeError("handler failed")
+
+    client = AsyncClient(rpc=rpc, warning_handler=warning_handler)
+    monkeypatch.setattr("tenki_sandbox.aio.client.AsyncClient", lambda **_kwargs: client)
+
+    with caplog.at_level("ERROR", logger="tenki_sandbox"):
+        async with await AsyncSandbox.create(wait=False) as sandbox:
+            assert sandbox._client is client
+            assert sandbox._owns_client
+            assert sandbox.warnings[0].message == "sticky overrides max_duration"
+
+    assert "sandbox warning handler failed" in caplog.messages
+    assert rpc.closed
+
+
+async def test_async_create_default_warning_handler_and_suppression():
+    rpc = _rpc_with_create_warning(FakeControlRPC())
+    with pytest.warns(SandboxWarningNotification, match="sticky overrides max_duration"):
+        await AsyncClient(rpc=rpc).create(wait=False)
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        await AsyncClient(rpc=rpc, warning_handler=None).create(wait=False)
+    assert not captured
+
+
+def _rpc_with_create_warning(rpc):
+    original_create = rpc.create_session
+
+    async def create_session(req):
+        response = await original_create(req)
+        response.warnings.add(
+            code=pb.SANDBOX_WARNING_CODE_STICKY_OVERRIDES_MAX_DURATION,
+            message="sticky overrides max_duration",
+        )
+        return response
+
+    rpc.create_session = create_session
+    return rpc
 
 
 async def test_async_create_waits_via_stream():
@@ -250,6 +352,93 @@ async def test_async_sandbox_update_normalizes_tags():
     req = rpc.requests["update_session"][-1]
     assert list(req.tags) == []
     assert req.clear_tags is True
+
+
+async def test_async_sandbox_update_maps_max_duration_with_sticky_false():
+    rpc = FakeControlRPC()
+    sandbox = await AsyncClient(rpc=rpc).create(wait=False)
+
+    await sandbox.update(sticky=False, max_duration=90.5)
+
+    req = rpc.requests["update_session"][-1]
+    assert req.HasField("sticky")
+    assert req.sticky is False
+    assert req.max_duration.seconds == 90
+    assert req.max_duration.nanos == 500_000_000
+
+
+@pytest.mark.parametrize("max_duration", [0, -1])
+async def test_async_sandbox_update_rejects_nonpositive_max_duration_before_rpc(
+    max_duration,
+):
+    rpc = FakeControlRPC()
+    sandbox = await AsyncClient(rpc=rpc).create(wait=False)
+
+    with pytest.raises(ValueError, match="max_duration must be greater than zero"):
+        await sandbox.update(sticky=False, max_duration=max_duration)
+
+    assert "update_session" not in rpc.requests
+
+
+async def test_async_sandbox_update_requires_sticky_with_max_duration_before_rpc():
+    rpc = FakeControlRPC()
+    sandbox = await AsyncClient(rpc=rpc).create(wait=False)
+
+    with pytest.raises(
+        ValueError, match="sticky must be set when max_duration is provided"
+    ):
+        await sandbox.update(max_duration=90)
+
+    assert "update_session" not in rpc.requests
+
+
+async def test_async_sandbox_update_retains_warnings_and_is_safe_with_warnings_as_errors():
+    rpc = FakeControlRPC()
+    original_update = rpc.update_session
+
+    async def update_session(req):
+        response = await original_update(req)
+        response.warnings.add(
+            code=pb.SANDBOX_WARNING_CODE_STICKY_OVERRIDES_IDLE_TIMEOUT,
+            message="sticky overrides idle timeout",
+        )
+        return response
+
+    rpc.update_session = update_session
+    sandbox = await AsyncClient(rpc=rpc).create(wait=False)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", SandboxWarningNotification)
+        await sandbox.update(sticky=True)
+
+    assert sandbox.warnings[-1].code == SandboxWarningCode.STICKY_OVERRIDES_IDLE_TIMEOUT
+    assert sandbox.warnings[-1].message == "sticky overrides idle timeout"
+
+
+async def test_async_sandbox_update_ignores_custom_warning_handler_errors(caplog):
+    rpc = FakeControlRPC()
+    original_update = rpc.update_session
+
+    async def update_session(req):
+        response = await original_update(req)
+        response.warnings.add(
+            code=pb.SANDBOX_WARNING_CODE_MAX_DURATION_CAPPED,
+            message="max duration capped",
+        )
+        return response
+
+    def warning_handler(_warning):
+        raise RuntimeError("handler failed")
+
+    rpc.update_session = update_session
+    sandbox = await AsyncClient(rpc=rpc, warning_handler=warning_handler).create(
+        wait=False
+    )
+    with caplog.at_level("ERROR", logger="tenki_sandbox"):
+        await sandbox.update(sticky=False)
+
+    assert sandbox.warnings[-1].code == SandboxWarningCode.MAX_DURATION_CAPPED
+    assert "sandbox warning handler failed" in caplog.messages
 
 
 async def test_async_context_manager_terminates():

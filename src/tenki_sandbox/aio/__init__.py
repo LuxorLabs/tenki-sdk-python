@@ -15,10 +15,15 @@ from .resources import AsyncSnapshots, AsyncTemplates, AsyncVolumes
 from .sandbox import AsyncSandbox
 from .ssh import AsyncSSHConn
 from .tunnel import AsyncHostPortTunnel, AsyncResilientHostPortTunnel
+from ..warning import SandboxWarning, SandboxWarningCode, SandboxWarningNotification, WarningHandler
 
 __all__ = [
     "AsyncClient",
     "AsyncSandbox",
+    "SandboxWarning",
+    "SandboxWarningCode",
+    "SandboxWarningNotification",
+    "WarningHandler",
     "AsyncProcess",
     "AsyncProcessStream",
     "AsyncSandboxFS",

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import threading
+import warnings
+from datetime import datetime, timedelta, timezone
 
 import pytest
+from google.protobuf.duration_pb2 import Duration
+from google.protobuf.timestamp_pb2 import Timestamp
 
 import tenki_sandbox
 from tenki_sandbox import (
@@ -13,6 +17,9 @@ from tenki_sandbox import (
     PauseFailedError,
     PauseWaitCancelledError,
     Sandbox,
+    SandboxInfo,
+    SandboxWarningCode,
+    SandboxWarningNotification,
     TemplateRuntimeFailedError,
     UnauthorizedError,
     WaitReadyFailedError,
@@ -143,6 +150,100 @@ def test_create_maps_pythonic_options_without_wait():
     assert req.volumes[0].readonly is True
 
 
+def test_create_retains_and_emits_warnings_once():
+    rpc = _rpc_with_create_warning(FakeRPC())
+    emitted = []
+
+    sandbox = Client(rpc=rpc, warning_handler=emitted.append).create(wait=False)
+
+    assert sandbox.warnings[0].code == SandboxWarningCode.STICKY_OVERRIDES_MAX_DURATION
+    assert sandbox.warnings[0].message == "sticky overrides max_duration"
+    assert emitted == list(sandbox.warnings)
+
+
+def test_create_default_warning_handler_is_safe_with_warnings_as_errors():
+    rpc = _rpc_with_create_warning(FakeRPC())
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", SandboxWarningNotification)
+        sandbox = Client(rpc=rpc).create(wait=False)
+
+    assert sandbox.warnings[0].message == "sticky overrides max_duration"
+
+
+def test_create_default_warning_handler_uses_the_caller_module_for_filters():
+    rpc = _rpc_with_create_warning(FakeRPC())
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.filterwarnings(
+            "ignore", category=SandboxWarningNotification, module=__name__
+        )
+        Client(rpc=rpc).create(wait=False)
+
+    assert not captured
+
+
+def test_sandbox_create_default_warning_handler_uses_the_caller_module_and_owns_client(
+    monkeypatch,
+):
+    rpc = _rpc_with_create_warning(FakeRPC())
+    rpc.closed = False
+
+    def close():
+        rpc.closed = True
+
+    rpc.close = close
+    client = Client(rpc=rpc)
+    monkeypatch.setattr("tenki_sandbox.client.Client", lambda **_kwargs: client)
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.filterwarnings(
+            "ignore", category=SandboxWarningNotification, module=__name__
+        )
+        with Sandbox.create(wait=False) as sandbox:
+            assert sandbox._client is client
+            assert sandbox._owns_client
+            assert sandbox.warnings[0].message == "sticky overrides max_duration"
+
+    assert not captured
+    assert rpc.closed
+
+
+def test_sandbox_create_ignores_custom_warning_handler_errors(monkeypatch, caplog):
+    rpc = _rpc_with_create_warning(FakeRPC())
+    rpc.closed = False
+
+    def close():
+        rpc.closed = True
+
+    def warning_handler(_warning):
+        raise RuntimeError("handler failed")
+
+    rpc.close = close
+    client = Client(rpc=rpc, warning_handler=warning_handler)
+    monkeypatch.setattr("tenki_sandbox.client.Client", lambda **_kwargs: client)
+
+    with caplog.at_level("ERROR", logger="tenki_sandbox"):
+        with Sandbox.create(wait=False) as sandbox:
+            assert sandbox._client is client
+            assert sandbox._owns_client
+            assert sandbox.warnings[0].message == "sticky overrides max_duration"
+
+    assert "sandbox warning handler failed" in caplog.messages
+    assert rpc.closed
+
+
+def test_create_default_warning_handler_and_suppression():
+    rpc = _rpc_with_create_warning(FakeRPC())
+    with pytest.warns(SandboxWarningNotification, match="sticky overrides max_duration"):
+        Client(rpc=rpc).create(wait=False)
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always")
+        Client(rpc=rpc, warning_handler=None).create(wait=False)
+    assert not captured
+
+
 def test_create_infers_workspace_from_api_key():
     rpc = FakeRPC()
     client = Client(rpc=rpc)
@@ -207,6 +308,53 @@ def test_sandbox_info_reports_server_network_policy():
     )
     assert info.inbound_enabled is True
     assert info.outbound_enabled is False
+
+
+def test_sandbox_info_reports_lifecycle_state():
+    timeout_at = Timestamp()
+    timeout_at.FromDatetime(datetime(2026, 8, 24, 12, tzinfo=timezone.utc))
+    last_activity_at = Timestamp()
+    last_activity_at.FromDatetime(datetime(2026, 8, 24, 11, 30, tzinfo=timezone.utc))
+    paused_at = Timestamp()
+    paused_at.FromDatetime(datetime(2026, 8, 24, 11, 45, tzinfo=timezone.utc))
+    pause_expires_at = Timestamp()
+    pause_expires_at.FromDatetime(datetime(2026, 8, 8, 11, 45, tzinfo=timezone.utc))
+
+    info = sandbox_info(
+        pb.SandboxSession(
+            id="s",
+            timeout_at=timeout_at,
+            idle_timeout_minutes=30,
+            last_activity_at=last_activity_at,
+            paused_at=paused_at,
+            pause_snapshot_id="snap-1",
+            pause_retention=Duration(seconds=3600),
+            pause_expires_at=pause_expires_at,
+            last_resume_error="capacity unavailable",
+            terminal_error="session cleanup failed",
+        )
+    )
+
+    assert info.timeout_at == datetime(2026, 8, 24, 12, tzinfo=timezone.utc)
+    assert info.idle_timeout_minutes == 30
+    assert info.last_activity_at == datetime(2026, 8, 24, 11, 30, tzinfo=timezone.utc)
+    assert info.paused_at == datetime(2026, 8, 24, 11, 45, tzinfo=timezone.utc)
+    assert info.pause_snapshot_id == "snap-1"
+    assert info.pause_retention == timedelta(hours=1)
+    assert info.pause_expires_at == datetime(2026, 8, 8, 11, 45, tzinfo=timezone.utc)
+    assert info.last_resume_error == "capacity unavailable"
+    assert info.terminal_error == "session cleanup failed"
+
+
+def test_sandbox_info_preserves_existing_positional_field_order():
+    pause_expires_at = datetime(2026, 8, 24, 12, tzinfo=timezone.utc)
+
+    info = SandboxInfo(
+        "s", "name", "PAUSED", "workspace", True, False, 2, 4096, 20, None, pause_expires_at
+    )
+
+    assert info.pause_expires_at == pause_expires_at
+    assert info.idle_timeout_minutes is None
 
 
 def test_create_surfaces_network_policy_on_info():
@@ -672,6 +820,21 @@ class FakeRPC:
     def detach_volume(self, req):
         self.requests["detach_volume"].append(req)
         return pb.DetachVolumeResponse()
+
+
+def _rpc_with_create_warning(rpc):
+    original_create = rpc.create_session
+
+    def create_session(req):
+        response = original_create(req)
+        response.warnings.add(
+            code=pb.SANDBOX_WARNING_CODE_STICKY_OVERRIDES_MAX_DURATION,
+            message="sticky overrides max_duration",
+        )
+        return response
+
+    rpc.create_session = create_session
+    return rpc
 
 
 def _session(state=pb.SESSION_STATE_RUNNING, sid="session-1"):

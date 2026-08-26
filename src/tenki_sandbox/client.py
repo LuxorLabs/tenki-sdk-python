@@ -21,6 +21,12 @@ from .preview_url import PreviewUrls
 from .registry import Registry
 from .resources import Snapshots, Templates, Volumes
 from .sandbox import Sandbox
+from .warning import (
+    WarningHandler,
+    default_warning_handler,
+    emit_warnings,
+    sandbox_warnings_from_proto,
+)
 
 
 class Client:
@@ -31,6 +37,7 @@ class Client:
         base_url: str | None = None,
         gateway_url: str | None = None,
         timeout: float | None = None,
+        warning_handler: WarningHandler | None = default_warning_handler,
         rpc=None,
     ) -> None:
         self.base_url = resolve_base_url(base_url)
@@ -44,6 +51,7 @@ class Client:
                 timeout=timeout,
             )
         )
+        self._warning_handler = warning_handler
         self.preview_urls = PreviewUrls(self._rpc)
         self.volumes = Volumes(self._rpc)
         self.snapshots = Snapshots(self._rpc)
@@ -129,13 +137,18 @@ class Client:
         except Exception as err:
             raise map_rpc_error(err) from err
 
+        warnings = sandbox_warnings_from_proto(resp.warnings)
         sandbox = Sandbox(
             self,
             sandbox_info(resp.session),
+            warnings=warnings,
             owns_client=_owns_client,
             data_plane_endpoint=resp.data_plane_endpoint,
             data_plane_credential=resp.credential if resp.HasField("credential") else None,
             data_plane_route_status=resp.route_status,
+        )
+        emit_warnings(
+            warnings, self._warning_handler, stacklevel=5 if _owns_client else 4
         )
         if wait and sandbox.state != "RUNNING":
             try:

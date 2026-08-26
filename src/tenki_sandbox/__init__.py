@@ -80,10 +80,15 @@ from .models import (
 from .sandbox import Sandbox
 from .ssh import SSHConn
 from .template_spec import TemplateSpec
+from .warning import SandboxWarning, SandboxWarningCode, SandboxWarningNotification, WarningHandler
 
 __all__ = [
     "Client",
     "Sandbox",
+    "SandboxWarning",
+    "SandboxWarningCode",
+    "SandboxWarningNotification",
+    "WarningHandler",
     "AsyncClient",
     "AsyncSandbox",
     "SSHConn",

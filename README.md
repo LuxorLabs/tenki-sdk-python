@@ -221,7 +221,7 @@ it. There is no reattach.
 Use `shell()` when you want shell parsing:
 
 ```python
-sb.shell("python3 -m http.server 3000 >/tmp/server.log 2>&1 &")
+sb.shell("python3 -m http.server 3000 >/home/tenki/server.log 2>&1 &")
 ```
 
 ### Timeouts
@@ -284,8 +284,6 @@ Long-lived sandboxes are a parameter choice at `create()`, not a separate API:
 ```python
 sb = client.create(
     sticky=True,              # long-lived session: not reaped on idle
-    idle_timeout_minutes=120, # or: generous idle window before auto-pause
-    max_duration=8 * 3600,    # total lifetime cap (seconds)
     pause_retention=24 * 3600,# how long a paused session is kept resumable
 )
 ```
@@ -294,9 +292,26 @@ sb = client.create(
   (`sb.info.timeout_at`) while running.
 - `idle_timeout_minutes` auto-pauses an idle sandbox; `sb.resume()` brings it
   back with the filesystem intact.
-- `sticky=True` opts the session out of idle reaping for keep-warm use cases
-  (workspaces cap concurrent sticky sessions).
+- `sticky=True` opts the session out of idle reaping for keep-warm use cases.
+  It discards `max_duration` and disables automatic idle pause. Manual pause and
+  resume do not clear sticky.
 - `client.list(sticky=True)` filters for long-lived sessions in the API key's Workspace.
+
+When the service discards a create option, `sb.warnings` retains the structured
+warning. By default, `Client` and `AsyncClient` emit a `SandboxWarningNotification`.
+Pass `warning_handler` to route warnings through your logger, or pass `None` to
+suppress emission while still reading `sb.warnings`:
+
+```python
+import logging
+
+from tenki import Client, SandboxWarningCode
+
+logger = logging.getLogger(__name__)
+client = Client(warning_handler=lambda warning: logger.warning(warning.message))
+sb = client.create(sticky=True, max_duration=8 * 3600)
+assert sb.warnings[0].code == SandboxWarningCode.STICKY_OVERRIDES_MAX_DURATION
+```
 
 ## SSH
 

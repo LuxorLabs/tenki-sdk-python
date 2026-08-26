@@ -20,6 +20,12 @@ from ..client import (
 from ..constants import ENV_GATEWAY_URL
 from ..errors import WaitReadyFailedError, map_rpc_error
 from ..models import Identity, Image, Template, WorkspaceUsageLimit
+from ..warning import (
+    WarningHandler,
+    default_warning_handler,
+    emit_warnings,
+    sandbox_warnings_from_proto,
+)
 from ._transport import AsyncGrpcSandboxRPC
 from .preview_url import AsyncPreviewUrls
 from .registry import AsyncRegistry
@@ -35,6 +41,7 @@ class AsyncClient:
         base_url: str | None = None,
         gateway_url: str | None = None,
         timeout: float | None = None,
+        warning_handler: WarningHandler | None = default_warning_handler,
         rpc=None,
     ) -> None:
         self.base_url = resolve_base_url(base_url)
@@ -48,6 +55,7 @@ class AsyncClient:
                 timeout=timeout,
             )
         )
+        self._warning_handler = warning_handler
         self.preview_urls = AsyncPreviewUrls(self._rpc)
         self.volumes = AsyncVolumes(self._rpc)
         self.snapshots = AsyncSnapshots(self._rpc)
@@ -136,13 +144,18 @@ class AsyncClient:
         except Exception as err:
             raise map_rpc_error(err) from err
 
+        warnings = sandbox_warnings_from_proto(resp.warnings)
         sandbox = AsyncSandbox(
             self,
             sandbox_info(resp.session),
+            warnings=warnings,
             owns_client=_owns_client,
             data_plane_endpoint=resp.data_plane_endpoint,
             data_plane_credential=resp.credential if resp.HasField("credential") else None,
             data_plane_route_status=resp.route_status,
+        )
+        emit_warnings(
+            warnings, self._warning_handler, stacklevel=5 if _owns_client else 4
         )
         if wait and sandbox.state != "RUNNING":
             try:

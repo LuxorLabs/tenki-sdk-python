@@ -104,9 +104,30 @@ def sandbox_info(proto) -> SandboxInfo:
         timeout_at=datetime_from_proto(proto.timeout_at)
         if proto.HasField("timeout_at")
         else None,
+        idle_timeout_minutes=(
+            proto.idle_timeout_minutes
+            if proto.HasField("idle_timeout_minutes")
+            else None
+        ),
+        last_activity_at=datetime_from_proto(proto.last_activity_at)
+        if proto.HasField("last_activity_at")
+        else None,
+        paused_at=datetime_from_proto(proto.paused_at)
+        if proto.HasField("paused_at")
+        else None,
+        pause_snapshot_id=(
+            proto.pause_snapshot_id if proto.HasField("pause_snapshot_id") else None
+        ),
+        pause_retention=(
+            proto.pause_retention.ToTimedelta()
+            if proto.HasField("pause_retention")
+            else None
+        ),
         pause_expires_at=datetime_from_proto(proto.pause_expires_at)
         if proto.HasField("pause_expires_at")
         else None,
+        last_resume_error=proto.last_resume_error,
+        terminal_error=proto.terminal_error,
         metadata=dict(proto.metadata),
         tags=tuple(proto.tags),
         volume_mounts=tuple(
