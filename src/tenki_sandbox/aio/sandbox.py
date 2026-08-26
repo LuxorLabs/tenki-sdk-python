@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -9,7 +10,12 @@ from .._convert import exposed_port, sandbox_info
 from .._pb import pb
 from .._time import duration, seconds
 from ..client import _normalize_tags
-from ..errors import map_rpc_error
+from ..errors import (
+    PauseFailedError,
+    PauseWaitCancelledError,
+    SessionNotFoundError,
+    map_rpc_error,
+)
 from ..models import CommandResult, ExposedPort, SandboxInfo, VolumeMount
 from ..sandbox import _is_unimplemented
 from .data_plane import AsyncDataPlaneCredentialManager, AsyncGrpcDataPlaneRPC
@@ -243,6 +249,41 @@ class AsyncSandbox:
             await asyncio.sleep(0.5)
         raise TimeoutError(f"timeout waiting for sandbox {self.id}")
 
+    async def wait_paused(
+        self,
+        timeout: float = 180,
+        *,
+        cancel_event: asyncio.Event | threading.Event | None = None,
+    ) -> None:
+        """Wait locally for a durable pause without cancelling the remote pause."""
+        deadline = time.monotonic() + timeout if timeout > 0 else None
+        started = time.monotonic()
+        saw_pausing = False
+        while deadline is None or time.monotonic() < deadline:
+            if cancel_event is not None and cancel_event.is_set():
+                raise PauseWaitCancelledError(
+                    f"wait for sandbox {self.id} to pause cancelled locally"
+                )
+            try:
+                await self.refresh()
+            except SessionNotFoundError:
+                pass
+            else:
+                if self.state == "PAUSED":
+                    return
+                if self.state in {"TERMINATING", "TERMINATED"}:
+                    raise RuntimeError(f"sandbox entered terminal state: {self.state}")
+                if self.state == "PAUSING":
+                    saw_pausing = True
+                elif self.state == "RUNNING" and (
+                    saw_pausing or time.monotonic() - started > 3
+                ):
+                    raise PauseFailedError(
+                        f"pause failed: sandbox {self.id} reverted to {self.state}"
+                    )
+            await asyncio.sleep(0.5)
+        raise TimeoutError(f"timeout waiting for sandbox {self.id} to pause")
+
     async def start(
         self,
         *argv: str,
@@ -345,10 +386,16 @@ class AsyncSandbox:
             raise map_rpc_error(err) from err
 
     async def pause(self) -> None:
+        await self._pause(async_=False)
+
+    async def pause_async(self) -> None:
+        await self._pause(async_=True)
+
+    async def _pause(self, *, async_: bool) -> None:
+        req = pb.PauseSessionRequest(session_id=self.id)
+        setattr(req, "async", async_)
         try:
-            resp = await self._client._rpc.pause_session(
-                pb.PauseSessionRequest(session_id=self.id)
-            )
+            resp = await self._client._rpc.pause_session(req)
             self._info = sandbox_info(resp.session)
         except Exception as err:
             raise map_rpc_error(err) from err

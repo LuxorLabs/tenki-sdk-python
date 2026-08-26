@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 import pytest
 
 import tenki_sandbox
@@ -8,6 +10,8 @@ from tenki_sandbox import (
     InvalidAuthTokenError,
     InvalidResourceConfigError,
     MissingAuthTokenError,
+    PauseFailedError,
+    PauseWaitCancelledError,
     Sandbox,
     TemplateRuntimeFailedError,
     UnauthorizedError,
@@ -301,11 +305,16 @@ def test_pause_and_resume_reset_data_plane():
     paused_credential, paused_rpc = _prime_data_plane(sandbox)
     sandbox.pause()
     assert sandbox.state == "PAUSED"
+    assert getattr(rpc.requests["pause_session"][-1], "async") is False
     assert paused_credential.stopped is True
     assert paused_rpc.closed is True
     assert sandbox._data_plane_credentials is None
     assert sandbox._data_plane_rpc is None
     assert sandbox._data_plane_verified is False
+
+    sandbox.pause_async()
+    assert sandbox.state == "PAUSED"
+    assert getattr(rpc.requests["pause_session"][-1], "async") is True
 
     resumed_credential, resumed_rpc = _prime_data_plane(sandbox)
     sandbox.resume()
@@ -389,6 +398,72 @@ def test_wait_ready_falls_back_to_poll_when_stream_unimplemented():
     assert len(rpc.requests["get_session"]) == 1
 
 
+def test_wait_paused_reaches_paused():
+    rpc = FakeRPC()
+    rpc.get_states = [pb.SESSION_STATE_PAUSING, pb.SESSION_STATE_PAUSED]
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    sandbox.wait_paused(timeout=5)
+
+    assert sandbox.state == "PAUSED"
+
+
+def test_wait_paused_retries_not_found(monkeypatch):
+    rpc = FakeRPC()
+    rpc.get_states = [pb.SESSION_STATE_PAUSED]
+    get_session = rpc.get_session
+    calls = 0
+
+    def get_session_after_replica_lag(req):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise FakeRPCError("NOT_FOUND")
+        return get_session(req)
+
+    rpc.get_session = get_session_after_replica_lag
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    monkeypatch.setattr("tenki_sandbox.sandbox.time.sleep", lambda _duration: None)
+
+    sandbox.wait_paused(timeout=5)
+
+    assert sandbox.state == "PAUSED"
+    assert calls == 2
+
+
+@pytest.mark.parametrize("timeout", [0, -1])
+def test_wait_paused_nonpositive_timeout_waits_until_paused(monkeypatch, timeout):
+    rpc = FakeRPC()
+    rpc.get_states = [pb.SESSION_STATE_PAUSING, pb.SESSION_STATE_PAUSED]
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    monkeypatch.setattr("tenki_sandbox.sandbox.time.sleep", lambda _duration: None)
+
+    sandbox.wait_paused(timeout=timeout)
+
+    assert sandbox.state == "PAUSED"
+
+
+def test_wait_paused_unbounded_can_be_cancelled():
+    rpc = FakeRPC()
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    cancel = threading.Event()
+    cancel.set()
+
+    with pytest.raises(PauseWaitCancelledError, match="cancelled locally"):
+        sandbox.wait_paused(timeout=0, cancel_event=cancel)
+
+    assert rpc.requests["get_session"] == []
+
+
+def test_wait_paused_raises_when_pause_rolls_back():
+    rpc = FakeRPC()
+    rpc.get_states = [pb.SESSION_STATE_PAUSING, pb.SESSION_STATE_RUNNING]
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    with pytest.raises(PauseFailedError):
+        sandbox.wait_paused(timeout=5)
+
+
 def test_wait_ready_stream_preserves_terminal_state_error_type():
     rpc = FakeRPC()
     rpc.wait_states = [pb.SESSION_STATE_TERMINATING]
@@ -410,6 +485,8 @@ def test_public_error_exports_are_importable():
         "TemplateBuildInProgressError",
         "TemplateRuntimeFailedError",
         "WaitReadyFailedError",
+        "PauseFailedError",
+        "PauseWaitCancelledError",
         "InvalidStateError",
         "InvalidAuthTokenError",
         "StreamClosedError",

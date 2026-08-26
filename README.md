@@ -50,6 +50,26 @@ with Sandbox.create(cpu_cores=2, memory_mb=4096) as sb:
 
 The API key determines the Workspace automatically; ordinary Sandbox calls do not require a Workspace ID.
 
+## Durable pause
+
+`pause()` preserves legacy completion semantics and returns only after the pause completes.
+`pause_async()` returns after the service accepts the request and moves the sandbox to `PAUSING`.
+Call `wait_paused()` after `pause_async()` when the caller needs a durable checkpoint before continuing.
+It returns at `PAUSED` and raises `PauseFailedError` if a verified rollback restores `RUNNING`.
+Pass `timeout=0` to wait without a deadline.
+For explicit local cancellation, pass a `threading.Event` as `cancel_event`; cancellation raises `PauseWaitCancelledError` and leaves the remote pause running.
+
+```python
+sb.pause_async()
+sb.wait_paused(timeout=0)
+```
+
+`AsyncSandbox` exposes the same operation through `await sb.pause_async()` and `await sb.wait_paused(timeout=0)`.
+Its wait accepts an `asyncio.Event` or `threading.Event`, and normal task cancellation also stops local observation without cancelling the remote pause.
+`DURABLE_CEPH` snapshots can resume on a capability-matched host in the same datacenter while R2 replication continues.
+`DURABLE` snapshots are portable to eligible hosts.
+`LOCAL_READY` is not resumable for pause operations.
+
 `allow_inbound` and `allow_outbound` both default to `True` on `create()`, so a new sandbox reaches the
 internet and can expose ports without passing either argument. Both are create-time settings and cannot be
 changed on an existing sandbox; `sandbox.info.inbound_enabled` / `sandbox.info.outbound_enabled` report what

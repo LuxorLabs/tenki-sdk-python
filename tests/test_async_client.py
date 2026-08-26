@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from tenki_sandbox import (
@@ -7,11 +9,13 @@ from tenki_sandbox import (
     AsyncSandbox,
     InvalidAuthTokenError,
     MissingAuthTokenError,
+    PauseFailedError,
+    PauseWaitCancelledError,
     WaitReadyFailedError,
 )
 from tenki_sandbox._pb import pb
 
-from _async_fakes import FakeControlRPC
+from _async_fakes import FakeControlRPC, FakeRPCError
 
 
 def test_async_client_requires_auth_without_injected_rpc(monkeypatch):
@@ -112,6 +116,93 @@ async def test_async_wait_falls_back_to_poll_on_unimplemented():
     sandbox = await client.create(workspace_id="ws-1", wait=True, timeout=5)
     assert sandbox.state == "RUNNING"
     assert rpc.requests["get_session"]  # poll path used
+
+
+async def test_async_wait_paused_reaches_paused():
+    rpc = FakeControlRPC()
+    rpc.get_states = [pb.SESSION_STATE_PAUSING, pb.SESSION_STATE_PAUSED]
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    await sandbox.wait_paused(timeout=5)
+
+    assert sandbox.state == "PAUSED"
+
+
+async def test_async_wait_paused_retries_not_found(monkeypatch):
+    rpc = FakeControlRPC()
+    rpc.get_states = [pb.SESSION_STATE_PAUSED]
+    get_session = rpc.get_session
+    calls = 0
+
+    async def get_session_after_replica_lag(req):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise FakeRPCError("NOT_FOUND")
+        return await get_session(req)
+
+    rpc.get_session = get_session_after_replica_lag
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    async def no_sleep(_duration):
+        return None
+
+    monkeypatch.setattr("tenki_sandbox.aio.sandbox.asyncio.sleep", no_sleep)
+
+    await sandbox.wait_paused(timeout=5)
+
+    assert sandbox.state == "PAUSED"
+    assert calls == 2
+
+
+@pytest.mark.parametrize("timeout", [0, -1])
+async def test_async_wait_paused_nonpositive_timeout_waits_until_paused(monkeypatch, timeout):
+    rpc = FakeControlRPC()
+    rpc.get_states = [pb.SESSION_STATE_PAUSING, pb.SESSION_STATE_PAUSED]
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    async def no_sleep(_duration):
+        return None
+
+    monkeypatch.setattr("tenki_sandbox.aio.sandbox.asyncio.sleep", no_sleep)
+
+    await sandbox.wait_paused(timeout=timeout)
+
+    assert sandbox.state == "PAUSED"
+
+
+async def test_async_wait_paused_unbounded_can_be_cancelled():
+    rpc = FakeControlRPC()
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    cancel = asyncio.Event()
+    cancel.set()
+
+    with pytest.raises(PauseWaitCancelledError, match="cancelled locally"):
+        await sandbox.wait_paused(timeout=0, cancel_event=cancel)
+
+    assert "get_session" not in rpc.requests
+
+
+async def test_async_wait_paused_preserves_task_cancellation():
+    rpc = FakeControlRPC()
+    rpc.get_states = [pb.SESSION_STATE_PAUSING]
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    task = asyncio.create_task(sandbox.wait_paused(timeout=0))
+    await asyncio.sleep(0)
+
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+async def test_async_wait_paused_raises_when_pause_rolls_back():
+    rpc = FakeControlRPC()
+    rpc.get_states = [pb.SESSION_STATE_PAUSING, pb.SESSION_STATE_RUNNING]
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    with pytest.raises(PauseFailedError):
+        await sandbox.wait_paused(timeout=5)
 
 
 async def test_async_create_skips_failed_data_plane_route():
@@ -218,10 +309,15 @@ async def test_async_pause_and_resume_reset_data_plane_fields():
     await sandbox.pause()
 
     assert sandbox.state == "PAUSED"
+    assert getattr(rpc.requests["pause_session"][-1], "async") is False
     assert paused_dp.closed is True
     assert sandbox._data_plane_rpc is None
     assert sandbox._data_plane_credentials is None
     assert sandbox._data_plane_verified is False
+
+    await sandbox.pause_async()
+    assert sandbox.state == "PAUSED"
+    assert getattr(rpc.requests["pause_session"][-1], "async") is True
 
     resumed_dp = _DP()
     sandbox._data_plane_rpc = resumed_dp

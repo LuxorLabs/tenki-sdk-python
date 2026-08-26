@@ -110,6 +110,14 @@ class SnapshotNotDurableError(SandboxError):
     pass
 
 
+class PauseFailedError(SandboxError):
+    pass
+
+
+class PauseWaitCancelledError(SandboxError):
+    """Local pause observation was cancelled; the remote pause continues."""
+
+
 class TemplateNotFoundError(SandboxError):
     pass
 

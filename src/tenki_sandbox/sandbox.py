@@ -9,7 +9,12 @@ from ._convert import exposed_port, sandbox_info
 from ._pb import pb
 from ._time import duration, seconds
 from .data_plane import DataPlaneCredentialManager, GrpcDataPlaneRPC
-from .errors import map_rpc_error
+from .errors import (
+    PauseFailedError,
+    PauseWaitCancelledError,
+    SessionNotFoundError,
+    map_rpc_error,
+)
 from .fs import SandboxFS
 from .git import SandboxGit
 from .models import CommandResult, ExposedPort, SandboxInfo, VolumeMount
@@ -246,6 +251,47 @@ class Sandbox:
             time.sleep(0.5)
         raise TimeoutError(f"timeout waiting for sandbox {self.id}")
 
+    def wait_paused(
+        self,
+        timeout: float = 180,
+        *,
+        cancel_event: threading.Event | None = None,
+    ) -> None:
+        """Wait locally for a durable pause without cancelling the remote pause."""
+        deadline = time.monotonic() + timeout if timeout > 0 else None
+        started = time.monotonic()
+        saw_pausing = False
+        while deadline is None or time.monotonic() < deadline:
+            if cancel_event is not None and cancel_event.is_set():
+                raise PauseWaitCancelledError(
+                    f"wait for sandbox {self.id} to pause cancelled locally"
+                )
+            try:
+                self.refresh()
+            except SessionNotFoundError:
+                pass
+            else:
+                if self.state == "PAUSED":
+                    return
+                if self.state in {"TERMINATING", "TERMINATED"}:
+                    raise RuntimeError(f"sandbox entered terminal state: {self.state}")
+                if self.state == "PAUSING":
+                    saw_pausing = True
+                elif self.state == "RUNNING" and (
+                    saw_pausing or time.monotonic() - started > 3
+                ):
+                    raise PauseFailedError(
+                        f"pause failed: sandbox {self.id} reverted to {self.state}"
+                    )
+            if cancel_event is not None:
+                if cancel_event.wait(0.5):
+                    raise PauseWaitCancelledError(
+                        f"wait for sandbox {self.id} to pause cancelled locally"
+                    )
+            else:
+                time.sleep(0.5)
+        raise TimeoutError(f"timeout waiting for sandbox {self.id} to pause")
+
     def start(
         self,
         *argv: str,
@@ -349,10 +395,16 @@ class Sandbox:
             raise map_rpc_error(err) from err
 
     def pause(self) -> None:
+        self._pause(async_=False)
+
+    def pause_async(self) -> None:
+        self._pause(async_=True)
+
+    def _pause(self, *, async_: bool) -> None:
+        req = pb.PauseSessionRequest(session_id=self.id)
+        setattr(req, "async", async_)
         try:
-            resp = self._client._rpc.pause_session(
-                pb.PauseSessionRequest(session_id=self.id)
-            )
+            resp = self._client._rpc.pause_session(req)
             self._info = sandbox_info(resp.session)
         except Exception as err:
             raise map_rpc_error(err) from err
