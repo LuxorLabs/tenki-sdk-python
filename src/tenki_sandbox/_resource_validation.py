@@ -16,6 +16,11 @@ def validate_create_resources(
     memory_mb: int | None,
     disk_size_gb: int | None,
 ) -> None:
+    """Check create resources against the sandbox API's constraints without issuing a
+    request. Create applies it to every request; it is exported so callers building a
+    form can reject one field at a time, passing ``None`` for the fields they are not
+    checking.
+    """
     if cpu_cores is not None:
         _validate_cpu_cores(cpu_cores)
     if memory_mb is not None:

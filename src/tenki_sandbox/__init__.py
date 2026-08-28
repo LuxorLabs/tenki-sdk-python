@@ -1,3 +1,4 @@
+from ._resource_validation import validate_create_resources
 from .aio import AsyncClient, AsyncSandbox
 from .client import Client
 from .constants import GB, GiB, KB, KiB, MB, MiB, TB, TiB
@@ -93,6 +94,7 @@ __all__ = [
     "AsyncSandbox",
     "SSHConn",
     "DialConn",
+    "validate_create_resources",
     "HostPortTunnel",
     "ResilientHostPortTunnel",
     "TunnelTermination",

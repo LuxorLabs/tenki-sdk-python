@@ -101,6 +101,13 @@ class Client:
         wait_for_runtime: bool = False,
         _owns_client: bool = False,
     ) -> Sandbox:
+        """Create a sandbox.
+
+        ``cpu_cores`` is 1-16 and ``memory_mb`` is 128-65536 and must be even.
+        ``disk_size_gb`` is 5-100: a create with no ``image``, ``snapshot_id`` or
+        ``from_template_spec`` defaults to 5, while one with a source inherits
+        that source's disk unless this is set.
+        """
         req = build_create_session_request(
             workspace_id=workspace_id,
             name=name,
