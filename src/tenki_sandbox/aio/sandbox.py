@@ -16,7 +16,7 @@ from ..errors import (
     SessionNotFoundError,
     map_rpc_error,
 )
-from ..models import CommandResult, ExposedPort, SandboxInfo, VolumeMount
+from ..models import CommandResult, ExposedPort, SandboxInfo, SessionMetrics, VolumeMount
 from ..sandbox import _is_unimplemented
 from ..warning import SandboxWarning, emit_warnings, sandbox_warnings_from_proto
 from .data_plane import AsyncDataPlaneCredentialManager, AsyncGrpcDataPlaneRPC
@@ -208,6 +208,9 @@ class AsyncSandbox:
     async def refresh(self) -> SandboxInfo:
         self._info = (await self._client.get(self.id)).info
         return self._info
+
+    async def metrics(self, *, window: float | int | object | None = None) -> SessionMetrics:
+        return await self._client.get_session_metrics(self.id, window=window)
 
     async def wait_ready(self, timeout: float = 180) -> None:
         try:

@@ -57,6 +57,24 @@ async def test_async_create_without_wait_maps_options():
     assert list(req.tags) == ["nightly", "gpu"]
 
 
+async def test_async_get_session_metrics_maps_optional_values_and_window():
+    rpc = FakeControlRPC()
+    metrics = await AsyncClient(rpc=rpc).get_session_metrics("session-1", window=300)
+
+    assert rpc.requests["get_session_metrics"][-1].window.seconds == 300
+    assert metrics.cpu.average_cores is None
+    assert metrics.cpu.sample_count == 3
+
+
+async def test_async_sandbox_metrics_uses_its_session_id():
+    rpc = FakeControlRPC()
+    sandbox = await AsyncClient(rpc=rpc).get("session-1")
+    metrics = await sandbox.metrics()
+
+    assert metrics.session_id == "session-1"
+    assert rpc.requests["get_session_metrics"][-1].session_id == "session-1"
+
+
 async def test_async_create_retains_and_emits_warnings_once():
     rpc = _rpc_with_create_warning(FakeControlRPC())
     emitted = []

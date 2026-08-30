@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import os
 
-from .._convert import identity, sandbox_info, workspace_usage_limit
+from .._convert import identity, sandbox_info, session_metrics, workspace_usage_limit
 from .._pb import pb
 from .._pagination import advance_page_token
+from .._time import duration
 from .._transport import (
     GrpcConfig,
     resolve_auth_token,
@@ -20,6 +21,7 @@ from ..client import (
 from ..constants import ENV_GATEWAY_URL
 from ..errors import WaitReadyFailedError, map_rpc_error
 from ..models import Identity, Image, Template, WorkspaceUsageLimit
+from ..models import SessionMetrics
 from ..warning import (
     WarningHandler,
     default_warning_handler,
@@ -173,6 +175,17 @@ class AsyncClient:
         try:
             resp = await self._rpc.get_session(pb.GetSessionRequest(session_id=sandbox_id))
             return AsyncSandbox(self, sandbox_info(resp.session))
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def get_session_metrics(
+        self, sandbox_id: str, *, window: float | int | object | None = None
+    ) -> SessionMetrics:
+        req = pb.GetSessionMetricsRequest(session_id=sandbox_id)
+        if window is not None:
+            req.window.CopyFrom(duration(window))
+        try:
+            return session_metrics(await self._rpc.get_session_metrics(req))
         except Exception as err:
             raise map_rpc_error(err) from err
 

@@ -17,7 +17,7 @@ from .errors import (
 )
 from .fs import SandboxFS
 from .git import SandboxGit
-from .models import CommandResult, ExposedPort, SandboxInfo, VolumeMount
+from .models import CommandResult, ExposedPort, SandboxInfo, SessionMetrics, VolumeMount
 from .process import Process
 from .warning import SandboxWarning, emit_warnings, sandbox_warnings_from_proto
 
@@ -210,6 +210,9 @@ class Sandbox:
     def refresh(self) -> SandboxInfo:
         self._info = self._client.get(self.id).info
         return self._info
+
+    def metrics(self, *, window: float | int | object | None = None) -> SessionMetrics:
+        return self._client.get_session_metrics(self.id, window=window)
 
     def wait_ready(self, timeout: float = 180) -> None:
         try:

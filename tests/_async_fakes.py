@@ -70,6 +70,13 @@ class FakeControlRPC:
         state = self.get_states.pop(0) if self.get_states else pb.SESSION_STATE_RUNNING
         return pb.GetSessionResponse(session=session(state))
 
+    async def get_session_metrics(self, req):
+        self._record("get_session_metrics", req)
+        return pb.GetSessionMetricsResponse(
+            session_id=req.session_id,
+            cpu=pb.SessionCPUUsageAverage(limit_cores=2, sample_count=3),
+        )
+
     def wait_session(self, req, **kwargs):
         self._record("wait_session", req)
         states = list(self.wait_states)

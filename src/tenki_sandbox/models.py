@@ -82,6 +82,41 @@ class SandboxInfo:
     terminal_error: str = ""
 
 
+# Numeric durations use seconds, matching Python timeout and TTL APIs.
+@dataclass(frozen=True)
+class SessionCPUUsageAverage:
+    average_cores: float | None = None
+    average_percent: float | None = None
+    limit_cores: float = 0
+    sample_count: int = 0
+    observed_duration: float = 0
+    coverage_percent: float = 0
+    first_sample_at: datetime | None = None
+    last_sample_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class SessionMemoryUsageAverage:
+    average_bytes: float | None = None
+    average_percent: float | None = None
+    limit_bytes: int = 0
+    sample_count: int = 0
+    observed_duration: float = 0
+    coverage_percent: float = 0
+    first_sample_at: datetime | None = None
+    last_sample_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class SessionMetrics:
+    session_id: str
+    requested_window: float = 0
+    window_start: datetime | None = None
+    window_end: datetime | None = None
+    cpu: SessionCPUUsageAverage = field(default_factory=SessionCPUUsageAverage)
+    memory: SessionMemoryUsageAverage = field(default_factory=SessionMemoryUsageAverage)
+
+
 @dataclass(frozen=True)
 class ExposedPort:
     port: int

@@ -18,6 +18,9 @@ from .models import (
     RegistryTag,
     RegistryVersionDeleteResult,
     ResolvedRegistryRef,
+    SessionCPUUsageAverage,
+    SessionMemoryUsageAverage,
+    SessionMetrics,
     SandboxInfo,
     Snapshot,
     SnapshotDownloadURL,
@@ -48,6 +51,47 @@ def workspace_usage_limit(proto) -> WorkspaceUsageLimit:
         max=int(proto.max) if proto.HasField("max") else None,
         help_text=proto.help_text,
     )
+
+
+def session_metrics(proto) -> SessionMetrics:
+    return SessionMetrics(
+        session_id=proto.session_id,
+        requested_window=_duration_seconds(proto.requested_window) if proto.HasField("requested_window") else 0,
+        window_start=datetime_from_proto(proto.window_start) if proto.HasField("window_start") else None,
+        window_end=datetime_from_proto(proto.window_end) if proto.HasField("window_end") else None,
+        cpu=_cpu_usage_average(proto.cpu) if proto.HasField("cpu") else SessionCPUUsageAverage(),
+        memory=_memory_usage_average(proto.memory) if proto.HasField("memory") else SessionMemoryUsageAverage(),
+    )
+
+
+def _cpu_usage_average(proto) -> SessionCPUUsageAverage:
+    return SessionCPUUsageAverage(
+        average_cores=proto.average_cores if proto.HasField("average_cores") else None,
+        average_percent=proto.average_percent if proto.HasField("average_percent") else None,
+        limit_cores=proto.limit_cores,
+        sample_count=int(proto.sample_count),
+        observed_duration=_duration_seconds(proto.observed_duration) if proto.HasField("observed_duration") else 0,
+        coverage_percent=proto.coverage_percent,
+        first_sample_at=datetime_from_proto(proto.first_sample_at) if proto.HasField("first_sample_at") else None,
+        last_sample_at=datetime_from_proto(proto.last_sample_at) if proto.HasField("last_sample_at") else None,
+    )
+
+
+def _memory_usage_average(proto) -> SessionMemoryUsageAverage:
+    return SessionMemoryUsageAverage(
+        average_bytes=proto.average_bytes if proto.HasField("average_bytes") else None,
+        average_percent=proto.average_percent if proto.HasField("average_percent") else None,
+        limit_bytes=int(proto.limit_bytes),
+        sample_count=int(proto.sample_count),
+        observed_duration=_duration_seconds(proto.observed_duration) if proto.HasField("observed_duration") else 0,
+        coverage_percent=proto.coverage_percent,
+        first_sample_at=datetime_from_proto(proto.first_sample_at) if proto.HasField("first_sample_at") else None,
+        last_sample_at=datetime_from_proto(proto.last_sample_at) if proto.HasField("last_sample_at") else None,
+    )
+
+
+def _duration_seconds(value) -> float:
+    return value.seconds + value.nanos / 1_000_000_000
 
 
 def session_state(value: int) -> str:

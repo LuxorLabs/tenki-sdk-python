@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from ._convert import identity, sandbox_info, workspace_usage_limit
+from ._convert import identity, sandbox_info, session_metrics, workspace_usage_limit
 from ._pb import pb
 from ._pagination import advance_page_token
 from ._resource_validation import validate_create_resources
@@ -16,7 +16,7 @@ from ._transport import (
 )
 from .constants import ENV_GATEWAY_URL
 from .errors import WaitReadyFailedError, map_rpc_error
-from .models import Identity, Image, Template, WorkspaceUsageLimit
+from .models import Identity, Image, SessionMetrics, Template, WorkspaceUsageLimit
 from .preview_url import PreviewUrls
 from .registry import Registry
 from .resources import Snapshots, Templates, Volumes
@@ -173,6 +173,17 @@ class Client:
         try:
             resp = self._rpc.get_session(pb.GetSessionRequest(session_id=sandbox_id))
             return Sandbox(self, sandbox_info(resp.session))
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    def get_session_metrics(
+        self, sandbox_id: str, *, window: float | int | object | None = None
+    ) -> SessionMetrics:
+        req = pb.GetSessionMetricsRequest(session_id=sandbox_id)
+        if window is not None:
+            req.window.CopyFrom(duration(window))
+        try:
+            return session_metrics(self._rpc.get_session_metrics(req))
         except Exception as err:
             raise map_rpc_error(err) from err
 
