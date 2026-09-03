@@ -151,6 +151,13 @@ print(result.stdout_text)
 result.check()
 ```
 
+Argv may be passed as separate arguments or as a single list:
+
+```python
+sb.exec("sh", "-c", "echo hi")
+sb.exec(["sh", "-c", "echo hi"])  # equivalent
+```
+
 `start` returns a live process:
 
 ```python

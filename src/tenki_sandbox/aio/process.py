@@ -14,7 +14,7 @@ from ..errors import (
     session_termination_cause,
 )
 from ..models import CommandResult
-from ..process import _is_retryable_run_establishment_error
+from ..process import _is_retryable_run_establishment_error, normalize_argv
 
 # Seconds to wait for the guest to ack process start before giving up.
 _START_TIMEOUT = 30
@@ -60,16 +60,14 @@ class AsyncProcess:
     def __init__(
         self,
         session_id: str,
-        argv: Sequence[str],
+        argv: Sequence[object],
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         timeout: float | int | object | None = None,
         privileged: bool = False,
     ) -> None:
-        if not argv or not argv[0]:
-            raise ValueError("empty command")
-        self.argv = [str(part) for part in argv]
+        self.argv = normalize_argv(argv)
         self.stdout = AsyncProcessStream()
         self.stderr = AsyncProcessStream()
         self._outbound: asyncio.Queue = asyncio.Queue()
@@ -99,7 +97,7 @@ class AsyncProcess:
         cls,
         rpc,
         session_id: str,
-        argv: Sequence[str],
+        argv: Sequence[object],
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,

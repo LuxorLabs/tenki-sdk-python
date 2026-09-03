@@ -5,6 +5,7 @@ import dataclasses
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from typing import Sequence
 
 from .._convert import exposed_port, sandbox_info
 from .._pb import pb
@@ -293,7 +294,7 @@ class AsyncSandbox:
 
     async def start(
         self,
-        *argv: str,
+        *argv: str | Sequence[str],
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         timeout: float | int | object | None = None,
@@ -316,7 +317,7 @@ class AsyncSandbox:
 
     async def exec(
         self,
-        *argv: str,
+        *argv: str | Sequence[str],
         cwd: str | None = None,
         env: dict[str, str] | None = None,
         timeout: float | int | object | None = None,

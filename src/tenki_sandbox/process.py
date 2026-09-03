@@ -22,6 +22,43 @@ from .models import CommandResult
 _RUN_ESTABLISHMENT_TIMEOUT = 30.0
 
 
+def _stringifies_to_a_repr(value: object) -> bool:
+    """Whether str(value) falls back to a repr instead of something meant as argv.
+
+    A type owning its own __str__ renders to something the caller plausibly
+    intended (``bytes``, ``UserString``, an int, a ``Path``), so it keeps the
+    historical coercion. Every other iterable -- list, tuple, set, dict, deque,
+    generator, map -- renders as a repr that can never name a binary, which is
+    the silent corruption this guards against.
+    """
+    if isinstance(value, str):
+        return False
+    return isinstance(value, Iterable) and type(value).__str__ is object.__str__
+
+
+def normalize_argv(argv: Sequence[object]) -> list[str]:
+    """Resolve the varargs of exec/start into the argv the guest should run.
+
+    A lone list or tuple is the argv itself, so `exec(["sh", "-c", cmd])` means
+    the same as `exec("sh", "-c", cmd)`. Any other iterable is ambiguous -- a set
+    has no argv order, an iterator cannot be replayed on reconnect -- and is
+    rejected rather than stringified into a binary name that cannot resolve.
+    """
+    if len(argv) == 1 and isinstance(argv[0], (list, tuple)):
+        argv = tuple(argv[0])
+    if not argv or not argv[0]:
+        raise ValueError("empty command")
+    parts: list[str] = []
+    for index, part in enumerate(argv):
+        if _stringifies_to_a_repr(part):
+            raise TypeError(
+                f"argv[{index}] must be a string, got {type(part).__name__}: "
+                f"{part!r}; pass argv as a list of strings"
+            )
+        parts.append(str(part))
+    return parts
+
+
 def _rpc_error_message(err: Exception) -> str:
     details = getattr(err, "details", None)
     if callable(details):
@@ -105,7 +142,7 @@ class Process:
         self,
         rpc,
         session_id: str,
-        argv: Sequence[str],
+        argv: Sequence[object],
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
@@ -113,9 +150,7 @@ class Process:
         stdin: bytes | str | None = None,
         privileged: bool = False,
     ) -> None:
-        if not argv or not argv[0]:
-            raise ValueError("empty command")
-        self.argv = [str(part) for part in argv]
+        self.argv = normalize_argv(argv)
         self.stdout = ProcessStream()
         self.stderr = ProcessStream()
         self._outbound: queue.Queue[pb.RunRequest | None] = queue.Queue()
