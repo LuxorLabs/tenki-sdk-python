@@ -120,13 +120,14 @@ def test_data_plane_endpoint_hints_are_isolated_per_session():
     assert second.current() == "https://second.test"
 
 
-def test_client_sandboxes_share_data_plane_endpoint_hints():
+def test_client_sandboxes_isolate_data_plane_endpoint_hints():
     client = Client(rpc=FakeRPC())
     first = client.create(wait=False)
     second = client.create(wait=False)
 
-    assert first._data_plane_endpoint_hints is client._data_plane_endpoint_hints
-    assert second._data_plane_endpoint_hints is client._data_plane_endpoint_hints
+    first._data_plane_endpoint_hints.remember("https://node.test")
+
+    assert second._data_plane_endpoint_hints.current() == ""
 
 
 def test_renew_data_plane_rejects_failed_route_endpoint():

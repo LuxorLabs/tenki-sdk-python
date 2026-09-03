@@ -80,14 +80,13 @@ class AsyncSandbox:
         data_plane_endpoint: str = "",
         data_plane_credential=None,
         data_plane_route_status=None,
-        data_plane_endpoint_hints: _AsyncDataPlaneEndpointHints | None = None,
     ) -> None:
         self._client = client
         self._info = info
         self.warnings = warnings
         self._owns_client = owns_client
         self._detached = False
-        self._data_plane_endpoint_hints = data_plane_endpoint_hints or _AsyncDataPlaneEndpointHints()
+        self._data_plane_endpoint_hints = _AsyncDataPlaneEndpointHints()
         self._data_plane_lock = asyncio.Lock()
         self._data_plane_credentials: AsyncDataPlaneCredentialManager | None = None
         self._data_plane_rpc: AsyncGrpcDataPlaneRPC | None = None

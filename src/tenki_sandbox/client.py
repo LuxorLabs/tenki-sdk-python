@@ -20,7 +20,7 @@ from .models import Identity, Image, SessionMetrics, Template, WorkspaceUsageLim
 from .preview_url import PreviewUrls
 from .registry import Registry
 from .resources import Snapshots, Templates, Volumes
-from .sandbox import Sandbox, _DataPlaneEndpointHints
+from .sandbox import Sandbox
 from .warning import (
     WarningHandler,
     default_warning_handler,
@@ -52,7 +52,6 @@ class Client:
             )
         )
         self._warning_handler = warning_handler
-        self._data_plane_endpoint_hints = _DataPlaneEndpointHints()
         self.preview_urls = PreviewUrls(self._rpc)
         self.volumes = Volumes(self._rpc)
         self.snapshots = Snapshots(self._rpc)
@@ -70,7 +69,6 @@ class Client:
     def __exit__(self, exc_type, exc, tb) -> None:
         self.close()
 
-    # Sandboxes optimistically reuse a node-origin hint and refresh it on a route mismatch.
     def create(
         self,
         *,
@@ -155,7 +153,6 @@ class Client:
             data_plane_endpoint=resp.data_plane_endpoint,
             data_plane_credential=resp.credential if resp.HasField("credential") else None,
             data_plane_route_status=resp.route_status,
-            data_plane_endpoint_hints=self._data_plane_endpoint_hints,
         )
         emit_warnings(
             warnings, self._warning_handler, stacklevel=5 if _owns_client else 4
@@ -178,7 +175,6 @@ class Client:
             return Sandbox(
                 self,
                 sandbox_info(resp.session),
-                data_plane_endpoint_hints=self._data_plane_endpoint_hints,
             )
         except Exception as err:
             raise map_rpc_error(err) from err
@@ -221,7 +217,6 @@ class Client:
                     Sandbox(
                         self,
                         sandbox_info(item),
-                        data_plane_endpoint_hints=self._data_plane_endpoint_hints,
                     )
                     for item in resp.sessions
                 )

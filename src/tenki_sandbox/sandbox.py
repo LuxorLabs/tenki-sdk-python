@@ -79,14 +79,13 @@ class Sandbox:
         data_plane_endpoint: str = "",
         data_plane_credential=None,
         data_plane_route_status=None,
-        data_plane_endpoint_hints: _DataPlaneEndpointHints | None = None,
     ) -> None:
         self._client = client
         self._info = info
         self.warnings = warnings
         self._owns_client = owns_client
         self._detached = False
-        self._data_plane_endpoint_hints = data_plane_endpoint_hints or _DataPlaneEndpointHints()
+        self._data_plane_endpoint_hints = _DataPlaneEndpointHints()
         self._data_plane_lock = threading.RLock()
         self._data_plane_credentials = None
         self._data_plane_rpc = None

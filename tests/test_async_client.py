@@ -78,13 +78,14 @@ async def test_async_data_plane_endpoint_hints_are_isolated_per_session():
     assert second.current() == "https://second.test"
 
 
-async def test_async_client_sandboxes_share_data_plane_endpoint_hints():
+async def test_async_client_sandboxes_isolate_data_plane_endpoint_hints():
     client = AsyncClient(rpc=FakeControlRPC())
     first = await client.create(wait=False)
     second = await client.create(wait=False)
 
-    assert first._data_plane_endpoint_hints is client._data_plane_endpoint_hints
-    assert second._data_plane_endpoint_hints is client._data_plane_endpoint_hints
+    first._data_plane_endpoint_hints.remember("https://node.test")
+
+    assert second._data_plane_endpoint_hints.current() == ""
 
 
 async def test_async_renew_data_plane_rejects_failed_route_endpoint():
