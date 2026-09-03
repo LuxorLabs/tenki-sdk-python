@@ -59,6 +59,23 @@ def normalize_argv(argv: Sequence[object]) -> list[str]:
     return parts
 
 
+class _StaticProcessSandbox:
+    def __init__(self, rpc) -> None:
+        self._rpc = rpc
+
+    def _ensure_data_plane(self, *, verify_serving: bool = True):
+        return self._rpc
+
+    def _mark_data_plane_serving(self, rpc) -> None:
+        return None
+
+    def _data_plane_provisioning_pending(self, rpc) -> bool:
+        return False
+
+    def _refresh_hinted_data_plane(self, rpc) -> None:
+        return None
+
+
 def _rpc_error_message(err: Exception) -> str:
     details = getattr(err, "details", None)
     if callable(details):
@@ -69,7 +86,19 @@ def _rpc_error_message(err: Exception) -> str:
     return str(err).lower()
 
 
-def _is_retryable_run_establishment_error(err: Exception) -> bool:
+def _is_provisioning_session_not_found(err: Exception, provisioning_pending: bool) -> bool:
+    if not provisioning_pending:
+        return False
+    get_code = getattr(err, "code", None)
+    code = get_code() if callable(get_code) else None
+    return code == grpc.StatusCode.NOT_FOUND and "session not found" in _rpc_error_message(err)
+
+
+def _is_retryable_run_establishment_error(
+    err: Exception, provisioning_pending: bool = False
+) -> bool:
+    if _is_provisioning_session_not_found(err, provisioning_pending):
+        return True
     candidate: BaseException | None = err
     seen: set[int] = set()
     for _ in range(4):
@@ -86,6 +115,8 @@ def _is_retryable_run_establishment_error(err: Exception) -> bool:
                 pass
         code_name = getattr(code, "name", str(code))
         if code_name == "UNIMPLEMENTED" and "404" in message:
+            return True
+        if provisioning_pending and code == grpc.StatusCode.UNAVAILABLE:
             return True
         if any(token in message for token in ("refused_stream", "refused stream", "goaway")):
             return True
@@ -140,7 +171,7 @@ class ProcessStream(Iterable[bytes]):
 class Process:
     def __init__(
         self,
-        rpc,
+        sandbox,
         session_id: str,
         argv: Sequence[object],
         *,
@@ -177,7 +208,12 @@ class Process:
         )
         self._start_request = start
 
-        self._thread = threading.Thread(target=self._pump, args=(rpc,), daemon=True)
+        self._sandbox = (
+            sandbox
+            if hasattr(sandbox, "_ensure_data_plane")
+            else _StaticProcessSandbox(sandbox)
+        )
+        self._thread = threading.Thread(target=self._pump, daemon=True)
         self._thread.start()
         if stdin is not None:
             self.write_stdin(stdin)
@@ -236,15 +272,19 @@ class Process:
                 return
             yield item
 
-    def _pump(self, rpc) -> None:
+    def _pump(self) -> None:
         try:
             deadline = time.monotonic() + _RUN_ESTABLISHMENT_TIMEOUT
             attempt = 0
             while True:
+                rpc = self._sandbox._ensure_data_plane(verify_serving=False)
+                if rpc is None:
+                    raise RuntimeError("sandbox data-plane endpoint unavailable")
                 received_response = False
                 try:
                     for frame in rpc.run(self._request_iter()):
                         received_response = True
+                        self._sandbox._mark_data_plane_serving(rpc)
                         self._disable_start_replay()
                         kind = frame.WhichOneof("payload")
                         if kind == "started":
@@ -279,12 +319,18 @@ class Process:
                             return
                     raise RuntimeError("sandbox run stream closed before exit")
                 except Exception as err:
-                    if received_response or not _is_retryable_run_establishment_error(err):
+                    provisioning_pending = self._sandbox._data_plane_provisioning_pending(rpc)
+                    if received_response or not _is_retryable_run_establishment_error(
+                        err, provisioning_pending
+                    ):
                         raise
+                    if _is_provisioning_session_not_found(err, provisioning_pending):
+                        self._sandbox._refresh_hinted_data_plane(rpc)
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         raise
-                    time.sleep(min(0.05 * (attempt + 1), 0.75, remaining))
+                    if attempt > 0:
+                        time.sleep(min(0.05 * attempt, 0.75, remaining))
                     if not self._can_replay_start():
                         raise
                     attempt += 1

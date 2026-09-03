@@ -33,6 +33,41 @@ class _SessionRPC:
         return getattr(self._sandbox._session_rpc, name)
 
 
+class _DataPlaneEndpointHints:
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._endpoint = ""
+        self._resolving = False
+
+    def remember(self, endpoint: str) -> None:
+        endpoint = endpoint.strip()
+        if not endpoint:
+            return
+        with self._condition:
+            self._endpoint = endpoint
+            self._condition.notify_all()
+
+    def current(self) -> str:
+        with self._condition:
+            return self._endpoint
+
+    def resolve(self, resolve) -> str:
+        with self._condition:
+            while self._resolving and not self._endpoint:
+                self._condition.wait()
+            if self._endpoint:
+                return self._endpoint
+            self._resolving = True
+        try:
+            endpoint = resolve().strip()
+            self.remember(endpoint)
+            return endpoint
+        finally:
+            with self._condition:
+                self._resolving = False
+                self._condition.notify_all()
+
+
 class Sandbox:
     def __init__(
         self,
@@ -44,16 +79,19 @@ class Sandbox:
         data_plane_endpoint: str = "",
         data_plane_credential=None,
         data_plane_route_status=None,
+        data_plane_endpoint_hints: _DataPlaneEndpointHints | None = None,
     ) -> None:
         self._client = client
         self._info = info
         self.warnings = warnings
         self._owns_client = owns_client
         self._detached = False
-        self._data_plane_lock = threading.Lock()
+        self._data_plane_endpoint_hints = data_plane_endpoint_hints or _DataPlaneEndpointHints()
+        self._data_plane_lock = threading.RLock()
         self._data_plane_credentials = None
         self._data_plane_rpc = None
         self._data_plane_verified = False
+        self._data_plane_from_hint = False
         self._data_plane_warm_started = False
         self._apply_data_plane_response(
             data_plane_endpoint, data_plane_credential, data_plane_route_status
@@ -66,22 +104,52 @@ class Sandbox:
         return self._ensure_data_plane() or self._client._rpc
 
     def _apply_data_plane_response(
-        self, endpoint: str = "", credential=None, route_status=None
+        self,
+        endpoint: str = "",
+        credential=None,
+        route_status=None,
+        *,
+        from_hint: bool = False,
     ) -> None:
         if route_status == pb.DATA_PLANE_ROUTE_STATUS_FAILED:
             return
         endpoint = (endpoint or "").strip()
-        if not endpoint:
-            return
         with self._data_plane_lock:
+            if credential is not None and self._data_plane_credentials is None:
+                self._data_plane_credentials = DataPlaneCredentialManager(
+                    self, credential
+                )
+            if not endpoint:
+                hint = self._data_plane_endpoint_hints.current()
+                if hint and self._data_plane_credentials is not None:
+                    endpoint = hint
+                    from_hint = True
+                else:
+                    return
+            if not from_hint:
+                self._data_plane_endpoint_hints.remember(endpoint)
+            if (
+                self._data_plane_rpc is not None
+                and getattr(self._data_plane_rpc, "endpoint", "") == endpoint
+            ):
+                if credential is not None and self._data_plane_credentials is not None:
+                    self._data_plane_credentials.set(credential)
+                self._data_plane_from_hint = from_hint
+                if route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED:
+                    self._data_plane_verified = True
+                return
             if self._data_plane_rpc is not None:
                 self._data_plane_rpc.close()
-            if self._data_plane_credentials is not None:
+            if credential is not None and self._data_plane_credentials is not None:
                 self._data_plane_credentials.stop()
-            self._data_plane_credentials = DataPlaneCredentialManager(self, credential)
+            if credential is not None or self._data_plane_credentials is None:
+                self._data_plane_credentials = DataPlaneCredentialManager(
+                    self, credential
+                )
             self._data_plane_rpc = GrpcDataPlaneRPC(
                 endpoint, self._data_plane_credentials
             )
+            self._data_plane_from_hint = from_hint
             self._data_plane_verified = (
                 route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED
             )
@@ -106,51 +174,78 @@ class Sandbox:
 
         threading.Thread(target=_warm, name="tenki-dp-warm", daemon=True).start()
 
-    def _ensure_data_plane(self):
+    def _ensure_data_plane(self, *, verify_serving: bool = True):
         # CreateSessionResponse returns the endpoint empty pre-provision; bootstrap
         # via CreateSessionCredential on first data-plane use (mirrors the Go SDK).
-        if self._data_plane_rpc is not None:
-            if not self._data_plane_verified:
-                ensure_serving = getattr(self._data_plane_rpc, "ensure_serving", None)
-                if callable(ensure_serving):
-                    ensure_serving(self.id)
-                self._data_plane_verified = True
-            return self._data_plane_rpc
         with self._data_plane_lock:
-            if self._data_plane_rpc is not None:
-                if not self._data_plane_verified:
-                    ensure_serving = getattr(
-                        self._data_plane_rpc, "ensure_serving", None
+            if self._data_plane_rpc is None:
+                if (
+                    self._data_plane_credentials is not None
+                    and self._data_plane_credentials.current()
+                ):
+                    endpoint = self._data_plane_endpoint_hints.resolve(
+                        self._renew_data_plane
                     )
+                else:
+                    endpoint = self._renew_data_plane()
+                if not endpoint:
+                    return None
+                if self._data_plane_rpc is None:
+                    self._apply_data_plane_response(endpoint, from_hint=True)
+            if verify_serving and not self._data_plane_verified:
+                try:
+                    ensure_serving = getattr(self._data_plane_rpc, "ensure_serving", None)
                     if callable(ensure_serving):
                         ensure_serving(self.id)
-                    self._data_plane_verified = True
-                return self._data_plane_rpc
-            try:
-                resp = self._client._rpc.create_session_credential(
-                    pb.CreateSessionCredentialRequest(session_id=self.id)
-                )
-            except AttributeError:
-                return None
-            except Exception as err:
-                raise map_rpc_error(err) from err
-            endpoint = resp.data_plane_endpoint.strip()
-            if not endpoint:
-                return None
-            credentials = DataPlaneCredentialManager(
-                self, resp.credential if resp.HasField("credential") else None
-            )
-            rpc = GrpcDataPlaneRPC(endpoint, credentials)
-            try:
-                rpc.ensure_serving(self.id)
-            except Exception as err:
-                credentials.stop()
-                rpc.close()
-                raise map_rpc_error(err) from err
-            self._data_plane_credentials = credentials
-            self._data_plane_rpc = rpc
-            self._data_plane_verified = True
+                except Exception as err:
+                    if self._data_plane_credentials is not None:
+                        self._data_plane_credentials.stop()
+                        self._data_plane_credentials = None
+                    self._data_plane_rpc.close()
+                    self._data_plane_rpc = None
+                    self._data_plane_verified = False
+                    self._data_plane_from_hint = False
+                    raise map_rpc_error(err) from err
+                self._data_plane_verified = True
             return self._data_plane_rpc
+
+    def _renew_data_plane(self) -> str:
+        try:
+            resp = self._client._rpc.create_session_credential(
+                pb.CreateSessionCredentialRequest(session_id=self.id)
+            )
+        except AttributeError:
+            return ""
+        except Exception as err:
+            raise map_rpc_error(err) from err
+        endpoint = resp.data_plane_endpoint.strip()
+        self._apply_data_plane_response(
+            endpoint,
+            resp.credential if resp.HasField("credential") else None,
+            resp.route_status,
+        )
+        if resp.route_status == pb.DATA_PLANE_ROUTE_STATUS_FAILED:
+            return ""
+        if endpoint:
+            return endpoint
+        if self._data_plane_rpc is not None:
+            return self._data_plane_endpoint_hints.current()
+        return ""
+
+    def _data_plane_provisioning_pending(self, rpc) -> bool:
+        with self._data_plane_lock:
+            return self._data_plane_rpc is rpc and not self._data_plane_verified
+
+    def _mark_data_plane_serving(self, rpc) -> None:
+        with self._data_plane_lock:
+            if self._data_plane_rpc is rpc:
+                self._data_plane_verified = True
+
+    def _refresh_hinted_data_plane(self, rpc) -> None:
+        with self._data_plane_lock:
+            if self._data_plane_rpc is not rpc or not self._data_plane_from_hint:
+                return
+            self._renew_data_plane()
 
     def _reset_data_plane(self) -> None:
         with self._data_plane_lock:
@@ -161,6 +256,7 @@ class Sandbox:
                 self._data_plane_rpc.close()
                 self._data_plane_rpc = None
             self._data_plane_verified = False
+            self._data_plane_from_hint = False
 
     @classmethod
     def create(cls, **kwargs) -> "Sandbox":
@@ -309,11 +405,11 @@ class Sandbox:
         stdin: bytes | str | None = None,
         privileged: bool = False,
     ) -> Process:
-        rpc = self._ensure_data_plane()
+        rpc = self._ensure_data_plane(verify_serving=False)
         if rpc is None:
             raise RuntimeError("sandbox data-plane endpoint unavailable")
         return Process(
-            rpc,
+            self,
             self.id,
             argv,
             cwd=cwd,
@@ -353,10 +449,7 @@ class Sandbox:
         return self.exec("bash", "-lc", command, **kwargs)
 
     def close(self) -> None:
-        if self._data_plane_credentials is not None:
-            self._data_plane_credentials.stop()
-        if self._data_plane_rpc is not None:
-            self._data_plane_rpc.close()
+        self._reset_data_plane()
         try:
             resp = self._client._rpc.terminate_session(
                 pb.TerminateSessionRequest(session_id=self.id)

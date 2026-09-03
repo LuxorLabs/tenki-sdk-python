@@ -32,7 +32,7 @@ from ._transport import AsyncGrpcSandboxRPC
 from .preview_url import AsyncPreviewUrls
 from .registry import AsyncRegistry
 from .resources import AsyncSnapshots, AsyncTemplates, AsyncVolumes
-from .sandbox import AsyncSandbox
+from .sandbox import AsyncSandbox, _AsyncDataPlaneEndpointHints
 
 
 class AsyncClient:
@@ -58,6 +58,7 @@ class AsyncClient:
             )
         )
         self._warning_handler = warning_handler
+        self._data_plane_endpoint_hints = _AsyncDataPlaneEndpointHints()
         self.preview_urls = AsyncPreviewUrls(self._rpc)
         self.volumes = AsyncVolumes(self._rpc)
         self.snapshots = AsyncSnapshots(self._rpc)
@@ -78,6 +79,7 @@ class AsyncClient:
     async def __aexit__(self, exc_type, exc, tb) -> None:
         await self.close()
 
+    # Sandboxes optimistically reuse a node-origin hint and refresh it on a route mismatch.
     async def create(
         self,
         *,
@@ -155,6 +157,7 @@ class AsyncClient:
             data_plane_endpoint=resp.data_plane_endpoint,
             data_plane_credential=resp.credential if resp.HasField("credential") else None,
             data_plane_route_status=resp.route_status,
+            data_plane_endpoint_hints=self._data_plane_endpoint_hints,
         )
         emit_warnings(
             warnings, self._warning_handler, stacklevel=5 if _owns_client else 4
@@ -174,7 +177,11 @@ class AsyncClient:
     async def get(self, sandbox_id: str) -> AsyncSandbox:
         try:
             resp = await self._rpc.get_session(pb.GetSessionRequest(session_id=sandbox_id))
-            return AsyncSandbox(self, sandbox_info(resp.session))
+            return AsyncSandbox(
+                self,
+                sandbox_info(resp.session),
+                data_plane_endpoint_hints=self._data_plane_endpoint_hints,
+            )
         except Exception as err:
             raise map_rpc_error(err) from err
 
@@ -213,7 +220,12 @@ class AsyncClient:
                     req.sticky = sticky
                 resp = await self._rpc.list_workspace_sandboxes(req)
                 sandboxes.extend(
-                    AsyncSandbox(self, sandbox_info(item)) for item in resp.sessions
+                    AsyncSandbox(
+                        self,
+                        sandbox_info(item),
+                        data_plane_endpoint_hints=self._data_plane_endpoint_hints,
+                    )
+                    for item in resp.sessions
                 )
                 page_token = advance_page_token(page_token, resp.next_page_token)
                 if not page_token:

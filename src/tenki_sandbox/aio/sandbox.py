@@ -26,6 +26,49 @@ from .git import AsyncSandboxGit
 from .process import AsyncProcess
 
 
+class _AsyncDataPlaneEndpointHints:
+    def __init__(self) -> None:
+        self._endpoint = ""
+        self._lock = asyncio.Lock()
+        self._task: asyncio.Task | None = None
+
+    def remember(self, endpoint: str) -> None:
+        endpoint = endpoint.strip()
+        if endpoint:
+            self._endpoint = endpoint
+
+    def current(self) -> str:
+        return self._endpoint
+
+    async def resolve(self, resolve) -> str:
+        while True:
+            if self._endpoint:
+                return self._endpoint
+            async with self._lock:
+                if self._endpoint:
+                    return self._endpoint
+                owner = self._task is None
+                if owner:
+                    self._task = asyncio.create_task(resolve())
+                task = self._task
+            try:
+                endpoint = (await task).strip()
+            except Exception:
+                if owner:
+                    raise
+                async with self._lock:
+                    if self._task is task:
+                        self._task = None
+                continue
+            finally:
+                if owner:
+                    async with self._lock:
+                        if self._task is task:
+                            self._task = None
+            self.remember(endpoint)
+            return endpoint
+
+
 class AsyncSandbox:
     def __init__(
         self,
@@ -37,16 +80,19 @@ class AsyncSandbox:
         data_plane_endpoint: str = "",
         data_plane_credential=None,
         data_plane_route_status=None,
+        data_plane_endpoint_hints: _AsyncDataPlaneEndpointHints | None = None,
     ) -> None:
         self._client = client
         self._info = info
         self.warnings = warnings
         self._owns_client = owns_client
         self._detached = False
+        self._data_plane_endpoint_hints = data_plane_endpoint_hints or _AsyncDataPlaneEndpointHints()
         self._data_plane_lock = asyncio.Lock()
         self._data_plane_credentials: AsyncDataPlaneCredentialManager | None = None
         self._data_plane_rpc: AsyncGrpcDataPlaneRPC | None = None
         self._data_plane_verified = False
+        self._data_plane_from_hint = False
         # A FAILED route carries a stale/dead endpoint; leave _data_plane_rpc
         # unset so first use re-bootstraps via CreateSessionCredential (mirrors
         # the sync client). Binding it would route every fs/exec/dial to a dead
@@ -58,42 +104,90 @@ class AsyncSandbox:
         self.git = AsyncSandboxGit(self)
 
     def _bind_data_plane(
-        self, endpoint: str = "", credential=None, route_status=None
+        self,
+        endpoint: str = "",
+        credential=None,
+        route_status=None,
+        *,
+        from_hint: bool = False,
     ) -> None:
         # Synchronous bind for construction: no existing rpc to close and no loop
         # yet. `_apply_data_plane_response` is the async equivalent used later.
         if route_status == pb.DATA_PLANE_ROUTE_STATUS_FAILED:
             return
         endpoint = (endpoint or "").strip()
+        if credential is not None and self._data_plane_credentials is None:
+            self._data_plane_credentials = AsyncDataPlaneCredentialManager(
+                self, credential
+            )
         if not endpoint:
-            return
-        self._data_plane_credentials = AsyncDataPlaneCredentialManager(self, credential)
+            hint = self._data_plane_endpoint_hints.current()
+            if hint and self._data_plane_credentials is not None:
+                endpoint = hint
+                from_hint = True
+            else:
+                return
+        if not from_hint:
+            self._data_plane_endpoint_hints.remember(endpoint)
+        if credential is not None or self._data_plane_credentials is None:
+            self._data_plane_credentials = AsyncDataPlaneCredentialManager(
+                self, credential
+            )
         self._data_plane_rpc = AsyncGrpcDataPlaneRPC(
             endpoint, self._data_plane_credentials
         )
+        self._data_plane_from_hint = from_hint
         self._data_plane_verified = route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED
 
     async def _apply_data_plane_response(
-        self, endpoint: str = "", credential=None, route_status=None
+        self,
+        endpoint: str = "",
+        credential=None,
+        route_status=None,
+        *,
+        from_hint: bool = False,
     ) -> None:
         # Re-apply an endpoint/route observed while waiting (WaitSession frames).
         # Skips FAILED and may replace an existing rpc, so it awaits close().
         if route_status == pb.DATA_PLANE_ROUTE_STATUS_FAILED:
             return
         endpoint = (endpoint or "").strip()
-        if not endpoint:
-            return
-        async with self._data_plane_lock:
-            if self._data_plane_rpc is not None:
-                await self._data_plane_rpc.close()
-            if self._data_plane_credentials is not None:
-                self._data_plane_credentials.stop()
+        if credential is not None and self._data_plane_credentials is None:
             self._data_plane_credentials = AsyncDataPlaneCredentialManager(
                 self, credential
             )
+        if not endpoint:
+            hint = self._data_plane_endpoint_hints.current()
+            if hint and self._data_plane_credentials is not None:
+                endpoint = hint
+                from_hint = True
+            else:
+                return
+        if not from_hint:
+            self._data_plane_endpoint_hints.remember(endpoint)
+        async with self._data_plane_lock:
+            if (
+                self._data_plane_rpc is not None
+                and getattr(self._data_plane_rpc, "endpoint", "") == endpoint
+            ):
+                if credential is not None and self._data_plane_credentials is not None:
+                    self._data_plane_credentials.set(credential)
+                self._data_plane_from_hint = from_hint
+                if route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED:
+                    self._data_plane_verified = True
+                return
+            if self._data_plane_rpc is not None:
+                await self._data_plane_rpc.close()
+            if credential is not None and self._data_plane_credentials is not None:
+                self._data_plane_credentials.stop()
+            if credential is not None or self._data_plane_credentials is None:
+                self._data_plane_credentials = AsyncDataPlaneCredentialManager(
+                    self, credential
+                )
             self._data_plane_rpc = AsyncGrpcDataPlaneRPC(
                 endpoint, self._data_plane_credentials
             )
+            self._data_plane_from_hint = from_hint
             self._data_plane_verified = (
                 route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED
             )
@@ -104,51 +198,85 @@ class AsyncSandbox:
     async def _verify_serving(self) -> None:
         # An eagerly-bound but unverified endpoint may not be routable yet; probe
         # once (retries edge-not-ready) before first use, like the sync client.
-        if self._data_plane_verified or self._data_plane_rpc is None:
-            return
-        ensure_serving = getattr(self._data_plane_rpc, "ensure_serving", None)
-        if ensure_serving is not None:
-            await ensure_serving(self.id)
-        self._data_plane_verified = True
+        async with self._data_plane_lock:
+            if self._data_plane_verified or self._data_plane_rpc is None:
+                return
+            ensure_serving = getattr(self._data_plane_rpc, "ensure_serving", None)
+            if ensure_serving is not None:
+                rpc = self._data_plane_rpc
+                try:
+                    await ensure_serving(self.id)
+                except Exception:
+                    if self._data_plane_credentials is not None:
+                        self._data_plane_credentials.stop()
+                        self._data_plane_credentials = None
+                    await rpc.close()
+                    self._data_plane_rpc = None
+                    self._data_plane_verified = False
+                    self._data_plane_from_hint = False
+                    raise
+            self._data_plane_verified = True
 
-    async def _ensure_data_plane(self):
+    async def _ensure_data_plane(self, *, verify_serving: bool = True):
         # CreateSessionResponse returns the endpoint empty pre-provision; bootstrap
         # via CreateSessionCredential on first data-plane use (mirrors the Go SDK).
         if self._data_plane_rpc is not None:
-            await self._verify_serving()
+            if verify_serving:
+                await self._verify_serving()
             if self._data_plane_credentials is not None:
                 # Recover renewal if the manager was constructed without a loop.
                 self._data_plane_credentials.ensure_scheduled()
             return self._data_plane_rpc
-        async with self._data_plane_lock:
-            if self._data_plane_rpc is not None:
-                await self._verify_serving()
-                return self._data_plane_rpc
-            try:
-                resp = await self._client._rpc.create_session_credential(
-                    pb.CreateSessionCredentialRequest(session_id=self.id)
-                )
-            except AttributeError:
-                return None
-            except Exception as err:
-                raise map_rpc_error(err) from err
-            endpoint = resp.data_plane_endpoint.strip()
-            if not endpoint:
-                return None
-            credentials = AsyncDataPlaneCredentialManager(
-                self, resp.credential if resp.HasField("credential") else None
+        if self._data_plane_credentials is not None and self._data_plane_credentials.current():
+            endpoint = await self._data_plane_endpoint_hints.resolve(
+                self._renew_data_plane
             )
-            rpc = AsyncGrpcDataPlaneRPC(endpoint, credentials)
-            try:
-                await rpc.ensure_serving(self.id)
-            except Exception as err:
-                credentials.stop()
-                await rpc.close()
-                raise map_rpc_error(err) from err
-            self._data_plane_credentials = credentials
-            self._data_plane_rpc = rpc
+        else:
+            endpoint = await self._renew_data_plane()
+        if not endpoint:
+            return None
+        if self._data_plane_rpc is None:
+            await self._apply_data_plane_response(endpoint, from_hint=True)
+        if verify_serving:
+            await self._verify_serving()
+        if self._data_plane_credentials is not None:
+            self._data_plane_credentials.ensure_scheduled()
+        return self._data_plane_rpc
+
+    async def _renew_data_plane(self) -> str:
+        try:
+            resp = await self._client._rpc.create_session_credential(
+                pb.CreateSessionCredentialRequest(session_id=self.id)
+            )
+        except AttributeError:
+            return ""
+        except Exception as err:
+            raise map_rpc_error(err) from err
+        endpoint = resp.data_plane_endpoint.strip()
+        await self._apply_data_plane_response(
+            endpoint,
+            resp.credential if resp.HasField("credential") else None,
+            resp.route_status,
+        )
+        if resp.route_status == pb.DATA_PLANE_ROUTE_STATUS_FAILED:
+            return ""
+        if endpoint:
+            return endpoint
+        if self._data_plane_rpc is not None:
+            return self._data_plane_endpoint_hints.current()
+        return ""
+
+    def _data_plane_provisioning_pending(self, rpc) -> bool:
+        return self._data_plane_rpc is rpc and not self._data_plane_verified
+
+    def _mark_data_plane_serving(self, rpc) -> None:
+        if self._data_plane_rpc is rpc:
             self._data_plane_verified = True
-            return self._data_plane_rpc
+
+    async def _refresh_hinted_data_plane(self, rpc) -> None:
+        if self._data_plane_rpc is not rpc or not self._data_plane_from_hint:
+            return
+        await self._renew_data_plane()
 
     async def _reset_data_plane(self) -> None:
         async with self._data_plane_lock:
@@ -159,6 +287,7 @@ class AsyncSandbox:
                 await self._data_plane_rpc.close()
                 self._data_plane_rpc = None
             self._data_plane_verified = False
+            self._data_plane_from_hint = False
 
     @classmethod
     async def create(cls, **kwargs) -> "AsyncSandbox":
@@ -301,11 +430,11 @@ class AsyncSandbox:
         stdin: bytes | str | None = None,
         privileged: bool = False,
     ) -> AsyncProcess:
-        rpc = await self._ensure_data_plane()
+        rpc = await self._ensure_data_plane(verify_serving=False)
         if rpc is None:
             raise RuntimeError("sandbox data-plane endpoint unavailable")
         return await AsyncProcess.start(
-            rpc,
+            self,
             self.id,
             argv,
             cwd=cwd,

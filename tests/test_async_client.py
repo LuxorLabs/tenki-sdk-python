@@ -17,6 +17,7 @@ from tenki_sandbox import (
     WaitReadyFailedError,
 )
 from tenki_sandbox._pb import pb
+from tenki_sandbox.aio.sandbox import _AsyncDataPlaneEndpointHints
 
 from _async_fakes import FakeControlRPC, FakeRPCError
 
@@ -26,6 +27,131 @@ def test_async_client_requires_auth_without_injected_rpc(monkeypatch):
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
     with pytest.raises(MissingAuthTokenError):
         AsyncClient()
+
+
+async def test_async_data_plane_endpoint_hint_resolution_is_singleflight():
+    hints = _AsyncDataPlaneEndpointHints()
+    calls = 0
+
+    async def resolve():
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0.02)
+        return "https://node.test"
+
+    results = await asyncio.gather(
+        *(hints.resolve(resolve) for _ in range(8))
+    )
+
+    assert calls == 1
+    assert results == ["https://node.test"] * 8
+
+
+async def test_async_data_plane_endpoint_hint_waiters_retry_resolver_failure():
+    hints = _AsyncDataPlaneEndpointHints()
+    calls = 0
+
+    async def resolve():
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0.01)
+        if calls == 1:
+            raise RuntimeError("transient resolver failure")
+        return "https://node.test"
+
+    results = await asyncio.gather(
+        *(hints.resolve(resolve) for _ in range(8)), return_exceptions=True
+    )
+
+    assert calls == 2
+    assert sum(isinstance(result, RuntimeError) for result in results) == 1
+    assert results.count("https://node.test") == 7
+
+
+async def test_async_data_plane_endpoint_hints_are_isolated_per_session():
+    first = _AsyncDataPlaneEndpointHints()
+    second = _AsyncDataPlaneEndpointHints()
+    first.remember("https://first.test")
+    second.remember("https://second.test")
+
+    assert first.current() == "https://first.test"
+    assert second.current() == "https://second.test"
+
+
+async def test_async_client_sandboxes_share_data_plane_endpoint_hints():
+    client = AsyncClient(rpc=FakeControlRPC())
+    first = await client.create(wait=False)
+    second = await client.create(wait=False)
+
+    assert first._data_plane_endpoint_hints is client._data_plane_endpoint_hints
+    assert second._data_plane_endpoint_hints is client._data_plane_endpoint_hints
+
+
+async def test_async_renew_data_plane_rejects_failed_route_endpoint():
+    rpc = FakeControlRPC()
+
+    async def create_session_credential(_req):
+        return pb.CreateSessionCredentialResponse(
+            data_plane_endpoint="https://dead.test",
+            route_status=pb.DATA_PLANE_ROUTE_STATUS_FAILED,
+        )
+
+    rpc.create_session_credential = create_session_credential
+    sandbox = await AsyncClient(rpc=rpc).create(wait=False)
+
+    assert await sandbox._renew_data_plane() == ""
+    assert sandbox._data_plane_rpc is None
+
+
+async def test_async_refresh_hinted_data_plane_keeps_hint_after_failed_renewal():
+    rpc = FakeControlRPC()
+
+    async def create_session_credential(_req):
+        return pb.CreateSessionCredentialResponse(
+            data_plane_endpoint="https://dead.test",
+            route_status=pb.DATA_PLANE_ROUTE_STATUS_FAILED,
+        )
+
+    rpc.create_session_credential = create_session_credential
+    sandbox = await AsyncClient(rpc=rpc).create(wait=False)
+    data_plane = object()
+    sandbox._data_plane_rpc = data_plane
+    sandbox._data_plane_from_hint = True
+
+    await sandbox._refresh_hinted_data_plane(data_plane)
+
+    assert sandbox._data_plane_from_hint is True
+
+
+async def test_async_verify_serving_discards_failed_rpc():
+    class FailingDataPlaneRPC:
+        closed = False
+
+        async def ensure_serving(self, _session_id):
+            raise FakeRPCError("UNAVAILABLE")
+
+        async def close(self):
+            self.closed = True
+
+    sandbox = await AsyncClient(rpc=FakeControlRPC()).create(wait=False)
+    data_plane = FailingDataPlaneRPC()
+    class CredentialManager:
+        stopped = False
+
+        def stop(self):
+            self.stopped = True
+
+    credentials = CredentialManager()
+    sandbox._data_plane_rpc = data_plane
+    sandbox._data_plane_credentials = credentials
+
+    with pytest.raises(FakeRPCError):
+        await sandbox._verify_serving()
+
+    assert data_plane.closed is True
+    assert sandbox._data_plane_rpc is None
+    assert credentials.stopped is True
+    assert sandbox._data_plane_credentials is None
 
 
 @pytest.mark.parametrize("auth_token", ["ory_st_test", "cookie:session-token"])

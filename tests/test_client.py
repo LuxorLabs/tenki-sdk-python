@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 import warnings
 from datetime import datetime, timedelta, timezone
 
@@ -18,6 +19,7 @@ from tenki_sandbox import (
     PauseWaitCancelledError,
     Sandbox,
     SandboxInfo,
+    SandboxError,
     SandboxWarningCode,
     SandboxWarningNotification,
     TemplateRuntimeFailedError,
@@ -35,6 +37,7 @@ from tenki_sandbox._transport import (
 )
 from tenki_sandbox.client import _create_wait_timeout
 from tenki_sandbox.models import VolumeMount
+from tenki_sandbox.sandbox import _DataPlaneEndpointHints
 
 
 def test_client_requires_auth_without_injected_rpc(monkeypatch):
@@ -43,6 +46,145 @@ def test_client_requires_auth_without_injected_rpc(monkeypatch):
 
     with pytest.raises(MissingAuthTokenError):
         Client()
+
+
+def test_data_plane_endpoint_hint_resolution_is_singleflight():
+    hints = _DataPlaneEndpointHints()
+    calls = 0
+    calls_lock = threading.Lock()
+
+    def resolve():
+        nonlocal calls
+        with calls_lock:
+            calls += 1
+        time.sleep(0.02)
+        return "https://node.test"
+
+    results = []
+    threads = [
+        threading.Thread(
+            target=lambda: results.append(hints.resolve(resolve))
+        )
+        for _ in range(8)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert calls == 1
+    assert results == ["https://node.test"] * 8
+
+
+def test_data_plane_endpoint_hint_waiters_retry_resolver_failure():
+    hints = _DataPlaneEndpointHints()
+    calls = 0
+    calls_lock = threading.Lock()
+
+    def resolve():
+        nonlocal calls
+        with calls_lock:
+            calls += 1
+            call = calls
+        time.sleep(0.02)
+        if call == 1:
+            raise RuntimeError("transient resolver failure")
+        return "https://node.test"
+
+    results = []
+
+    def run():
+        try:
+            results.append(hints.resolve(resolve))
+        except Exception as err:
+            results.append(err)
+
+    threads = [threading.Thread(target=run) for _ in range(8)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert calls == 2
+    assert sum(isinstance(result, RuntimeError) for result in results) == 1
+    assert results.count("https://node.test") == 7
+
+
+def test_data_plane_endpoint_hints_are_isolated_per_session():
+    first = _DataPlaneEndpointHints()
+    second = _DataPlaneEndpointHints()
+    first.remember("https://first.test")
+    second.remember("https://second.test")
+
+    assert first.current() == "https://first.test"
+    assert second.current() == "https://second.test"
+
+
+def test_client_sandboxes_share_data_plane_endpoint_hints():
+    client = Client(rpc=FakeRPC())
+    first = client.create(wait=False)
+    second = client.create(wait=False)
+
+    assert first._data_plane_endpoint_hints is client._data_plane_endpoint_hints
+    assert second._data_plane_endpoint_hints is client._data_plane_endpoint_hints
+
+
+def test_renew_data_plane_rejects_failed_route_endpoint():
+    rpc = FakeRPC()
+    rpc.create_session_credential = lambda _req: pb.CreateSessionCredentialResponse(
+        data_plane_endpoint="https://dead.test",
+        route_status=pb.DATA_PLANE_ROUTE_STATUS_FAILED,
+    )
+    sandbox = Client(rpc=rpc).create(wait=False)
+
+    assert sandbox._renew_data_plane() == ""
+    assert sandbox._data_plane_rpc is None
+
+
+def test_refresh_hinted_data_plane_keeps_hint_after_failed_renewal():
+    rpc = FakeRPC()
+    rpc.create_session_credential = lambda _req: pb.CreateSessionCredentialResponse(
+        data_plane_endpoint="https://dead.test",
+        route_status=pb.DATA_PLANE_ROUTE_STATUS_FAILED,
+    )
+    sandbox = Client(rpc=rpc).create(wait=False)
+    data_plane = object()
+    sandbox._data_plane_rpc = data_plane
+    sandbox._data_plane_from_hint = True
+
+    sandbox._refresh_hinted_data_plane(data_plane)
+
+    assert sandbox._data_plane_from_hint is True
+
+
+def test_ensure_data_plane_discards_rpc_after_serving_failure():
+    class FailingDataPlaneRPC:
+        closed = False
+
+        def ensure_serving(self, _session_id):
+            raise FakeRPCError("UNAVAILABLE")
+
+        def close(self):
+            self.closed = True
+
+    class CredentialManager:
+        stopped = False
+
+        def stop(self):
+            self.stopped = True
+
+    sandbox = Client(rpc=FakeRPC()).create(wait=False)
+    data_plane = FailingDataPlaneRPC()
+    credentials = CredentialManager()
+    sandbox._data_plane_rpc = data_plane
+    sandbox._data_plane_credentials = credentials
+
+    with pytest.raises(SandboxError):
+        sandbox._ensure_data_plane()
+
+    assert data_plane.closed is True
+    assert credentials.stopped is True
+    assert sandbox._data_plane_rpc is None
 
 
 @pytest.mark.parametrize("auth_token", ["ory_st_test", "cookie:session-token"])

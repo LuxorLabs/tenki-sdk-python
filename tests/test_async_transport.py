@@ -129,6 +129,7 @@ import pytest  # noqa: E402
 
 from tenki_sandbox.aio.data_plane import (  # noqa: E402
     AsyncDataPlaneCredentialManager,
+    AsyncGrpcDataPlaneRPC,
     _credential_error_is_retryable,
 )
 from tenki_sandbox.errors import PermissionDeniedError  # noqa: E402
@@ -189,10 +190,49 @@ def test_credential_error_retryable_classification():
         is False
     )
     assert _credential_error_is_retryable(ValueError("non-grpc")) is True
-    # transport maps errors; the AioRpcError is the mapped exception's __cause__
     mapped = PermissionDeniedError("revoked")
     mapped.__cause__ = _FakeAio(grpc.StatusCode.PERMISSION_DENIED)
     assert _credential_error_is_retryable(mapped) is False
+
+
+async def test_async_data_plane_channels_are_shared_by_origin(monkeypatch):
+    from tenki_sandbox._internal.proto.tenki.sandbox.v1 import sandbox_pb2_grpc
+
+    class Channel:
+        closed = False
+
+        async def close(self, _grace):
+            self.closed = True
+
+    class Credentials:
+        def current(self):
+            return "credential"
+
+    created = []
+
+    def new_channel(target):
+        channel = Channel()
+        created.append((target, channel))
+        return channel
+
+    monkeypatch.setattr(grpc.aio, "insecure_channel", new_channel)
+    monkeypatch.setattr(
+        sandbox_pb2_grpc,
+        "SandboxSessionDataPlaneServiceStub",
+        lambda channel: object(),
+    )
+
+    first = AsyncGrpcDataPlaneRPC("http://shared-async.test:8080/a", Credentials())
+    second = AsyncGrpcDataPlaneRPC("http://shared-async.test:8080/b", Credentials())
+    first._ensure_stub()
+    second._ensure_stub()
+
+    assert first._channel is second._channel
+    assert len(created) == 1
+    await first.close()
+    assert created[0][1].closed is False
+    await second.close()
+    assert created[0][1].closed is True
 
 
 async def test_credential_renew_stops_on_permanent_error():

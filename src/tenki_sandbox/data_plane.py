@@ -13,6 +13,41 @@ from ._transport import grpc_target
 
 DATA_PLANE_CREDENTIAL_HEADER = "x-tenki-session-cert"
 
+_shared_channels_lock = threading.Lock()
+_shared_channels: dict[tuple[str, bool], list] = {}
+
+
+def _acquire_shared_channel(endpoint: str):
+    target, secure = grpc_target(endpoint)
+    key = (target, secure)
+    with _shared_channels_lock:
+        shared = _shared_channels.get(key)
+        if shared is None:
+            channel = (
+                grpc.secure_channel(target, grpc.ssl_channel_credentials())
+                if secure
+                else grpc.insecure_channel(target)
+            )
+            shared = [channel, 0]
+            _shared_channels[key] = shared
+        shared[1] += 1
+
+    closed = False
+
+    def release() -> None:
+        nonlocal closed
+        with _shared_channels_lock:
+            if closed:
+                return
+            closed = True
+            shared[1] -= 1
+            if shared[1] > 0 or _shared_channels.get(key) is not shared:
+                return
+            del _shared_channels[key]
+        shared[0].close()
+
+    return shared[0], release
+
 
 def _rpc_error_message(err) -> str:
     details = getattr(err, "details", None)
@@ -132,18 +167,13 @@ class GrpcDataPlaneRPC:
     def __init__(self, endpoint: str, credentials: DataPlaneCredentialManager) -> None:
         from tenki_sandbox._internal.proto.tenki.sandbox.v1 import sandbox_pb2_grpc
 
-        target, secure = grpc_target(endpoint)
-        if not secure:
-            self._channel = grpc.insecure_channel(target)
-        else:
-            self._channel = grpc.secure_channel(target, grpc.ssl_channel_credentials())
+        self.endpoint = endpoint
+        self._channel, self._release_channel = _acquire_shared_channel(endpoint)
         self._stub = sandbox_pb2_grpc.SandboxSessionDataPlaneServiceStub(self._channel)
         self._credentials = credentials
 
     def close(self) -> None:
-        close = getattr(self._channel, "close", None)
-        if callable(close):
-            close()
+        self._release_channel()
 
     def ensure_serving(self, session_id: str, *, attempts: int = 24) -> None:
         # The engine publishes the per-session edge route synchronously but Edge

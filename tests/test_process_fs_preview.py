@@ -8,8 +8,6 @@ import pytest
 from tenki_sandbox import Client, CommandFailedError
 from tenki_sandbox import errors
 from tenki_sandbox._pb import pb
-
-
 def test_exec_collects_stdout_stderr_and_check_raises():
     rpc = FakeRPC()
     sandbox = create_test_sandbox(rpc)
@@ -95,6 +93,48 @@ def test_start_retries_transient_stream_establishment_reset():
     assert proc.wait().ok
     assert proc.pid == 42
     assert rpc.run_calls == 2
+
+
+def test_start_retries_unavailable_while_provisioning():
+    rpc = UnavailableOnFirstRunRPC()
+    sandbox = create_test_sandbox(rpc)
+
+    assert sandbox.start("true").wait().ok
+    assert rpc.run_calls == 2
+
+    rpc = UnavailableOnFirstRunRPC()
+    sandbox = create_test_sandbox(rpc)
+    sandbox._data_plane_verified = True
+
+    with pytest.raises(errors.SandboxError, match="503"):
+        sandbox.start("true").wait()
+    assert rpc.run_calls == 1
+
+
+def test_start_skips_readiness_stat_and_marks_first_response_serving():
+    rpc = EnsureServingSpyRPC()
+    sandbox = create_test_sandbox(rpc)
+
+    assert sandbox.start("true").wait().ok
+
+    assert rpc.ensure_serving_calls == 0
+    assert sandbox._data_plane_verified is True
+
+
+def test_start_retries_session_not_found_only_while_provisioning():
+    rpc = SessionNotFoundOnFirstRunRPC()
+    sandbox = create_test_sandbox(rpc)
+
+    assert sandbox.start("true").wait().ok
+    assert rpc.run_calls == 2
+
+    rpc = SessionNotFoundOnFirstRunRPC()
+    sandbox = create_test_sandbox(rpc)
+    sandbox._data_plane_verified = True
+
+    with pytest.raises(errors.SessionNotFoundError):
+        sandbox.start("true").wait()
+    assert rpc.run_calls == 1
 
 
 def test_start_does_not_retry_after_first_response():
@@ -362,6 +402,17 @@ class ResetOnFirstRunRPC(FakeRPC):
         yield pb.RunResponse(exit=pb.RunExit(exit_code=0, duration_ms=12, reason="exit"))
 
 
+class UnavailableOnFirstRunRPC(ResetOnFirstRunRPC):
+    def run(self, requests):
+        first = next(requests)
+        self.run_starts.append(first.start)
+        self.run_calls += 1
+        if self.run_calls == 1:
+            raise RunRpcError(grpc.StatusCode.UNAVAILABLE, "HTTP status 503 Service Unavailable")
+        yield pb.RunResponse(started=pb.RunStarted(pid=42))
+        yield pb.RunResponse(exit=pb.RunExit(exit_code=0, duration_ms=12, reason="exit"))
+
+
 class ResetAfterStartedRPC(FakeRPC):
     def __init__(self):
         super().__init__()
@@ -373,6 +424,32 @@ class ResetAfterStartedRPC(FakeRPC):
         self.run_calls += 1
         yield pb.RunResponse(started=pb.RunStarted(pid=42))
         raise TransientRunError()
+
+
+class EnsureServingSpyRPC(FakeRPC):
+    def __init__(self):
+        super().__init__()
+        self.ensure_serving_calls = 0
+
+    def ensure_serving(self, session_id):
+        self.ensure_serving_calls += 1
+
+
+class SessionNotFoundOnFirstRunRPC(FakeRPC):
+    def __init__(self):
+        super().__init__()
+        self.run_calls = 0
+
+    def run(self, requests):
+        first = next(requests)
+        self.run_starts.append(first.start)
+        self.run_calls += 1
+        if self.run_calls == 1:
+            raise RunRpcError(grpc.StatusCode.NOT_FOUND, "session not found")
+        yield pb.RunResponse(started=pb.RunStarted(pid=42))
+        yield pb.RunResponse(
+            exit=pb.RunExit(exit_code=0, duration_ms=12, reason="exit")
+        )
 
 
 class OrderingRPC(FakeRPC):

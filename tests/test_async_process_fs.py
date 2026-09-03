@@ -178,6 +178,53 @@ async def test_async_start_retries_transient_stream_establishment_reset():
     assert rpc.run_calls == 2
 
 
+async def test_async_start_retries_unavailable_while_provisioning():
+    rpc = UnavailableOnFirstRunRPC()
+    sandbox = await _sandbox(rpc)
+
+    proc = await sandbox.start("true")
+    assert (await proc.wait()).ok
+    assert rpc.run_calls == 2
+
+    rpc = UnavailableOnFirstRunRPC()
+    sandbox = await _sandbox(rpc)
+    sandbox._data_plane_verified = True
+
+    proc = await sandbox.start("true")
+    with pytest.raises(errors.SandboxError, match="503"):
+        await proc.wait()
+    assert rpc.run_calls == 1
+
+
+async def test_async_start_skips_readiness_stat_and_marks_first_response_serving():
+    rpc = EnsureServingSpyRPC()
+    sandbox = await _sandbox(rpc)
+
+    proc = await sandbox.start("true")
+    assert (await proc.wait()).ok
+
+    assert rpc.ensure_serving_calls == 0
+    assert sandbox._data_plane_verified is True
+
+
+async def test_async_start_retries_session_not_found_only_while_provisioning():
+    rpc = SessionNotFoundOnFirstRunRPC()
+    sandbox = await _sandbox(rpc)
+
+    proc = await sandbox.start("true")
+    assert (await proc.wait()).ok
+    assert rpc.run_calls == 2
+
+    rpc = SessionNotFoundOnFirstRunRPC()
+    sandbox = await _sandbox(rpc)
+    sandbox._data_plane_verified = True
+
+    proc = await sandbox.start("true")
+    with pytest.raises(errors.SessionNotFoundError):
+        await proc.wait()
+    assert rpc.run_calls == 1
+
+
 async def test_async_start_does_not_retry_after_first_response():
     rpc = ResetAfterStartedRPC()
     sandbox = await _sandbox(rpc)
@@ -252,6 +299,20 @@ class ResetOnFirstRunRPC(FakeDataPlaneRPC):
         return gen()
 
 
+class UnavailableOnFirstRunRPC(ResetOnFirstRunRPC):
+    def run(self, requests):
+        async def gen():
+            first = await requests.__anext__()
+            self.run_starts.append(first.start)
+            self.run_calls += 1
+            if self.run_calls == 1:
+                raise RunRpcError(grpc.StatusCode.UNAVAILABLE, "HTTP status 503 Service Unavailable")
+            yield pb.RunResponse(started=pb.RunStarted(pid=42))
+            yield pb.RunResponse(exit=pb.RunExit(exit_code=0, duration_ms=12, reason="exit"))
+
+        return gen()
+
+
 class ResetAfterStartedRPC(FakeDataPlaneRPC):
     def __init__(self):
         super().__init__()
@@ -264,6 +325,35 @@ class ResetAfterStartedRPC(FakeDataPlaneRPC):
             self.run_calls += 1
             yield pb.RunResponse(started=pb.RunStarted(pid=42))
             raise TransientRunError()
+
+        return gen()
+
+
+class EnsureServingSpyRPC(FakeDataPlaneRPC):
+    def __init__(self):
+        super().__init__()
+        self.ensure_serving_calls = 0
+
+    async def ensure_serving(self, session_id):
+        self.ensure_serving_calls += 1
+
+
+class SessionNotFoundOnFirstRunRPC(FakeDataPlaneRPC):
+    def __init__(self):
+        super().__init__()
+        self.run_calls = 0
+
+    def run(self, requests):
+        async def gen():
+            first = await requests.__anext__()
+            self.run_starts.append(first.start)
+            self.run_calls += 1
+            if self.run_calls == 1:
+                raise RunRpcError(grpc.StatusCode.NOT_FOUND, "session not found")
+            yield pb.RunResponse(started=pb.RunStarted(pid=42))
+            yield pb.RunResponse(
+                exit=pb.RunExit(exit_code=0, duration_ms=12, reason="exit")
+            )
 
         return gen()
 

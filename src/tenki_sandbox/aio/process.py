@@ -14,10 +14,31 @@ from ..errors import (
     session_termination_cause,
 )
 from ..models import CommandResult
-from ..process import _is_retryable_run_establishment_error, normalize_argv
+from ..process import (
+    _is_provisioning_session_not_found,
+    _is_retryable_run_establishment_error,
+    normalize_argv,
+)
 
 # Seconds to wait for the guest to ack process start before giving up.
 _START_TIMEOUT = 30
+
+
+class _StaticAsyncProcessSandbox:
+    def __init__(self, rpc) -> None:
+        self._rpc = rpc
+
+    async def _ensure_data_plane(self, *, verify_serving: bool = True):
+        return self._rpc
+
+    def _mark_data_plane_serving(self, rpc) -> None:
+        return None
+
+    def _data_plane_provisioning_pending(self, rpc) -> bool:
+        return False
+
+    async def _refresh_hinted_data_plane(self, rpc) -> None:
+        return None
 
 
 class AsyncProcessStream:
@@ -95,7 +116,7 @@ class AsyncProcess:
     @classmethod
     async def start(
         cls,
-        rpc,
+        sandbox,
         session_id: str,
         argv: Sequence[object],
         *,
@@ -106,7 +127,12 @@ class AsyncProcess:
         privileged: bool = False,
     ) -> "AsyncProcess":
         proc = cls(session_id, argv, cwd=cwd, env=env, timeout=timeout, privileged=privileged)
-        proc._pump_task = asyncio.create_task(proc._pump(rpc))
+        proc._sandbox = (
+            sandbox
+            if hasattr(sandbox, "_ensure_data_plane")
+            else _StaticAsyncProcessSandbox(sandbox)
+        )
+        proc._pump_task = asyncio.create_task(proc._pump())
         if stdin is not None:
             await proc.write_stdin(stdin)
             await proc.close_stdin()
@@ -175,16 +201,20 @@ class AsyncProcess:
                 return
             yield item
 
-    async def _pump(self, rpc) -> None:
+    async def _pump(self) -> None:
         try:
             loop = asyncio.get_running_loop()
             deadline = loop.time() + _START_TIMEOUT
             attempt = 0
             while True:
+                rpc = await self._sandbox._ensure_data_plane(verify_serving=False)
+                if rpc is None:
+                    raise RuntimeError("sandbox data-plane endpoint unavailable")
                 received_response = False
                 try:
                     async for frame in rpc.run(self._request_iter()):
                         received_response = True
+                        self._sandbox._mark_data_plane_serving(rpc)
                         self._start_replayable = False
                         kind = frame.WhichOneof("payload")
                         if kind == "started":
@@ -219,12 +249,18 @@ class AsyncProcess:
                             return
                     raise RuntimeError("sandbox run stream closed before exit")
                 except Exception as err:
-                    if received_response or not _is_retryable_run_establishment_error(err):
+                    provisioning_pending = self._sandbox._data_plane_provisioning_pending(rpc)
+                    if received_response or not _is_retryable_run_establishment_error(
+                        err, provisioning_pending
+                    ):
                         raise
+                    if _is_provisioning_session_not_found(err, provisioning_pending):
+                        await self._sandbox._refresh_hinted_data_plane(rpc)
                     remaining = deadline - loop.time()
                     if remaining <= 0:
                         raise
-                    await asyncio.sleep(min(0.05 * (attempt + 1), 0.75, remaining))
+                    if attempt > 0:
+                        await asyncio.sleep(min(0.05 * attempt, 0.75, remaining))
                     if not self._start_replayable:
                         raise
                     attempt += 1

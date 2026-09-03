@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import threading
 from datetime import datetime, timezone
 
 from .._pb import pb
@@ -21,6 +22,41 @@ logger = logging.getLogger("tenki_sandbox")
 _DP_STREAM_OUT = frozenset({"run", "dial", "host_port_tunnel", "read_file_stream"})
 # Data-plane RPCs whose request is an async iterator of frames.
 _DP_STREAM_IN = frozenset({"run", "dial", "host_port_tunnel", "write_file_stream"})
+
+_shared_channels_lock = threading.Lock()
+_shared_channels: dict[tuple[object, str, bool], list] = {}
+
+
+def _acquire_shared_channel(target: str, secure: bool):
+    import grpc
+
+    loop = asyncio.get_running_loop()
+    key = (loop, target, secure)
+    with _shared_channels_lock:
+        shared = _shared_channels.get(key)
+        if shared is None:
+            channel = (
+                grpc.aio.secure_channel(target, grpc.ssl_channel_credentials())
+                if secure
+                else grpc.aio.insecure_channel(target)
+            )
+            shared = [channel, 0]
+            _shared_channels[key] = shared
+        shared[1] += 1
+
+    async def release() -> None:
+        channel = None
+        with _shared_channels_lock:
+            if shared[1] <= 0:
+                return
+            shared[1] -= 1
+            if shared[1] == 0 and _shared_channels.get(key) is shared:
+                del _shared_channels[key]
+                channel = shared[0]
+        if channel is not None:
+            await channel.close(None)
+
+    return shared[0], release
 
 
 def _rpc_error_message(err) -> str:
@@ -172,11 +208,13 @@ class AsyncGrpcDataPlaneRPC:
         self, endpoint: str, credentials: AsyncDataPlaneCredentialManager
     ) -> None:
         target, secure = grpc_target(endpoint)
+        self.endpoint = endpoint
         self._target = target
         self._secure = secure
         self._credentials = credentials
         self._channel = None
         self._stub = None
+        self._release_channel = None
 
     def _ensure_stub(self):
         if self._stub is None:
@@ -184,20 +222,19 @@ class AsyncGrpcDataPlaneRPC:
 
             from tenki_sandbox._internal.proto.tenki.sandbox.v1 import sandbox_pb2_grpc
 
-            if not self._secure:
-                self._channel = grpc.aio.insecure_channel(self._target)
-            else:
-                self._channel = grpc.aio.secure_channel(
-                    self._target, grpc.ssl_channel_credentials()
-                )
+            self._channel, self._release_channel = _acquire_shared_channel(
+                self._target, self._secure
+            )
             self._stub = sandbox_pb2_grpc.SandboxSessionDataPlaneServiceStub(
                 self._channel
             )
         return self._stub
 
     async def close(self) -> None:
-        if self._channel is not None:
-            await self._channel.close(None)
+        if self._release_channel is not None:
+            release = self._release_channel
+            self._release_channel = None
+            await release()
 
     async def ensure_serving(self, session_id: str, *, attempts: int = 24) -> None:
         # Mirror the sync probe: the edge publishes the per-session route
