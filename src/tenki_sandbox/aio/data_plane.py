@@ -27,6 +27,52 @@ _shared_channels_lock = threading.Lock()
 _shared_channels: dict[tuple[object, str, bool], list] = {}
 
 
+class _AsyncDataPlaneEndpointHints:
+    def __init__(self) -> None:
+        self._endpoint = ""
+        self._lock = asyncio.Lock()
+        self._task: asyncio.Task | None = None
+
+    def remember(self, endpoint: str) -> None:
+        endpoint = endpoint.strip()
+        if endpoint:
+            self._endpoint = endpoint
+
+    def current(self) -> str:
+        return self._endpoint
+
+    def clear(self) -> None:
+        self._endpoint = ""
+
+    async def resolve(self, resolve) -> str:
+        while True:
+            if self._endpoint:
+                return self._endpoint
+            async with self._lock:
+                if self._endpoint:
+                    return self._endpoint
+                owner = self._task is None
+                if owner:
+                    self._task = asyncio.create_task(resolve())
+                task = self._task
+            try:
+                endpoint = (await task).strip()
+            except Exception:
+                if owner:
+                    raise
+                async with self._lock:
+                    if self._task is task:
+                        self._task = None
+                continue
+            finally:
+                if owner:
+                    async with self._lock:
+                        if self._task is task:
+                            self._task = None
+            self.remember(endpoint)
+            return endpoint
+
+
 def _acquire_shared_channel(target: str, secure: bool):
     import grpc
 

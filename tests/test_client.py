@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import threading
 import time
 import warnings
@@ -36,8 +37,8 @@ from tenki_sandbox._transport import (
     resolve_gateway_url,
 )
 from tenki_sandbox.client import _create_wait_timeout
+from tenki_sandbox.data_plane import _DataPlaneEndpointHints
 from tenki_sandbox.models import VolumeMount
-from tenki_sandbox.sandbox import _DataPlaneEndpointHints
 
 
 def test_client_requires_auth_without_injected_rpc(monkeypatch):
@@ -118,6 +119,9 @@ def test_data_plane_endpoint_hints_are_isolated_per_session():
 
     assert first.current() == "https://first.test"
     assert second.current() == "https://second.test"
+
+    first.clear()
+    assert first.current() == ""
 
 
 def test_client_sandboxes_isolate_data_plane_endpoint_hints():
@@ -830,6 +834,28 @@ def test_volume_attach_detach_updates_frozen_info():
     assert sandbox.info.volume_mounts == ()
     assert rpc.requests["attach_volume"][-1].volume.volume_id == "vol-1"
     assert rpc.requests["detach_volume"][-1].volume_id == "vol-1"
+
+
+def test_volume_detach_waits_past_historical_detached_attachment():
+    rpc = FakeRPC()
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    sandbox._info = dataclasses.replace(
+        sandbox.info,
+        volume_mounts=(
+            VolumeMount(volume_id="vol-1", mount_path="/data", state="DETACHED"),
+            VolumeMount(volume_id="vol-1", mount_path="/data", state="SYNC_PENDING"),
+        ),
+    )
+
+    assert sandbox._is_volume_detached("vol-1") is False
+    sandbox._info = dataclasses.replace(
+        sandbox.info,
+        volume_mounts=tuple(
+            dataclasses.replace(mount, state="DETACHED")
+            for mount in sandbox.info.volume_mounts
+        ),
+    )
+    assert sandbox._is_volume_detached("vol-1") is True
 
 
 class FakeRPCError(Exception):

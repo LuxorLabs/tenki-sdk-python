@@ -9,7 +9,11 @@ from typing import Sequence
 from ._convert import exposed_port, sandbox_info
 from ._pb import pb
 from ._time import duration, seconds
-from .data_plane import DataPlaneCredentialManager, GrpcDataPlaneRPC
+from .data_plane import (
+    DataPlaneCredentialManager,
+    GrpcDataPlaneRPC,
+    _DataPlaneEndpointHints,
+)
 from .errors import (
     PauseFailedError,
     PauseWaitCancelledError,
@@ -31,41 +35,6 @@ class _SessionRPC:
 
     def __getattr__(self, name: str):
         return getattr(self._sandbox._session_rpc, name)
-
-
-class _DataPlaneEndpointHints:
-    def __init__(self) -> None:
-        self._condition = threading.Condition()
-        self._endpoint = ""
-        self._resolving = False
-
-    def remember(self, endpoint: str) -> None:
-        endpoint = endpoint.strip()
-        if not endpoint:
-            return
-        with self._condition:
-            self._endpoint = endpoint
-            self._condition.notify_all()
-
-    def current(self) -> str:
-        with self._condition:
-            return self._endpoint
-
-    def resolve(self, resolve) -> str:
-        with self._condition:
-            while self._resolving and not self._endpoint:
-                self._condition.wait()
-            if self._endpoint:
-                return self._endpoint
-            self._resolving = True
-        try:
-            endpoint = resolve().strip()
-            self.remember(endpoint)
-            return endpoint
-        finally:
-            with self._condition:
-                self._resolving = False
-                self._condition.notify_all()
 
 
 class Sandbox:
@@ -254,6 +223,7 @@ class Sandbox:
             if self._data_plane_rpc is not None:
                 self._data_plane_rpc.close()
                 self._data_plane_rpc = None
+            self._data_plane_endpoint_hints.clear()
             self._data_plane_verified = False
             self._data_plane_from_hint = False
 
@@ -625,13 +595,19 @@ class Sandbox:
         deadline = time.monotonic() + wait
         while wait > 0 and time.monotonic() < deadline:
             self.refresh()
-            if all(mount.volume_id != volume_id for mount in self._info.volume_mounts):
+            if self._is_volume_detached(volume_id):
                 return
             time.sleep(0.5)
         mounts = tuple(
             mount for mount in self._info.volume_mounts if mount.volume_id != volume_id
         )
         self._info = dataclasses.replace(self._info, volume_mounts=mounts)
+
+    def _is_volume_detached(self, volume_id: str) -> bool:
+        matches = [
+            mount for mount in self._info.volume_mounts if mount.volume_id == volume_id
+        ]
+        return not matches or all(mount.state == "DETACHED" for mount in matches)
 
     def snapshot(self, *, name: str | None = None, wait: bool = True):
         if wait:

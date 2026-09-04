@@ -17,6 +17,45 @@ _shared_channels_lock = threading.Lock()
 _shared_channels: dict[tuple[str, bool], list] = {}
 
 
+class _DataPlaneEndpointHints:
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._endpoint = ""
+        self._resolving = False
+
+    def remember(self, endpoint: str) -> None:
+        endpoint = endpoint.strip()
+        if not endpoint:
+            return
+        with self._condition:
+            self._endpoint = endpoint
+            self._condition.notify_all()
+
+    def current(self) -> str:
+        with self._condition:
+            return self._endpoint
+
+    def clear(self) -> None:
+        with self._condition:
+            self._endpoint = ""
+
+    def resolve(self, resolve) -> str:
+        with self._condition:
+            while self._resolving and not self._endpoint:
+                self._condition.wait()
+            if self._endpoint:
+                return self._endpoint
+            self._resolving = True
+        try:
+            endpoint = resolve().strip()
+            self.remember(endpoint)
+            return endpoint
+        finally:
+            with self._condition:
+                self._resolving = False
+                self._condition.notify_all()
+
+
 def _acquire_shared_channel(endpoint: str):
     target, secure = grpc_target(endpoint)
     key = (target, secure)

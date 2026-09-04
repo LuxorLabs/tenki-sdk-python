@@ -20,53 +20,14 @@ from ..errors import (
 from ..models import CommandResult, ExposedPort, SandboxInfo, SessionMetrics, VolumeMount
 from ..sandbox import _is_unimplemented
 from ..warning import SandboxWarning, emit_warnings, sandbox_warnings_from_proto
-from .data_plane import AsyncDataPlaneCredentialManager, AsyncGrpcDataPlaneRPC
+from .data_plane import (
+    AsyncDataPlaneCredentialManager,
+    AsyncGrpcDataPlaneRPC,
+    _AsyncDataPlaneEndpointHints,
+)
 from .fs import AsyncSandboxFS
 from .git import AsyncSandboxGit
 from .process import AsyncProcess
-
-
-class _AsyncDataPlaneEndpointHints:
-    def __init__(self) -> None:
-        self._endpoint = ""
-        self._lock = asyncio.Lock()
-        self._task: asyncio.Task | None = None
-
-    def remember(self, endpoint: str) -> None:
-        endpoint = endpoint.strip()
-        if endpoint:
-            self._endpoint = endpoint
-
-    def current(self) -> str:
-        return self._endpoint
-
-    async def resolve(self, resolve) -> str:
-        while True:
-            if self._endpoint:
-                return self._endpoint
-            async with self._lock:
-                if self._endpoint:
-                    return self._endpoint
-                owner = self._task is None
-                if owner:
-                    self._task = asyncio.create_task(resolve())
-                task = self._task
-            try:
-                endpoint = (await task).strip()
-            except Exception:
-                if owner:
-                    raise
-                async with self._lock:
-                    if self._task is task:
-                        self._task = None
-                continue
-            finally:
-                if owner:
-                    async with self._lock:
-                        if self._task is task:
-                            self._task = None
-            self.remember(endpoint)
-            return endpoint
 
 
 class AsyncSandbox:
@@ -285,6 +246,7 @@ class AsyncSandbox:
             if self._data_plane_rpc is not None:
                 await self._data_plane_rpc.close()
                 self._data_plane_rpc = None
+            self._data_plane_endpoint_hints.clear()
             self._data_plane_verified = False
             self._data_plane_from_hint = False
 
@@ -652,13 +614,19 @@ class AsyncSandbox:
         deadline = time.monotonic() + wait
         while wait > 0 and time.monotonic() < deadline:
             await self.refresh()
-            if all(mount.volume_id != volume_id for mount in self._info.volume_mounts):
+            if self._is_volume_detached(volume_id):
                 return
             await asyncio.sleep(0.5)
         mounts = tuple(
             mount for mount in self._info.volume_mounts if mount.volume_id != volume_id
         )
         self._info = dataclasses.replace(self._info, volume_mounts=mounts)
+
+    def _is_volume_detached(self, volume_id: str) -> bool:
+        matches = [
+            mount for mount in self._info.volume_mounts if mount.volume_id == volume_id
+        ]
+        return not matches or all(mount.state == "DETACHED" for mount in matches)
 
     async def snapshot(self, *, name: str | None = None, wait: bool = True):
         if wait:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import warnings
 
 import pytest
@@ -17,7 +18,8 @@ from tenki_sandbox import (
     WaitReadyFailedError,
 )
 from tenki_sandbox._pb import pb
-from tenki_sandbox.aio.sandbox import _AsyncDataPlaneEndpointHints
+from tenki_sandbox.aio.data_plane import _AsyncDataPlaneEndpointHints
+from tenki_sandbox.models import VolumeMount
 
 from _async_fakes import FakeControlRPC, FakeRPCError
 
@@ -76,6 +78,30 @@ async def test_async_data_plane_endpoint_hints_are_isolated_per_session():
 
     assert first.current() == "https://first.test"
     assert second.current() == "https://second.test"
+
+    first.clear()
+    assert first.current() == ""
+
+
+async def test_async_volume_detach_waits_past_historical_detached_attachment():
+    sandbox = await AsyncClient(rpc=FakeControlRPC()).create(wait=False)
+    sandbox._info = dataclasses.replace(
+        sandbox.info,
+        volume_mounts=(
+            VolumeMount(volume_id="vol-1", mount_path="/data", state="DETACHED"),
+            VolumeMount(volume_id="vol-1", mount_path="/data", state="SYNC_PENDING"),
+        ),
+    )
+
+    assert sandbox._is_volume_detached("vol-1") is False
+    sandbox._info = dataclasses.replace(
+        sandbox.info,
+        volume_mounts=tuple(
+            dataclasses.replace(mount, state="DETACHED")
+            for mount in sandbox.info.volume_mounts
+        ),
+    )
+    assert sandbox._is_volume_detached("vol-1") is True
 
 
 async def test_async_client_sandboxes_isolate_data_plane_endpoint_hints():
