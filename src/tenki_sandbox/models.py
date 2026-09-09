@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Literal, Mapping
 
+from .disk import DiskUsage
 from .errors import CommandFailedError
 
 if TYPE_CHECKING:
@@ -22,6 +23,9 @@ class CommandResult:
     errno: int | None = None
     #: Execution budget spent. May be set alongside ``exit_code == 0``.
     timed_out: bool = False
+    #: Sandbox filesystem state observed while the command ran. ``None`` when
+    #: the guest did not report it.
+    disk: DiskUsage | None = None
 
     @property
     def ok(self) -> bool:

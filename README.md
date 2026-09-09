@@ -371,6 +371,18 @@ Notes:
   keys in the guest's `authorized_keys` if you prefer key-based auth for the
   in-guest sshd.
 
+## Disk space
+
+The root disk defaults to 5 GB and holds the base image as well as your work, so a fresh
+sandbox already reports around 56% used. It is fixed at create time and cannot be grown in
+place — pass `disk_size_gb` (5–100) to `create` if you need more. Budget for it before a
+large install.
+
+Every `CommandResult` carries `disk`, and `check=True` folds a full disk into the raised
+`CommandFailedError`. `result.disk.exhausted` reports whether the sandbox
+ran out of space at any point during the command — check it even when the command exited 0,
+since npm reports `ENOSPC` as a warning and still exits successfully with a broken install.
+
 ## Resource APIs
 
 ```python

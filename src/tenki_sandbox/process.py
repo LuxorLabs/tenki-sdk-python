@@ -17,6 +17,7 @@ from .errors import (
     map_rpc_error,
     session_termination_cause,
 )
+from .disk import DiskUsage
 from .models import CommandResult
 
 _RUN_ESTABLISHMENT_TIMEOUT = 30.0
@@ -57,6 +58,20 @@ def normalize_argv(argv: Sequence[object]) -> list[str]:
             )
         parts.append(str(part))
     return parts
+
+
+
+def _disk_usage_from_exit(exit: object) -> DiskUsage | None:
+    """Maps the guest exit frame's disk fields, absent on older guests."""
+    total = int(getattr(exit, "disk_total_bytes", 0) or 0)
+    if total <= 0:
+        return None
+    return DiskUsage(
+        total_bytes=total,
+        available_bytes=int(getattr(exit, "disk_available_bytes", 0) or 0),
+        min_available_bytes=int(getattr(exit, "disk_min_available_bytes", 0) or 0),
+        free_bytes=int(getattr(exit, "disk_free_bytes", 0) or 0),
+    )
 
 
 class _StaticProcessSandbox:
@@ -315,6 +330,7 @@ class Process:
                                 reason=exit.reason or None,
                                 errno=exit.errno or None,
                                 timed_out=bool(exit.timed_out),
+                                disk=_disk_usage_from_exit(exit),
                             )
                             return
                     raise RuntimeError("sandbox run stream closed before exit")

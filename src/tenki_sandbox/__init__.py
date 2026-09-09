@@ -44,6 +44,7 @@ from .errors import (
     VolumeSyncPendingError,
     WaitReadyFailedError,
 )
+from .disk import DiskUsage
 from .models import (
     CommandResult,
     ExposedPort,
@@ -151,6 +152,7 @@ __all__ = [
     "ResolvedRegistryRef",
     "SSHCert",
     "CommandResult",
+    "DiskUsage",
     "ExposedPort",
     "FileInfo",
     "Identity",

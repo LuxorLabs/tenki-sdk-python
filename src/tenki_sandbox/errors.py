@@ -210,15 +210,37 @@ class GitOperationFailedError(SandboxError):
         self.retryable = retryable
 
 
+def _gib(value: int) -> str:
+    """Render bytes in GiB/MiB. The ticket calls for GiB consistently; disks are
+    provisioned in GiB and the dashboard says GiB."""
+    if value >= 1024**3:
+        return f"{value / 1024**3:.2f} GiB"
+    if value >= 1024**2:
+        return f"{value / 1024**2:.0f} MiB"
+    return f"{value} B"
+
+
 @dataclass
 class CommandFailedError(SandboxError):
     result: Any
 
     def __post_init__(self) -> None:
-        super().__init__(
+        message = (
             f"command failed: exit_code={self.result.exit_code} "
             f"argv={' '.join(self.result.argv)!r}"
         )
+        # A full disk is the one cause the command's own output routinely fails
+        # to name - pip reports ENOENT, goose reports nothing - so say it here,
+        # where check=True callers actually look.
+        disk = getattr(self.result, "disk", None)
+        if disk is not None and disk.exhausted:
+            message += (
+                f"; the sandbox disk ran out of space during this command "
+                f"({_gib(disk.min_available_bytes)} free at its lowest, of "
+                f"{_gib(disk.total_bytes)} total). Recreate the sandbox with a "
+                f"larger disk_size_gb (5-100, default 5)."
+            )
+        super().__init__(message)
 
 
 class CapabilityUnavailableError(SandboxError):

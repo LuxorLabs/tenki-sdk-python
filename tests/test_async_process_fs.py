@@ -18,6 +18,9 @@ class FakeDataPlaneRPC(FakeControlRPC):
         self.files: dict[str, bytes] = {}
         self.run_starts = []
         self.next_exit_code = 0
+        self.disk_total_bytes = 0
+        self.disk_available_bytes = 0
+        self.disk_min_available_bytes = 0
         self.followups: list[str] = []
         self.stdin_data = b""
 
@@ -30,7 +33,16 @@ class FakeDataPlaneRPC(FakeControlRPC):
             yield pb.RunResponse(started=pb.RunStarted(pid=42))
             yield pb.RunResponse(stdout=b"hello\n")
             yield pb.RunResponse(stderr=b"warn\n")
-            yield pb.RunResponse(exit=pb.RunExit(exit_code=self.next_exit_code, duration_ms=12, reason="exit"))
+            yield pb.RunResponse(
+                exit=pb.RunExit(
+                    exit_code=self.next_exit_code,
+                    duration_ms=12,
+                    reason="exit",
+                    disk_total_bytes=self.disk_total_bytes,
+                    disk_available_bytes=self.disk_available_bytes,
+                    disk_min_available_bytes=self.disk_min_available_bytes,
+                )
+            )
 
         return gen()
 
@@ -416,3 +428,30 @@ async def test_async_stat_missing_raises_file_not_found():
     sandbox = await _sandbox(rpc)
     with pytest.raises(errors.FileNotFoundError):
         await sandbox.fs.stat("/workspace/missing.txt")
+
+
+async def test_async_exec_carries_disk_stats():
+    rpc = FakeDataPlaneRPC()
+    rpc.disk_total_bytes = 5 * 1024**3
+    rpc.disk_available_bytes = 214 * 1024**2
+    rpc.disk_min_available_bytes = 0
+    sandbox = await _sandbox(rpc)
+
+    result = await sandbox.exec("npm", "install", "-g", "typescript")
+
+    # npm reports ENOSPC as a warning and still exits 0, so the low-water mark
+    # is the only thing that shows the run was defeated by a full disk.
+    assert result.exit_code == 0
+    assert result.disk is not None
+    assert result.disk.total_bytes == 5 * 1024**3
+    assert result.disk.available_bytes == 214 * 1024**2
+    assert result.disk.exhausted
+
+
+async def test_async_exec_omits_disk_when_guest_is_silent():
+    rpc = FakeDataPlaneRPC()
+    sandbox = await _sandbox(rpc)
+
+    result = await sandbox.exec("true")
+
+    assert result.disk is None

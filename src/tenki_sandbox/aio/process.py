@@ -15,6 +15,7 @@ from ..errors import (
 )
 from ..models import CommandResult
 from ..process import (
+    _disk_usage_from_exit,
     _is_provisioning_session_not_found,
     _is_retryable_run_establishment_error,
     normalize_argv,
@@ -245,6 +246,7 @@ class AsyncProcess:
                                 reason=exit.reason or None,
                                 errno=exit.errno or None,
                                 timed_out=bool(exit.timed_out),
+                                disk=_disk_usage_from_exit(exit),
                             )
                             return
                     raise RuntimeError("sandbox run stream closed before exit")
