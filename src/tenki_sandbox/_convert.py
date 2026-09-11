@@ -22,6 +22,7 @@ from .models import (
     SessionMemoryUsageAverage,
     SessionMetrics,
     SandboxInfo,
+    SessionEgressPolicy,
     Snapshot,
     SnapshotDownloadURL,
     Template,
@@ -134,6 +135,14 @@ def snapshot_durability_state(value: int) -> str:
     )
 
 
+def session_egress_policy(proto) -> SessionEgressPolicy:
+    # An unset optional message field yields an empty default instance, never None.
+    return SessionEgressPolicy(
+        allow_domains=tuple(proto.allow_domains),
+        allow_cidrs=tuple(proto.allow_cidrs),
+    )
+
+
 def sandbox_info(proto) -> SandboxInfo:
     return SandboxInfo(
         id=proto.id,
@@ -174,6 +183,7 @@ def sandbox_info(proto) -> SandboxInfo:
         terminal_error=proto.terminal_error,
         metadata=dict(proto.metadata),
         tags=tuple(proto.tags),
+        egress=session_egress_policy(proto.egress),
         volume_mounts=tuple(
             VolumeMount(
                 volume_id=mount.volume_id,

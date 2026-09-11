@@ -54,6 +54,14 @@ class VolumeMount:
 
 
 @dataclass(frozen=True)
+class SessionEgressPolicy:
+    """Outbound allowlist echoed back on a session. Both lists empty means unrestricted."""
+
+    allow_domains: tuple[str, ...] = ()
+    allow_cidrs: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class SandboxInfo:
     id: str
     name: str = ""
@@ -68,6 +76,7 @@ class SandboxInfo:
     pause_expires_at: datetime | None = None
     metadata: Mapping[str, str] = field(default_factory=dict)
     tags: tuple[str, ...] = ()
+    egress: SessionEgressPolicy = field(default_factory=SessionEgressPolicy)
     volume_mounts: tuple[VolumeMount, ...] = ()
     sticky: bool = False
     source_registry_image_id: str | None = None

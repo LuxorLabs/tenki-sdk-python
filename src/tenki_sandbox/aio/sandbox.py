@@ -17,7 +17,14 @@ from ..errors import (
     SessionNotFoundError,
     map_rpc_error,
 )
-from ..models import CommandResult, ExposedPort, SandboxInfo, SessionMetrics, VolumeMount
+from ..models import (
+    CommandResult,
+    ExposedPort,
+    SandboxInfo,
+    SessionEgressPolicy,
+    SessionMetrics,
+    VolumeMount,
+)
 from ..sandbox import _is_unimplemented
 from ..warning import SandboxWarning, emit_warnings, sandbox_warnings_from_proto
 from .data_plane import (
@@ -187,7 +194,10 @@ class AsyncSandbox:
                 # Recover renewal if the manager was constructed without a loop.
                 self._data_plane_credentials.ensure_scheduled()
             return self._data_plane_rpc
-        if self._data_plane_credentials is not None and self._data_plane_credentials.current():
+        if (
+            self._data_plane_credentials is not None
+            and self._data_plane_credentials.current()
+        ):
             endpoint = await self._data_plane_endpoint_hints.resolve(
                 self._renew_data_plane
             )
@@ -284,6 +294,10 @@ class AsyncSandbox:
     def name(self) -> str:
         return self._info.name
 
+    @property
+    def egress(self) -> SessionEgressPolicy:
+        return self._info.egress
+
     async def __aenter__(self) -> "AsyncSandbox":
         return self
 
@@ -300,7 +314,9 @@ class AsyncSandbox:
         self._info = (await self._client.get(self.id)).info
         return self._info
 
-    async def metrics(self, *, window: float | int | object | None = None) -> SessionMetrics:
+    async def metrics(
+        self, *, window: float | int | object | None = None
+    ) -> SessionMetrics:
         return await self._client.get_session_metrics(self.id, window=window)
 
     async def wait_ready(self, timeout: float = 180) -> None:
@@ -474,7 +490,10 @@ class AsyncSandbox:
             req.sticky = sticky
         if max_duration is not None:
             max_duration_proto = duration(max_duration)
-            if max_duration_proto.seconds + max_duration_proto.nanos / 1_000_000_000 <= 0:
+            if (
+                max_duration_proto.seconds + max_duration_proto.nanos / 1_000_000_000
+                <= 0
+            ):
                 raise ValueError("max_duration must be greater than zero")
             if sticky is None:
                 raise ValueError("sticky must be set when max_duration is provided")

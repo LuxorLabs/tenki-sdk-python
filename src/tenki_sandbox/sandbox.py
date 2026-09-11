@@ -22,7 +22,14 @@ from .errors import (
 )
 from .fs import SandboxFS
 from .git import SandboxGit
-from .models import CommandResult, ExposedPort, SandboxInfo, SessionMetrics, VolumeMount
+from .models import (
+    CommandResult,
+    ExposedPort,
+    SandboxInfo,
+    SessionEgressPolicy,
+    SessionMetrics,
+    VolumeMount,
+)
 from .process import Process
 from .warning import SandboxWarning, emit_warnings, sandbox_warnings_from_proto
 
@@ -162,7 +169,9 @@ class Sandbox:
                     self._apply_data_plane_response(endpoint, from_hint=True)
             if verify_serving and not self._data_plane_verified:
                 try:
-                    ensure_serving = getattr(self._data_plane_rpc, "ensure_serving", None)
+                    ensure_serving = getattr(
+                        self._data_plane_rpc, "ensure_serving", None
+                    )
                     if callable(ensure_serving):
                         ensure_serving(self.id)
                 except Exception as err:
@@ -260,6 +269,10 @@ class Sandbox:
     @property
     def name(self) -> str:
         return self._info.name
+
+    @property
+    def egress(self) -> SessionEgressPolicy:
+        return self._info.egress
 
     def __enter__(self) -> "Sandbox":
         return self
@@ -455,7 +468,10 @@ class Sandbox:
             req.sticky = sticky
         if max_duration is not None:
             max_duration_proto = duration(max_duration)
-            if max_duration_proto.seconds + max_duration_proto.nanos / 1_000_000_000 <= 0:
+            if (
+                max_duration_proto.seconds + max_duration_proto.nanos / 1_000_000_000
+                <= 0
+            ):
                 raise ValueError("max_duration must be greater than zero")
             if sticky is None:
                 raise ValueError("sticky must be set when max_duration is provided")

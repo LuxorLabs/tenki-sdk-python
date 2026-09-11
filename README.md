@@ -75,6 +75,17 @@ internet and can expose ports without passing either argument. Both are create-t
 changed on an existing sandbox; `sandbox.info.inbound_enabled` / `sandbox.info.outbound_enabled` report what
 a sandbox was created with.
 
+Restrict outbound access with `allow_domains` and `allow_cidrs`. A sandbox that may only reach PyPI:
+
+```python
+sb = Sandbox.create(
+    allow_domains=["pypi.org", "*.pypi.org", "files.pythonhosted.org"],
+)
+```
+
+`allow_outbound=False` still blocks everything, regardless of `allow_domains`/`allow_cidrs`.
+Read the allowlist back from `sb.info.egress`.
+
 ## Async (asyncio)
 
 `AsyncClient` / `AsyncSandbox` expose the same surface with native `async`/`await`,

@@ -210,22 +210,24 @@ def test_auth_metadata_and_grpc_target_are_provider_friendly():
     assert grpc_target("localhost:8090") == ("localhost:8090", True)
 
 
-def test_sync_transport_starts_channel_connection(monkeypatch):
+def test_sync_transport_closes_without_a_background_connectivity_monitor(monkeypatch):
     import grpc
 
     from tenki_sandbox._internal.proto.tenki.sandbox.v1 import sandbox_pb2_grpc
 
-    channel = object()
+    class Channel:
+        closed = False
 
-    class ReadyFuture:
-        cancelled = False
+        def close(self):
+            self.closed = True
 
-        def cancel(self):
-            self.cancelled = True
+    channel = Channel()
 
-    ready_future = ReadyFuture()
+    def unexpected_monitor(_channel):
+        raise AssertionError("unused connectivity monitors race with channel.close()")
+
     monkeypatch.setattr(grpc, "insecure_channel", lambda _target: channel)
-    monkeypatch.setattr(grpc, "channel_ready_future", lambda candidate: ready_future)
+    monkeypatch.setattr(grpc, "channel_ready_future", unexpected_monitor)
     monkeypatch.setattr(sandbox_pb2_grpc, "SandboxServiceStub", lambda candidate: object())
 
     rpc = GrpcSandboxRPC(
@@ -233,9 +235,8 @@ def test_sync_transport_starts_channel_connection(monkeypatch):
     )
 
     assert rpc._channel is channel
-    assert rpc._ready_future is ready_future
     rpc.close()
-    assert ready_future.cancelled is True
+    assert channel.closed is True
 
 
 def test_gateway_url_derivation_preserves_port_and_overrides():
@@ -449,12 +450,60 @@ def test_create_preserves_inbound_policy_presence():
     assert not pb.CreateSessionRequest().HasField("allow_inbound")
 
 
+def test_create_sets_egress_only_when_allow_domains_or_allow_cidrs_given():
+    rpc = FakeRPC()
+    client = Client(rpc=rpc)
+
+    client.create(
+        workspace_id="ws-1",
+        wait=False,
+        allow_domains=["*.pypi.org", "files.pythonhosted.org"],
+        allow_cidrs=["10.0.0.0/8"],
+    )
+    with_egress = rpc.requests["create_session"][-1]
+    assert with_egress.HasField("egress")
+    assert list(with_egress.egress.allow_domains) == [
+        "*.pypi.org",
+        "files.pythonhosted.org",
+    ]
+    assert list(with_egress.egress.allow_cidrs) == ["10.0.0.0/8"]
+    assert (
+        pb.CreateSessionRequest(
+            egress=pb.SessionEgressPolicy(allow_domains=["*.pypi.org"])
+        ).SerializeToString()
+        == b"\x8a\x02\x0c\n\n*.pypi.org"
+    )
+
+    client.create(workspace_id="ws-1", wait=False)
+    without_egress = rpc.requests["create_session"][-1]
+    assert not without_egress.HasField("egress")
+    assert not pb.CreateSessionRequest().HasField("egress")
+
+
 def test_sandbox_info_reports_server_network_policy():
     info = sandbox_info(
         pb.SandboxSession(id="s", inbound_enabled=True, outbound_enabled=False)
     )
     assert info.inbound_enabled is True
     assert info.outbound_enabled is False
+
+
+def test_sandbox_info_reports_egress_policy():
+    info = sandbox_info(
+        pb.SandboxSession(
+            id="s",
+            egress=pb.SessionEgressPolicy(
+                allow_domains=["*.pypi.org", "files.pythonhosted.org"],
+                allow_cidrs=["10.0.0.0/8"],
+            ),
+        )
+    )
+    assert info.egress.allow_domains == ("*.pypi.org", "files.pythonhosted.org")
+    assert info.egress.allow_cidrs == ("10.0.0.0/8",)
+
+    unrestricted = sandbox_info(pb.SandboxSession(id="s"))
+    assert unrestricted.egress.allow_domains == ()
+    assert unrestricted.egress.allow_cidrs == ()
 
 
 def test_sandbox_info_reports_lifecycle_state():

@@ -78,6 +78,8 @@ class Client:
         timeout: float | None = None,
         allow_inbound: bool = True,
         allow_outbound: bool = True,
+        allow_domains: list[str] | None = None,
+        allow_cidrs: list[str] | None = None,
         max_duration: float | int | object | None = None,
         idle_timeout_minutes: int | None = None,
         pause_retention: float | int | object | None = None,
@@ -107,12 +109,17 @@ class Client:
         ``disk_size_gb`` is 5-100: a create with no ``image``, ``snapshot_id`` or
         ``from_template_spec`` defaults to 5, while one with a source inherits
         that source's disk unless this is set.
+
+        ``allow_domains``/``allow_cidrs`` restrict outbound access; both are
+        ignored when ``allow_outbound`` is false.
         """
         req = build_create_session_request(
             workspace_id=workspace_id,
             name=name,
             allow_inbound=allow_inbound,
             allow_outbound=allow_outbound,
+            allow_domains=allow_domains,
+            allow_cidrs=allow_cidrs,
             max_duration=max_duration,
             idle_timeout_minutes=idle_timeout_minutes,
             pause_retention=pause_retention,
@@ -302,6 +309,8 @@ def build_create_session_request(
     name: str | None = None,
     allow_inbound: bool = True,
     allow_outbound: bool = True,
+    allow_domains: list[str] | None = None,
+    allow_cidrs: list[str] | None = None,
     max_duration: float | int | object | None = None,
     idle_timeout_minutes: int | None = None,
     pause_retention: float | int | object | None = None,
@@ -350,6 +359,13 @@ def build_create_session_request(
         req.workspace_id = workspace_id.strip()
     if tags:
         req.tags.extend(_normalize_tags(tags))
+    if allow_domains or allow_cidrs:
+        req.egress.CopyFrom(
+            pb.SessionEgressPolicy(
+                allow_domains=list(allow_domains or []),
+                allow_cidrs=list(allow_cidrs or []),
+            )
+        )
     if max_duration is not None:
         req.max_duration.CopyFrom(duration(max_duration))
     if idle_timeout_minutes is not None:
