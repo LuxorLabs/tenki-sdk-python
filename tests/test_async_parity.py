@@ -81,3 +81,60 @@ def test_top_level_reexports():
     assert sync.AsyncClient is aio.AsyncClient
     assert sync.AsyncSandbox is aio.AsyncSandbox
     assert aio_client.AsyncClient is aio.AsyncClient
+
+
+# Sandbox.create is a typed shortcut, not a **kwargs passthrough, so a new
+# Client.create argument no longer reaches it for free. Fail here on drift.
+CLIENT_CONNECT_PARAMS = {
+    "auth_token",
+    "base_url",
+    "gateway_url",
+    "timeout",
+    "warning_handler",
+}
+
+
+def _keyword_params(fn) -> set[str]:
+    return {
+        name
+        for name, param in inspect.signature(fn).parameters.items()
+        if param.kind is inspect.Parameter.KEYWORD_ONLY
+    }
+
+
+def _assert_create_shortcut_covers(client_cls, sandbox_cls):
+    expected = (_keyword_params(client_cls.create) - {"_owns_client"}) | CLIENT_CONNECT_PARAMS
+    actual = _keyword_params(sandbox_cls.create)
+    assert actual == expected, (
+        f"{sandbox_cls.__name__}.create drifted from {client_cls.__name__}.create: "
+        f"missing {sorted(expected - actual)}, extra {sorted(actual - expected)}"
+    )
+
+
+def test_sandbox_create_shortcut_exposes_every_client_create_param():
+    _assert_create_shortcut_covers(sync.Client, sync.Sandbox)
+    _assert_create_shortcut_covers(aio.AsyncClient, aio.AsyncSandbox)
+
+
+def test_sandbox_create_shortcut_defaults_match_client_create():
+    pairs = ((sync.Client, sync.Sandbox), (aio.AsyncClient, aio.AsyncSandbox))
+    for client_cls, sandbox_cls in pairs:
+        shortcut = inspect.signature(sandbox_cls.create).parameters
+        for source in (client_cls.__init__, client_cls.create):
+            for name, param in inspect.signature(source).parameters.items():
+                if name not in shortcut or name in {"_owns_client", "rpc"}:
+                    continue
+                # timeout is deliberately the client's, not Client.create's.
+                if name == "timeout" and source is client_cls.create:
+                    continue
+                assert shortcut[name].default == param.default, (
+                    f"{sandbox_cls.__name__}.create({name}=) default drifted from "
+                    f"{client_cls.__name__}.{source.__name__}"
+                )
+
+
+def test_sandbox_create_shortcut_is_keyword_only():
+    for sandbox_cls in (sync.Sandbox, aio.AsyncSandbox):
+        kinds = {p.kind for p in inspect.signature(sandbox_cls.create).parameters.values()}
+        assert inspect.Parameter.VAR_KEYWORD not in kinds, f"{sandbox_cls.__name__}.create still takes **kwargs"
+        assert inspect.Parameter.POSITIONAL_OR_KEYWORD not in kinds

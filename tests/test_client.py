@@ -1066,3 +1066,47 @@ def _session(state=pb.SESSION_STATE_RUNNING, sid="session-1"):
         inbound_enabled=True,
         outbound_enabled=True,
     )
+
+
+def _closable(rpc):
+    rpc.closed = False
+
+    def close():
+        rpc.closed = True
+
+    rpc.close = close
+    return rpc
+
+
+def test_sandbox_create_closes_owned_client_when_create_fails(monkeypatch):
+    rpc = _closable(FakeRPC())
+
+    def boom(_req):
+        raise FakeRPCError("UNAVAILABLE")
+
+    rpc.create_session = boom
+    client = Client(rpc=rpc)
+    monkeypatch.setattr("tenki_sandbox.client.Client", lambda **_kwargs: client)
+
+    with pytest.raises(SandboxError):
+        Sandbox.create(wait=False)
+
+    assert rpc.closed, "owned client leaked when create failed"
+
+
+def test_sandbox_create_keeps_owned_client_open_for_wait_failure(monkeypatch):
+    # The sandbox exists server-side and rides out on the error, so the caller
+    # still needs a live channel to terminate it through.
+    rpc = _closable(FakeRPC())
+    rpc.wait_states = [pb.SESSION_STATE_CREATING]
+    client = Client(rpc=rpc)
+    monkeypatch.setattr("tenki_sandbox.client.Client", lambda **_kwargs: client)
+
+    with pytest.raises(WaitReadyFailedError) as exc_info:
+        Sandbox.create(wait=True, timeout=0)
+
+    assert not rpc.closed
+    with exc_info.value.sandbox as sandbox:
+        assert sandbox._owns_client
+    assert rpc.requests["terminate_session"][-1].session_id == "session-1"
+    assert rpc.closed

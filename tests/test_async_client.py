@@ -13,6 +13,7 @@ from tenki_sandbox import (
     MissingAuthTokenError,
     PauseFailedError,
     PauseWaitCancelledError,
+    SandboxError,
     SandboxWarningCode,
     SandboxWarningNotification,
     WaitReadyFailedError,
@@ -736,4 +737,40 @@ async def test_async_client_close_awaits_rpc_close():
     rpc = FakeControlRPC()
     client = AsyncClient(rpc=rpc)
     await client.close()
+    assert rpc.closed
+
+
+@pytest.mark.asyncio
+async def test_async_sandbox_create_closes_owned_client_when_create_fails(monkeypatch):
+    rpc = FakeControlRPC()
+
+    async def boom(_req):
+        raise FakeRPCError("UNAVAILABLE")
+
+    rpc.create_session = boom
+    client = AsyncClient(rpc=rpc)
+    monkeypatch.setattr("tenki_sandbox.aio.client.AsyncClient", lambda **_kwargs: client)
+
+    with pytest.raises(SandboxError):
+        await AsyncSandbox.create(wait=False)
+
+    assert rpc.closed, "owned client leaked when create failed"
+
+
+@pytest.mark.asyncio
+async def test_async_sandbox_create_keeps_owned_client_open_for_wait_failure(monkeypatch):
+    # The sandbox exists server-side and rides out on the error, so the caller
+    # still needs a live channel to terminate it through.
+    rpc = FakeControlRPC()
+    rpc.wait_states = [pb.SESSION_STATE_CREATING]
+    client = AsyncClient(rpc=rpc)
+    monkeypatch.setattr("tenki_sandbox.aio.client.AsyncClient", lambda **_kwargs: client)
+
+    with pytest.raises(WaitReadyFailedError) as exc_info:
+        await AsyncSandbox.create(wait=True, timeout=0)
+
+    assert not rpc.closed
+    async with exc_info.value.sandbox as sandbox:
+        assert sandbox._owns_client
+    assert rpc.requests["terminate_session"][-1].session_id == "session-1"
     assert rpc.closed

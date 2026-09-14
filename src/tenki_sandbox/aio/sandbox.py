@@ -15,18 +15,27 @@ from ..errors import (
     PauseFailedError,
     PauseWaitCancelledError,
     SessionNotFoundError,
+    WaitReadyFailedError,
     map_rpc_error,
 )
 from ..models import (
     CommandResult,
     ExposedPort,
+    Image,
     SandboxInfo,
     SessionEgressPolicy,
     SessionMetrics,
+    Template,
     VolumeMount,
 )
 from ..sandbox import _is_unimplemented
-from ..warning import SandboxWarning, emit_warnings, sandbox_warnings_from_proto
+from ..warning import (
+    SandboxWarning,
+    WarningHandler,
+    default_warning_handler,
+    emit_warnings,
+    sandbox_warnings_from_proto,
+)
 from .data_plane import (
     AsyncDataPlaneCredentialManager,
     AsyncGrpcDataPlaneRPC,
@@ -261,22 +270,100 @@ class AsyncSandbox:
             self._data_plane_from_hint = False
 
     @classmethod
-    async def create(cls, **kwargs) -> "AsyncSandbox":
+    async def create(
+        cls,
+        *,
+        auth_token: str | None = None,
+        base_url: str | None = None,
+        gateway_url: str | None = None,
+        timeout: float | None = None,
+        warning_handler: WarningHandler | None = default_warning_handler,
+        workspace_id: str | None = None,
+        name: str | None = None,
+        wait: bool = True,
+        allow_inbound: bool = True,
+        allow_outbound: bool = True,
+        allow_domains: list[str] | None = None,
+        allow_cidrs: list[str] | None = None,
+        max_duration: float | int | object | None = None,
+        idle_timeout_minutes: int | None = None,
+        pause_retention: float | int | object | None = None,
+        cpu_cores: int | None = None,
+        memory_mb: int | None = None,
+        disk_size_gb: int | None = None,
+        metadata: dict[str, str] | None = None,
+        tags: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        ssh_authorized_keys: list[str] | None = None,
+        snapshot_id: str | None = None,
+        image: str | Image | None = None,
+        from_template_spec: str | Template | None = None,
+        setup_env: dict[str, str] | None = None,
+        setup_secrets: dict[str, str] | None = None,
+        enable_opencode: bool = False,
+        clone_repo_url: str | None = None,
+        volumes: list[dict | tuple] | None = None,
+        github_token: str | None = None,
+        sticky: bool = False,
+        wait_for_runtime: bool = False,
+    ) -> "AsyncSandbox":
+        """Create a sandbox on a client this sandbox owns and closes.
+
+        Accepts every ``AsyncClient`` connection argument and every
+        ``AsyncClient.create`` argument; see ``Client.create`` for resource
+        bounds and egress rules. ``timeout`` is the client transport timeout,
+        not the readiness budget; construct a client and call
+        ``AsyncClient.create(timeout=...)`` to set that.
+        """
         from .client import AsyncClient
 
-        client_kwargs = {
-            key: kwargs.pop(key)
-            for key in [
-                "auth_token",
-                "base_url",
-                "gateway_url",
-                "timeout",
-                "warning_handler",
-            ]
-            if key in kwargs
-        }
-        client = AsyncClient(**client_kwargs)
-        return await client.create(**kwargs, _owns_client=True)
+        # timeout is the transport timeout here; Client.create's is the wait budget.
+        client = AsyncClient(
+            auth_token=auth_token,
+            base_url=base_url,
+            gateway_url=gateway_url,
+            timeout=timeout,
+            warning_handler=warning_handler,
+        )
+        try:
+            return await client.create(
+                workspace_id=workspace_id,
+                name=name,
+                wait=wait,
+                allow_inbound=allow_inbound,
+                allow_outbound=allow_outbound,
+                allow_domains=allow_domains,
+                allow_cidrs=allow_cidrs,
+                max_duration=max_duration,
+                idle_timeout_minutes=idle_timeout_minutes,
+                pause_retention=pause_retention,
+                cpu_cores=cpu_cores,
+                memory_mb=memory_mb,
+                disk_size_gb=disk_size_gb,
+                metadata=metadata,
+                tags=tags,
+                env=env,
+                ssh_authorized_keys=ssh_authorized_keys,
+                snapshot_id=snapshot_id,
+                image=image,
+                from_template_spec=from_template_spec,
+                setup_env=setup_env,
+                setup_secrets=setup_secrets,
+                enable_opencode=enable_opencode,
+                clone_repo_url=clone_repo_url,
+                volumes=volumes,
+                github_token=github_token,
+                sticky=sticky,
+                wait_for_runtime=wait_for_runtime,
+                _owns_client=True,
+            )
+        except WaitReadyFailedError:
+            # The sandbox rides out on the error and owns this client; closing it
+            # here would strip the caller of the handle they terminate it with.
+            raise
+        except BaseException:
+            await client.close()
+            raise
 
     @property
     def id(self) -> str:
