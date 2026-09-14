@@ -329,6 +329,13 @@ class AsyncResilientHostPortTunnel:
         self._current: AsyncHostPortTunnel | None = None
         self._reconnect_task: asyncio.Task | None = None
 
+    def endpoint(self) -> tuple[str, int]:
+        """Return the last established address and port from one connection."""
+        current = self._current
+        if current is None:
+            return "", 0
+        return current.sandbox_address, current.sandbox_port
+
     @property
     def state(self) -> str:
         return self._state

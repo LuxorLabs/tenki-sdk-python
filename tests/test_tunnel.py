@@ -530,6 +530,7 @@ def test_resilient_reconnect_updates_port_and_address():
     assert connected_event.wait(timeout=5)
     assert r.sandbox_port == 2222
     assert r.sandbox_address == "b:2222"
+    assert r.endpoint() == ("b:2222", 2222)
     r.close()
 
 

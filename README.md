@@ -123,6 +123,8 @@ The sync `Client` / `Sandbox` remain available for non-async consumers. SSH,
 the `tenki[async]` extra for `websockets`), `dial()` returns an
 `AsyncDialConn`, and `expose_host_port()` / `expose_host_port_resilient()` return
 async tunnels with `await tunnel.terminated.wait()` and `on_terminated` callbacks.
+For sync and async resilient tunnels, `address, port = tunnel.endpoint()` reads
+one established connection. It retains the last endpoint during reconnect and after close.
 
 ## Auth
 

@@ -356,6 +356,14 @@ class ResilientHostPortTunnel:
         self._closed = False
         self._current: HostPortTunnel | None = None
 
+    def endpoint(self) -> tuple[str, int]:
+        """Return the last established address and port from one connection."""
+        with self._mu:
+            current = self._current
+        if current is None:
+            return "", 0
+        return current.sandbox_address, current.sandbox_port
+
     @property
     def state(self) -> str:
         with self._mu:

@@ -369,10 +369,12 @@ async def test_substream_done_callback_retrieves_exception():
 async def test_async_resilient_tunnel_open_and_close():
     resilient = await open_resilient_host_port_tunnel(_StableTunnelRPC(), "sess-1", "127.0.0.1:1")
     assert resilient.sandbox_port == 7777
+    assert resilient.endpoint() == (resilient.sandbox_address, 7777)
     assert resilient.state == "connected"
     await resilient.close()
     assert resilient.terminated.is_set()
     assert resilient.state == "terminated"
+    assert resilient.endpoint() == (resilient.sandbox_address, 7777)
 
 
 async def test_async_tunnel_on_terminated_callback_fires():
