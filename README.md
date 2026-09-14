@@ -471,3 +471,35 @@ Checkout `mode` uses `"contents"` or `"directory"`; runtime `runAt`,
 `"on-failure"`, and `"memory"`. Full protobuf enum names remain accepted;
 unknown fields and enum values are rejected.
 See `examples/template_builder.py` for the full filesystem/memory workflow.
+
+## Workspace secrets
+
+Workspace clients manage secrets independently of sandbox Sessions:
+
+```python
+from tenki import WorkspaceClient, SecretPolicy
+
+with WorkspaceClient(workspace_id=workspace_id) as workspace:
+    secret = workspace.secrets.create(
+        "TOKEN", value_bytes,
+        SecretPolicy("guest_and_injection", "unset"),
+        request_id=request_id,
+    )
+```
+
+`AsyncWorkspaceClient` has the same methods and arguments. Use `async with`
+and await each operation. Authentication uses `TENKI_AUTH_TOKEN` or `TENKI_API_KEY`.
+Set `base_url` or `TENKI_CLOUD_API_URL` to override the cloud API endpoint
+independently of sandbox configuration. Set `workspace_id` once on the client. An omitted or empty workspace ID uses the authenticated
+workspace key's scope; other callers must specify one.
+
+`create`, `update`, `get`, `list`, `list_versions`, `revoke`, and `delete` return
+metadata only. Values are `bytes`; omitted or `None` on update retains the value,
+while `b""` creates an empty value. Update, revoke, and delete require
+`expected_revision`. To select an existing version, update `active_version` with
+`value` omitted. Revoking without `version` irreversibly revokes the entire secret.
+
+Mutations generate a request ID when none is supplied. For retries after an
+uncertain result, supply and reuse the same request ID and identical arguments.
+The SDK does not retry mutations automatically. `WorkspaceSecretError.code`
+preserves the RPC status, including revision conflicts.

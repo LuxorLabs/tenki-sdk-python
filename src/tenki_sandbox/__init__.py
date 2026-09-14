@@ -185,3 +185,28 @@ __all__ = [
     "GiB",
     "TiB",
 ]
+
+from .workspace import AsyncWorkspaceClient, WorkspaceClient
+from .workspace_secrets import (
+    SecretDeliveryMode,
+    SecretDestinationMode,
+    SecretPage,
+    SecretPolicy,
+    SecretVersionPage,
+    WorkspaceSecret,
+    WorkspaceSecretError,
+    WorkspaceSecretVersion,
+)
+
+__all__ += [
+    "WorkspaceSecretError",
+    "WorkspaceClient",
+    "AsyncWorkspaceClient",
+    "SecretPolicy",
+    "WorkspaceSecret",
+    "WorkspaceSecretVersion",
+    "SecretPage",
+    "SecretVersionPage",
+    "SecretDeliveryMode",
+    "SecretDestinationMode",
+]
