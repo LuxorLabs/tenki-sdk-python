@@ -167,6 +167,8 @@ class PreviewUrl:
     wildcard_status: str = "UNSPECIFIED"
     # Actionable reason when wildcard_status is FAILED; empty otherwise.
     wildcard_status_reason: str = ""
+    # Deadline after which the URL stops serving; None means it does not expire.
+    expires_at: datetime | None = None
 
 
 @dataclass(frozen=True)

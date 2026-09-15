@@ -551,7 +551,8 @@ class SandboxServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def ExposePort(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Deprecated: creates a preview URL; use CreatePreviewUrl instead.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -575,13 +576,15 @@ class SandboxServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def UnexposePort(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Deprecated: unbinds every preview URL on the port; use UnbindPreviewUrl.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def ListExposedPorts(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Deprecated: use ListPreviewUrls.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')

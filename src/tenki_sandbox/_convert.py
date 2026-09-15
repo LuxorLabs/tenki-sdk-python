@@ -274,6 +274,9 @@ def preview_url(proto) -> PreviewUrl:
         wildcard_status_reason=proto.wildcard_status_reason
         if proto.HasField("wildcard_status_reason")
         else "",
+        expires_at=datetime_from_proto(proto.expires_at)
+        if proto.HasField("expires_at")
+        else None,
     )
 
 
