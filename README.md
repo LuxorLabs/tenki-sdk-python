@@ -86,6 +86,40 @@ sb = Sandbox.create(
 `allow_outbound=False` still blocks everything, regardless of `allow_domains`/`allow_cidrs`.
 Read the allowlist back from `sb.info.egress`.
 
+## What survives a pause
+
+Pause captures the VM's full memory, not only its disk: a resumed sandbox is the
+same running machine, not a reboot. Processes keep their PIDs and their in-memory
+state, and the guest clock stops for the duration of the pause.
+
+`/tmp` is cleared across a pause. Keep durable state under `/home/tenki`, which
+is preserved.
+
+While a sandbox is paused it serves no traffic: preview requests return `404`
+until it resumes. The client connection itself is not dropped — a held
+keep-alive connection returns `200` again after resume — so treat a paused
+sandbox as unavailable rather than disconnected.
+
+SSH is different: a held transport fails on use while paused and does not
+recover after resume, so reconnect rather than retry on it. A fresh
+connection succeeds as soon as the sandbox is `RUNNING` again.
+
+```python
+sb.exec("bash", "-lc", "echo hello > ~/marker")
+sb.exec("bash", "-lc", "setsid nohup sleep 3600 >/dev/null 2>&1 </dev/null &")
+pid = sb.exec("bash", "-lc", "pgrep -n sleep").stdout.decode().strip()
+
+sb.pause()
+sb.resume()
+
+assert sb.exec("bash", "-lc", "cat ~/marker").stdout == b"hello\n"
+assert sb.exec("bash", "-lc", f"kill -0 {pid} && echo alive").stdout == b"alive\n"
+```
+
+`examples/pause_preserves_memory.py` extends this to prove the memory claim
+directly: it hashes a multi-megabyte buffer that only ever exists in RAM and
+re-reads it from the same process after resume.
+
 ## Async (asyncio)
 
 `AsyncClient` / `AsyncSandbox` expose the same surface with native `async`/`await`,
