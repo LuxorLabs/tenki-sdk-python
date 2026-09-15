@@ -308,18 +308,18 @@ Long-lived sandboxes are a parameter choice at `create()`, not a separate API:
 
 ```python
 sb = client.create(
-    sticky=True,              # long-lived session: not reaped on idle
+    sticky=True,              # long-lived session: no automatic lifetime limit
     pause_retention=24 * 3600,# how long a paused session is kept resumable
 )
 ```
 
 - `max_duration` caps total lifetime; `sb.extend(seconds)` pushes the deadline
   (`sb.info.timeout_at`) while running.
-- `idle_timeout_minutes` auto-pauses an idle sandbox; `sb.resume()` brings it
-  back with the filesystem intact.
-- `sticky=True` opts the session out of idle reaping for keep-warm use cases.
-  It discards `max_duration` and disables automatic idle pause. Manual pause and
-  resume do not clear sticky.
+- `sticky=True` runs the session until it is terminated, for keep-warm use
+  cases. It discards `max_duration`. Manual pause and resume do not clear
+  sticky.
+- `idle_timeout_minutes` is deprecated and ignored: sandboxes do not auto-pause
+  on idle. Use `max_duration`, or `sb.pause()` to pause explicitly.
 - `client.list(sticky=True)` filters for long-lived sessions in the API key's Workspace.
 
 When the service discards a create option, `sb.warnings` retains the structured

@@ -121,6 +121,9 @@ class AsyncClient:
 
         ``allow_domains``/``allow_cidrs`` restrict outbound access; both are
         ignored when ``allow_outbound`` is false.
+
+        ``idle_timeout_minutes`` is deprecated and ignored: sandboxes do not
+        auto-pause on idle.
         """
         req = build_create_session_request(
             workspace_id=workspace_id,

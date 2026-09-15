@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import warnings
 
 from ._convert import identity, sandbox_info, session_metrics, workspace_usage_limit
 from ._pb import pb
@@ -112,6 +113,9 @@ class Client:
 
         ``allow_domains``/``allow_cidrs`` restrict outbound access; both are
         ignored when ``allow_outbound`` is false.
+
+        ``idle_timeout_minutes`` is deprecated and ignored: sandboxes do not
+        auto-pause on idle.
         """
         req = build_create_session_request(
             workspace_id=workspace_id,
@@ -369,7 +373,12 @@ def build_create_session_request(
     if max_duration is not None:
         req.max_duration.CopyFrom(duration(max_duration))
     if idle_timeout_minutes is not None:
-        req.idle_timeout_minutes = idle_timeout_minutes
+        warnings.warn(
+            "idle_timeout_minutes is deprecated and ignored; sandboxes do not "
+            "auto-pause on idle. Use max_duration to bound a session's lifetime.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
     if pause_retention is not None:
         req.pause_retention.CopyFrom(duration(pause_retention))
     if cpu_cores is not None:
