@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 
 from .._convert import identity, sandbox_info, session_metrics, workspace_usage_limit
-from .._pb import pb
 from .._pagination import advance_page_token
+from .._pb import pb
 from .._time import duration
 from .._transport import (
     GrpcConfig,
@@ -20,8 +20,8 @@ from ..client import (
 )
 from ..constants import ENV_GATEWAY_URL
 from ..errors import WaitReadyFailedError, map_rpc_error
-from ..models import Identity, Image, Template, WorkspaceUsageLimit
-from ..models import SessionMetrics
+from ..models import Identity, Image, SessionMetrics, Template, WorkspaceUsageLimit
+from ..template_spec import TemplateSpec
 from ..warning import (
     WarningHandler,
     default_warning_handler,
@@ -104,6 +104,8 @@ class AsyncClient:
         from_template_spec: str | Template | None = None,
         setup_env: dict[str, str] | None = None,
         setup_secrets: dict[str, str] | None = None,
+        direct_runtime: TemplateSpec | None = None,
+        secret_overrides: dict[str, str] | None = None,
         enable_opencode: bool = False,
         clone_repo_url: str | None = None,
         volumes: list[dict | tuple] | None = None,
@@ -147,6 +149,8 @@ class AsyncClient:
             from_template_spec=from_template_spec,
             setup_env=setup_env,
             setup_secrets=setup_secrets,
+            direct_runtime=direct_runtime,
+            secret_overrides=secret_overrides,
             enable_opencode=enable_opencode,
             clone_repo_url=clone_repo_url,
             volumes=volumes,

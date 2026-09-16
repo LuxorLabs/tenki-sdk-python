@@ -537,3 +537,21 @@ Mutations generate a request ID when none is supplied. For retries after an
 uncertain result, supply and reuse the same request ID and identical arguments.
 The SDK does not retry mutations automatically. `WorkspaceSecretError.code`
 preserves the RPC status, including revision conflicts.
+
+Managed runtimes reference workspace secret names, without accepting their values:
+
+```python
+runtime = TemplateSpec().start("npm start", secret_env={"API_TOKEN": "app-token"})
+sandbox = client.create(
+    image="team/base:v1",
+    direct_runtime=runtime,
+    secret_overrides={"app-token": "development-token"},
+)
+```
+
+`start` with an argument list and `process_compose` also support `secret_env` in
+stored templates. Async clients accept the same options. Names resolve in the
+launching workspace. `direct_runtime` accepts a runtime-only spec and starts at
+boot; use create options for image and resources. Secret targets cannot also
+appear in ordinary runtime/session env. Session info and snapshot metadata expose
+the read-only `has_runtime_secrets` marker.

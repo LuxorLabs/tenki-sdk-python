@@ -4,8 +4,8 @@ import os
 import warnings
 
 from ._convert import identity, sandbox_info, session_metrics, workspace_usage_limit
-from ._pb import pb
 from ._pagination import advance_page_token
+from ._pb import pb
 from ._resource_validation import validate_create_resources
 from ._time import duration
 from ._transport import (
@@ -22,6 +22,7 @@ from .preview_url import PreviewUrls
 from .registry import Registry
 from .resources import Snapshots, Templates, Volumes
 from .sandbox import Sandbox
+from .template_spec import TemplateSpec
 from .warning import (
     WarningHandler,
     default_warning_handler,
@@ -96,6 +97,8 @@ class Client:
         from_template_spec: str | Template | None = None,
         setup_env: dict[str, str] | None = None,
         setup_secrets: dict[str, str] | None = None,
+        direct_runtime: TemplateSpec | None = None,
+        secret_overrides: dict[str, str] | None = None,
         enable_opencode: bool = False,
         clone_repo_url: str | None = None,
         volumes: list[dict | tuple] | None = None,
@@ -139,6 +142,8 @@ class Client:
             from_template_spec=from_template_spec,
             setup_env=setup_env,
             setup_secrets=setup_secrets,
+            direct_runtime=direct_runtime,
+            secret_overrides=secret_overrides,
             enable_opencode=enable_opencode,
             clone_repo_url=clone_repo_url,
             volumes=volumes,
@@ -330,6 +335,8 @@ def build_create_session_request(
     from_template_spec: str | Template | None = None,
     setup_env: dict[str, str] | None = None,
     setup_secrets: dict[str, str] | None = None,
+    direct_runtime: TemplateSpec | None = None,
+    secret_overrides: dict[str, str] | None = None,
     enable_opencode: bool = False,
     clone_repo_url: str | None = None,
     volumes: list[dict | tuple] | None = None,
@@ -356,6 +363,7 @@ def build_create_session_request(
         wait_for_runtime=wait_for_runtime,
         setup_env=dict(setup_env or {}),
         setup_secrets=dict(setup_secrets or {}),
+        secret_overrides=dict(secret_overrides or {}),
     )
     if name:
         req.name = name
@@ -414,6 +422,12 @@ def build_create_session_request(
             req.volumes.append(
                 pb.VolumeMount(volume_id=volume_id, mount_path=mount_path, readonly=bool(rest and rest[0]))
             )
+    if direct_runtime is not None:
+        if from_template_spec:
+            raise ValueError("direct_runtime conflicts with from_template_spec")
+        req.runtime.CopyFrom(direct_runtime._to_direct_runtime_proto())
+        if any(target in req.env for target in req.runtime.secret_env):
+            raise ValueError("secret target conflicts with session environment")
     return req
 
 

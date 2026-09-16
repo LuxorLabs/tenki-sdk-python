@@ -85,6 +85,7 @@ class SandboxInfo:
     source_registry_ref: str | None = None
     source_template_id: str | None = None
     runtime_state: str = "UNSPECIFIED"
+    has_runtime_secrets: bool = False
     runtime_error: str | None = None
     idle_timeout_minutes: int | None = None
     last_activity_at: datetime | None = None
@@ -227,6 +228,7 @@ class Snapshot:
     memory_mb: int = 0
     disk_size_gb: int = 0
     raw_image_available: bool = False
+    has_runtime_secrets: bool = False
 
 
 @dataclass(frozen=True)

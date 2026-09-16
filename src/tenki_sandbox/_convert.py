@@ -213,6 +213,7 @@ def sandbox_info(proto) -> SandboxInfo:
         source_template_id=proto.source_template_id
         if proto.HasField("source_template_id")
         else None,
+        has_runtime_secrets=proto.has_runtime_secrets,
         runtime_state=template_pb.TemplateRuntimeState.Name(proto.runtime_state).removeprefix(
             "TEMPLATE_RUNTIME_STATE_"
         ),
@@ -340,6 +341,7 @@ def snapshot(proto) -> Snapshot:
         memory_mb=proto.memory_mb,
         disk_size_gb=proto.disk_size_gb,
         raw_image_available=proto.raw_image_available,
+        has_runtime_secrets=proto.has_runtime_secrets,
     )
 
 

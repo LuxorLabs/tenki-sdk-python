@@ -34,6 +34,7 @@ from .models import (
     VolumeMount,
 )
 from .process import Process
+from .template_spec import TemplateSpec
 from .warning import (
     SandboxWarning,
     WarningHandler,
@@ -274,6 +275,8 @@ class Sandbox:
         snapshot_id: str | None = None,
         image: str | Image | None = None,
         from_template_spec: str | Template | None = None,
+        direct_runtime: TemplateSpec | None = None,
+        secret_overrides: dict[str, str] | None = None,
         setup_env: dict[str, str] | None = None,
         setup_secrets: dict[str, str] | None = None,
         enable_opencode: bool = False,
@@ -322,6 +325,8 @@ class Sandbox:
                 snapshot_id=snapshot_id,
                 image=image,
                 from_template_spec=from_template_spec,
+                direct_runtime=direct_runtime,
+                secret_overrides=secret_overrides,
                 setup_env=setup_env,
                 setup_secrets=setup_secrets,
                 enable_opencode=enable_opencode,
@@ -355,6 +360,10 @@ class Sandbox:
     @property
     def name(self) -> str:
         return self._info.name
+
+    @property
+    def has_runtime_secrets(self) -> bool:
+        return self._info.has_runtime_secrets
 
     @property
     def egress(self) -> SessionEgressPolicy:

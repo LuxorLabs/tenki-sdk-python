@@ -497,6 +497,7 @@ class TemplateSpec:
         ready_when: Any | None = None,
         snapshot_mode: str | None = None,
         stop_grace_seconds: int | None = None,
+        secret_env: Mapping[str, str] | None = None,
     ) -> "TemplateSpec":
         """Declare a single start command as the runtime entrypoint.
 
@@ -516,6 +517,9 @@ class TemplateSpec:
             if workdir is not None:
                 p.runtime.start.workdir = workdir
             options(p.runtime)
+            if secret_env is not None:
+                p.runtime.secret_env.clear()
+                p.runtime.secret_env.update(dict(secret_env))
 
         return self._evolve(mutate)
 
@@ -530,6 +534,7 @@ class TemplateSpec:
         ready_when: Any | None = None,
         snapshot_mode: str | None = None,
         stop_grace_seconds: int | None = None,
+        secret_env: Mapping[str, str] | None = None,
     ) -> "TemplateSpec":
         """Declare a process-compose supervisor as the runtime entrypoint."""
         options = self._runtime_options(
@@ -544,6 +549,9 @@ class TemplateSpec:
             if env_files:
                 p.runtime.process_compose.env_files.extend(env_files)
             options(p.runtime)
+            if secret_env is not None:
+                p.runtime.secret_env.clear()
+                p.runtime.secret_env.update(dict(secret_env))
 
         return self._evolve(mutate)
 
@@ -635,6 +643,29 @@ class TemplateSpec:
         proto = template_pb.TemplateBuildSpec()
         proto.CopyFrom(self._proto)
         return proto
+
+    def _to_direct_runtime_proto(self):
+        p = self.to_proto()
+        if (
+            p.base.WhichOneof("source") != "image"
+            or p.base.image != "sandbox"
+            or any(p.HasField(field) for field in ("context", "build", "resources"))
+            or p.steps
+        ):
+            raise ValueError(
+                "direct_runtime accepts runtime settings only; "
+                "configure launch image and resources on create"
+            )
+        self.validate()
+        if not p.HasField("runtime") or p.runtime.run_at not in (
+            template_pb.TEMPLATE_RUNTIME_RUN_AT_UNSPECIFIED,
+            template_pb.TEMPLATE_RUNTIME_RUN_AT_BOOT,
+        ):
+            raise ValueError("direct_runtime requires a boot runtime entrypoint")
+        entrypoint = p.runtime.WhichOneof("entrypoint")
+        if entrypoint and not getattr(p.runtime, entrypoint).workdir:
+            getattr(p.runtime, entrypoint).workdir = p.workdir
+        return p.runtime
 
     def to_dict(self) -> dict:
         """Authored JSON dict with camelCase fields and short enum values."""
@@ -916,6 +947,15 @@ def _validate_spec(p) -> list[str]:
 
 
 def _validate_runtime(out: list[str], runtime) -> None:
+    if len(runtime.secret_env) > 64:
+        out.append("runtime.secret_env: at most 64 secret references")
+    for target, name in runtime.secret_env.items():
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", target):
+            out.append("runtime.secret_env: invalid environment target")
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,127}", name):
+            out.append("runtime.secret_env: invalid workspace secret name")
+        if target in runtime.env:
+            out.append("runtime.secret_env: secret target conflicts with runtime environment")
     entrypoint = runtime.WhichOneof("entrypoint")
     if entrypoint is None:
         out.append("runtime: exactly one runtime entrypoint is required")
