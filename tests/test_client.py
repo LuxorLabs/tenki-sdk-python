@@ -203,6 +203,49 @@ def test_invalid_auth_token_is_unauthorized_error():
     assert issubclass(InvalidAuthTokenError, UnauthorizedError)
 
 
+@pytest.mark.parametrize("rpc", [None, object()])
+def test_client_accepts_api_key_as_an_alias_for_auth_token(rpc, monkeypatch):
+    monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("TENKI_API_KEY", raising=False)
+
+    assert Client(api_key="tk_alias", rpc=rpc).auth_token == "tk_alias"
+    assert Client(auth_token="tk_same", api_key="tk_same", rpc=rpc).auth_token == "tk_same"
+
+
+def test_auth_token_wins_over_the_api_key_alias():
+    assert Client(auth_token="tk_one", api_key="tk_two", rpc=object()).auth_token == "tk_one"
+
+
+def test_api_key_alias_is_validated_like_auth_token(monkeypatch):
+    monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("TENKI_API_KEY", raising=False)
+
+    with pytest.raises(InvalidAuthTokenError):
+        Client(api_key="ory_st_test", rpc=object())
+
+
+def test_api_key_alias_takes_precedence_over_the_environment(monkeypatch):
+    monkeypatch.setenv("TENKI_AUTH_TOKEN", "tk_env")
+
+    assert Client(api_key="tk_explicit", rpc=object()).auth_token == "tk_explicit"
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t\n"])
+def test_blank_credentials_count_as_absent(blank, monkeypatch):
+    """Whitespace-only values must behave like "" - no spurious conflict, env still wins."""
+    monkeypatch.delenv("TENKI_API_KEY", raising=False)
+    monkeypatch.setenv("TENKI_AUTH_TOKEN", "tk_env")
+
+    assert Client(auth_token="tk_real", api_key=blank, rpc=object()).auth_token == "tk_real"
+    assert Client(auth_token=blank, api_key="tk_real", rpc=object()).auth_token == "tk_real"
+    assert Client(auth_token=blank, rpc=object()).auth_token == "tk_env"
+    assert Client(api_key=blank, rpc=object()).auth_token == "tk_env"
+
+
+def test_padded_credentials_are_trimmed_not_conflicting(rpc=None):
+    assert Client(auth_token=" tk_same ", api_key="tk_same", rpc=object()).auth_token == "tk_same"
+
+
 def test_auth_metadata_and_grpc_target_are_provider_friendly():
     assert auth_metadata(" tk_test ") == (("authorization", "Bearer tk_test"),)
     assert grpc_target("https://api.tenki.cloud") == ("api.tenki.cloud:443", True)

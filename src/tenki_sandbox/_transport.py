@@ -25,9 +25,12 @@ def _validate_auth_token(auth_token: str) -> str:
     return token
 
 
-def resolve_auth_token(auth_token: str | None) -> str:
-    token = auth_token or os.getenv(ENV_AUTH_TOKEN) or os.getenv(ENV_API_KEY) or ""
-    return _validate_auth_token(token)
+def resolve_auth_token(auth_token: str | None, api_key: str | None = None) -> str:
+    # Strip first so a whitespace-only value counts as absent; auth_token wins over its alias.
+    explicit = (auth_token or "").strip()
+    alias = (api_key or "").strip()
+    token = explicit or alias or os.getenv(ENV_AUTH_TOKEN) or os.getenv(ENV_API_KEY)
+    return _validate_auth_token(token or "")
 
 
 def resolve_base_url(base_url: str | None) -> str:

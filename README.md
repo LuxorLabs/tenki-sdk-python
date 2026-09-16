@@ -165,13 +165,14 @@ one established connection. It retains the last endpoint during reconnect and af
 Auth resolution:
 
 1. `auth_token=` passed to `Client` or `Sandbox.create`
-2. `TENKI_AUTH_TOKEN`
-3. `TENKI_API_KEY`
+2. `api_key=`, an alias for `auth_token`
+3. `TENKI_AUTH_TOKEN`
+4. `TENKI_API_KEY`
 
 Credentials must be a Tenki API key or service token starting with `tk_`. Missing
 credentials raise `MissingAuthTokenError`; nonempty credentials with any other
-prefix raise `InvalidAuthTokenError`. Requests authenticate with an
-`Authorization: Bearer` header.
+prefix raise `InvalidAuthTokenError`. Blank or whitespace-only values count as
+absent. Requests authenticate with an `Authorization: Bearer` header.
 
 ### Migrating to v0.7.0
 

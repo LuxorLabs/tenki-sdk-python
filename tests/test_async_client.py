@@ -189,6 +189,18 @@ def test_async_client_rejects_invalid_auth_tokens(auth_token, rpc):
         AsyncClient(auth_token=auth_token, rpc=rpc)
 
 
+@pytest.mark.parametrize("rpc", [None, object()])
+def test_async_client_accepts_api_key_as_an_alias_for_auth_token(rpc, monkeypatch):
+    monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("TENKI_API_KEY", raising=False)
+
+    assert AsyncClient(api_key="tk_alias", rpc=rpc).auth_token == "tk_alias"
+
+
+def test_async_auth_token_wins_over_the_api_key_alias():
+    assert AsyncClient(auth_token="tk_one", api_key="tk_two", rpc=object()).auth_token == "tk_one"
+
+
 async def test_async_create_without_wait_maps_options():
     rpc = FakeControlRPC()
     client = AsyncClient(rpc=rpc)

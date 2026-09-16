@@ -275,6 +275,7 @@ class AsyncSandbox:
         cls,
         *,
         auth_token: str | None = None,
+        api_key: str | None = None,
         base_url: str | None = None,
         gateway_url: str | None = None,
         timeout: float | None = None,
@@ -323,6 +324,7 @@ class AsyncSandbox:
         # timeout is the transport timeout here; Client.create's is the wait budget.
         client = AsyncClient(
             auth_token=auth_token,
+            api_key=api_key,
             base_url=base_url,
             gateway_url=gateway_url,
             timeout=timeout,

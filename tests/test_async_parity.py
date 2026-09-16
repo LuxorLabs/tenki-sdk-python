@@ -87,6 +87,7 @@ def test_top_level_reexports():
 # Client.create argument no longer reaches it for free. Fail here on drift.
 CLIENT_CONNECT_PARAMS = {
     "auth_token",
+    "api_key",
     "base_url",
     "gateway_url",
     "timeout",

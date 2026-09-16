@@ -40,6 +40,7 @@ class AsyncClient:
         self,
         *,
         auth_token: str | None = None,
+        api_key: str | None = None,
         base_url: str | None = None,
         gateway_url: str | None = None,
         timeout: float | None = None,
@@ -49,7 +50,11 @@ class AsyncClient:
         self.base_url = resolve_base_url(base_url)
         self.gateway_url = resolve_gateway_url(gateway_url, self.base_url)
         self._gateway_explicit = bool((gateway_url or os.getenv(ENV_GATEWAY_URL) or "").strip())
-        self.auth_token = resolve_auth_token(auth_token) if rpc is None or auth_token is not None else "tk_test"
+        self.auth_token = (
+            resolve_auth_token(auth_token, api_key)
+            if rpc is None or auth_token is not None or api_key is not None
+            else "tk_test"
+        )
         self._rpc = rpc or AsyncGrpcSandboxRPC(
             GrpcConfig(
                 base_url=self.base_url,

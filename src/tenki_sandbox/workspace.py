@@ -16,11 +16,12 @@ class _WorkspaceClientBase:
         *,
         workspace_id: str = "",
         auth_token: str | None = None,
+        api_key: str | None = None,
         base_url: str | None = None,
         timeout: float = 30,
         root_certificates: bytes | None = None,
     ):
-        metadata = auth_metadata(resolve_auth_token(auth_token))
+        metadata = auth_metadata(resolve_auth_token(auth_token, api_key))
         endpoint = (
             base_url or os.getenv("TENKI_CLOUD_API_URL") or "https://api.tenki.cloud"
         )
