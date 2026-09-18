@@ -114,7 +114,8 @@ class FakeControlRPC:
 
     async def pause_session(self, req):
         self._record("pause_session", req)
-        return pb.PauseSessionResponse(session=session(pb.SESSION_STATE_PAUSED))
+        state = pb.SESSION_STATE_PAUSING if getattr(req, "async") else pb.SESSION_STATE_PAUSED
+        return pb.PauseSessionResponse(session=session(state))
 
     async def resume_session(self, req):
         self._record("resume_session", req)

@@ -52,9 +52,10 @@ The API key determines the Workspace automatically; ordinary Sandbox calls do no
 
 ## Durable pause
 
-`pause()` preserves legacy completion semantics and returns only after the pause completes.
-`pause_async()` returns after the service accepts the request and moves the sandbox to `PAUSING`.
-Call `wait_paused()` after `pause_async()` when the caller needs a durable checkpoint before continuing.
+`pause_async()` returns after the service durably accepts the request and moves the sandbox to `PAUSING` on a node that supports asynchronous pause.
+Snapshot capture and persistence continue in the background; acceptance does not mean the VM has stopped or the snapshot is durable.
+`pause()` retains its existing completion behavior for compatibility.
+Call `wait_paused()` before resuming or relying on a durable checkpoint.
 It returns at `PAUSED` and raises `PauseFailedError` if a verified rollback restores `RUNNING`.
 Pass `timeout=0` to wait without a deadline.
 For explicit local cancellation, pass a `threading.Event` as `cancel_event`; cancellation raises `PauseWaitCancelledError` and leaves the remote pause running.

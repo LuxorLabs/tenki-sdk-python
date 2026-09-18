@@ -700,7 +700,7 @@ def test_pause_and_resume_reset_data_plane():
     assert sandbox._data_plane_verified is False
 
     sandbox.pause_async()
-    assert sandbox.state == "PAUSED"
+    assert sandbox.state == "PAUSING"
     assert getattr(rpc.requests["pause_session"][-1], "async") is True
 
     resumed_credential, resumed_rpc = _prime_data_plane(sandbox)
@@ -1068,7 +1068,8 @@ class FakeRPC:
 
     def pause_session(self, req):
         self.requests["pause_session"].append(req)
-        return pb.PauseSessionResponse(session=_session(pb.SESSION_STATE_PAUSED))
+        state = pb.SESSION_STATE_PAUSING if getattr(req, "async") else pb.SESSION_STATE_PAUSED
+        return pb.PauseSessionResponse(session=_session(state))
 
     def resume_session(self, req):
         self.requests["resume_session"].append(req)

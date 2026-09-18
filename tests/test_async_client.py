@@ -689,7 +689,7 @@ async def test_async_pause_and_resume_reset_data_plane_fields():
     assert sandbox._data_plane_verified is False
 
     await sandbox.pause_async()
-    assert sandbox.state == "PAUSED"
+    assert sandbox.state == "PAUSING"
     assert getattr(rpc.requests["pause_session"][-1], "async") is True
 
     resumed_dp = _DP()
