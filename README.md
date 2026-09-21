@@ -328,6 +328,13 @@ To keep hold of a service instead, use `sb.start(...)` and read from the returne
 process; for services you always want running, start them from a template start
 command.
 
+That last option is the durable one. Every exec child runs inside the
+guest-agent's own systemd cgroup, so a guest-agent restart kills it, and `nohup`
+does not change that. Pause and resume restore VM memory, so a backgrounded
+process does survive a pause with the same PID — which makes an ad-hoc service
+look more durable than it is. Anything load-bearing belongs in a template start
+command with a readiness probe.
+
 Process `cwd` values follow the guest contract: relative paths are normalized
 under the sandbox guest workdir (`/home/tenki` by default), absolute paths are
 used unchanged, and missing or non-directory targets fail before the process
