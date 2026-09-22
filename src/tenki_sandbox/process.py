@@ -74,6 +74,32 @@ def _disk_usage_from_exit(exit: object) -> DiskUsage | None:
     )
 
 
+def _command_result_from_exit(
+    exit: pb.RunExit, argv: list[str], stdout: bytes, stderr: bytes
+) -> CommandResult:
+    if exit.reason.startswith("first_frame_timeout"):
+        raise PrimitiveTimeoutError(exit.reason)
+    if exit.reason.startswith("capability_unavailable"):
+        raise CapabilityUnavailableError(exit.reason)
+    if is_session_terminated_reason(exit.reason):
+        raise SessionTerminatedError(
+            exit.reason,
+            termination_cause=session_termination_cause(exit.reason),
+        )
+    return CommandResult(
+        argv=argv,
+        exit_code=exit.exit_code,
+        stdout=stdout,
+        stderr=stderr,
+        signal=exit.signal or None,
+        duration_ms=int(exit.duration_ms),
+        reason=exit.reason or None,
+        errno=exit.errno or None,
+        timed_out=bool(exit.timed_out),
+        disk=_disk_usage_from_exit(exit),
+    )
+
+
 class _StaticProcessSandbox:
     def __init__(self, rpc) -> None:
         self._rpc = rpc
@@ -296,8 +322,10 @@ class Process:
                 if rpc is None:
                     raise RuntimeError("sandbox data-plane endpoint unavailable")
                 received_response = False
+                responses = None
                 try:
-                    for frame in rpc.run(self._request_iter()):
+                    responses = rpc.run(self._request_iter())
+                    for frame in responses:
                         received_response = True
                         self._sandbox._mark_data_plane_serving(rpc)
                         self._disable_start_replay()
@@ -310,27 +338,8 @@ class Process:
                         elif kind == "stderr":
                             self.stderr.push(bytes(frame.stderr))
                         elif kind == "exit":
-                            exit = frame.exit
-                            if exit.reason.startswith("first_frame_timeout"):
-                                raise PrimitiveTimeoutError(exit.reason)
-                            if exit.reason.startswith("capability_unavailable"):
-                                raise CapabilityUnavailableError(exit.reason)
-                            if is_session_terminated_reason(exit.reason):
-                                raise SessionTerminatedError(
-                                    exit.reason,
-                                    termination_cause=session_termination_cause(exit.reason),
-                                )
-                            self._result = CommandResult(
-                                argv=self.argv,
-                                exit_code=exit.exit_code,
-                                stdout=self.stdout.read(),
-                                stderr=self.stderr.read(),
-                                signal=exit.signal or None,
-                                duration_ms=int(exit.duration_ms),
-                                reason=exit.reason or None,
-                                errno=exit.errno or None,
-                                timed_out=bool(exit.timed_out),
-                                disk=_disk_usage_from_exit(exit),
+                            self._result = _command_result_from_exit(
+                                frame.exit, self.argv, self.stdout.read(), self.stderr.read()
                             )
                             return
                     raise RuntimeError("sandbox run stream closed before exit")
@@ -350,6 +359,10 @@ class Process:
                     if not self._can_replay_start():
                         raise
                     attempt += 1
+                finally:
+                    close = getattr(responses, "close", None)
+                    if close is not None:
+                        close()
         except Exception as err:
             self._error = (
                 map_rpc_error(err)

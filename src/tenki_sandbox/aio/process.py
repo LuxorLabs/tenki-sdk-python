@@ -9,13 +9,11 @@ from ..errors import (
     CapabilityUnavailableError,
     PrimitiveTimeoutError,
     SessionTerminatedError,
-    is_session_terminated_reason,
     map_rpc_error,
-    session_termination_cause,
 )
 from ..models import CommandResult
 from ..process import (
-    _disk_usage_from_exit,
+    _command_result_from_exit,
     _is_provisioning_session_not_found,
     _is_retryable_run_establishment_error,
     normalize_argv,
@@ -212,8 +210,10 @@ class AsyncProcess:
                 if rpc is None:
                     raise RuntimeError("sandbox data-plane endpoint unavailable")
                 received_response = False
+                responses = None
                 try:
-                    async for frame in rpc.run(self._request_iter()):
+                    responses = rpc.run(self._request_iter())
+                    async for frame in responses:
                         received_response = True
                         self._sandbox._mark_data_plane_serving(rpc)
                         self._start_replayable = False
@@ -226,27 +226,8 @@ class AsyncProcess:
                         elif kind == "stderr":
                             self.stderr.push(bytes(frame.stderr))
                         elif kind == "exit":
-                            exit = frame.exit
-                            if exit.reason.startswith("first_frame_timeout"):
-                                raise PrimitiveTimeoutError(exit.reason)
-                            if exit.reason.startswith("capability_unavailable"):
-                                raise CapabilityUnavailableError(exit.reason)
-                            if is_session_terminated_reason(exit.reason):
-                                raise SessionTerminatedError(
-                                    exit.reason,
-                                    termination_cause=session_termination_cause(exit.reason),
-                                )
-                            self._result = CommandResult(
-                                argv=self.argv,
-                                exit_code=exit.exit_code,
-                                stdout=self.stdout.read(),
-                                stderr=self.stderr.read(),
-                                signal=exit.signal or None,
-                                duration_ms=int(exit.duration_ms),
-                                reason=exit.reason or None,
-                                errno=exit.errno or None,
-                                timed_out=bool(exit.timed_out),
-                                disk=_disk_usage_from_exit(exit),
+                            self._result = _command_result_from_exit(
+                                frame.exit, self.argv, self.stdout.read(), self.stderr.read()
                             )
                             return
                     raise RuntimeError("sandbox run stream closed before exit")
@@ -266,6 +247,10 @@ class AsyncProcess:
                     if not self._start_replayable:
                         raise
                     attempt += 1
+                finally:
+                    close = getattr(responses, "aclose", None)
+                    if close is not None:
+                        await close()
         except Exception as err:
             self._error = (
                 map_rpc_error(err)
