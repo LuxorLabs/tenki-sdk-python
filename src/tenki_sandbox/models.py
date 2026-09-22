@@ -465,6 +465,9 @@ class SSHCert:
     ca_pub: str
     expires_at: datetime | None = None
     cert_serial: str = ""
+    #: Whether the client should verify the gateway host certificate against
+    #: ``ca_pub``. False on engines that predate the field.
+    pin_host_key: bool = False
 
 
 @dataclass(frozen=True)

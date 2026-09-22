@@ -288,6 +288,7 @@ class Client:
             return SSHCert(
                 ssh_cert=resp.ssh_cert,
                 ca_pub=resp.ca_pub,
+                pin_host_key=resp.pin_host_key,
                 expires_at=datetime_from_proto(resp.expires_at) if resp.HasField("expires_at") else None,
                 cert_serial=resp.cert_serial,
             )
