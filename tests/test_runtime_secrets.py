@@ -95,6 +95,7 @@ async def test_sync_async_launch_contract(asynchronous, shortcut, monkeypatch):
         image="team/base:v1",
         direct_runtime=TemplateSpec().workdir("/app").start("app", secret_env=REFS),
         secret_overrides={"shared-token": "local-token"},
+        secret_files=[{"path":"/app/env.tpl-sandbox","content":"TOKEN=secrets://shared-token"}],
         wait=False,
     )
     sandbox = await result if inspect.isawaitable(result) else result
@@ -102,6 +103,7 @@ async def test_sync_async_launch_contract(asynchronous, shortcut, monkeypatch):
     assert sandbox.has_runtime_secrets
     request = requests[0]
     assert request.registry_ref == "team/base:v1"
+    assert request.secret_files[0].content == "TOKEN=secrets://shared-token"
     assert request.runtime.start.workdir == "/app"
     assert dict(request.runtime.secret_env) == REFS
     assert dict(request.secret_overrides) == {"shared-token": "local-token"}
@@ -115,3 +117,28 @@ async def test_sync_async_launch_contract(asynchronous, shortcut, monkeypatch):
         await result
     assert not requests[1].HasField("runtime")
     assert dict(requests[1].secret_overrides) == {"shared-token": "local-token"}
+
+@pytest.mark.parametrize("kind", ["start", "argv", "compose"])
+def test_runtime_file_contract(kind):
+    files = [
+        {"path":"/app/raw", "raw":{"name":"RAW"}},
+        {"path":"/app/.env", "content":"TOKEN=secrets://TOKEN"},
+        {"path":"/app/config.yaml", "source":"/app/config.tpl.yaml"},
+    ]
+    spec = (TemplateSpec().process_compose("compose.yaml", secret_files=files) if kind == "compose" else TemplateSpec().start(["app"] if kind == "argv" else "app", secret_files=files))
+    files[0]["path"] = "/etc/unsafe"
+    spec.validate()
+    runtime = TemplateSpec.from_json(spec.to_json())._to_direct_runtime_proto()
+    assert len(runtime.secret_files) == 3
+    assert runtime.secret_files[0].path == "/app/raw"
+    request = build_create_session_request(direct_runtime=spec)
+    assert request.runtime.secret_files == runtime.secret_files
+    with pytest.raises(Exception):
+        TemplateSpec().start("app", secret_files=files).validate()
+
+
+def test_source_marker_grammar():
+    from tenki_sandbox.secret_files import secret_file_names
+    assert secret_file_names(r"a=secrets://TOKEN,b=secrets://TOKEN,literal=\secrets://IGNORE,header=\secrets://API") == ["TOKEN"]
+    for text in ["secrets://", "secrets://9bad", "secrets://"+"a"*129, "bad\x00"]:
+        assert secret_file_names(text) is None

@@ -17,6 +17,7 @@ from typing import Any, Callable
 from google.protobuf import json_format
 
 from ._pb import template_pb
+from .secret_files import RuntimeSecretFile, valid_secret_files
 from .errors import TemplateSpecValidationError
 
 SPEC_VERSION = "tenki.template.v1"
@@ -498,6 +499,7 @@ class TemplateSpec:
         snapshot_mode: str | None = None,
         stop_grace_seconds: int | None = None,
         secret_env: Mapping[str, str] | None = None,
+        secret_files: Sequence[RuntimeSecretFile] | None = None,
     ) -> "TemplateSpec":
         """Declare a single start command as the runtime entrypoint.
 
@@ -517,6 +519,10 @@ class TemplateSpec:
             if workdir is not None:
                 p.runtime.start.workdir = workdir
             options(p.runtime)
+            if secret_files is not None:
+                del p.runtime.secret_files[:]
+                for file in secret_files:
+                    json_format.ParseDict(dict(file), p.runtime.secret_files.add())
             if secret_env is not None:
                 p.runtime.secret_env.clear()
                 p.runtime.secret_env.update(dict(secret_env))
@@ -535,6 +541,7 @@ class TemplateSpec:
         snapshot_mode: str | None = None,
         stop_grace_seconds: int | None = None,
         secret_env: Mapping[str, str] | None = None,
+        secret_files: Sequence[RuntimeSecretFile] | None = None,
     ) -> "TemplateSpec":
         """Declare a process-compose supervisor as the runtime entrypoint."""
         options = self._runtime_options(
@@ -549,6 +556,10 @@ class TemplateSpec:
             if env_files:
                 p.runtime.process_compose.env_files.extend(env_files)
             options(p.runtime)
+            if secret_files is not None:
+                del p.runtime.secret_files[:]
+                for file in secret_files:
+                    json_format.ParseDict(dict(file), p.runtime.secret_files.add())
             if secret_env is not None:
                 p.runtime.secret_env.clear()
                 p.runtime.secret_env.update(dict(secret_env))
@@ -947,6 +958,8 @@ def _validate_spec(p) -> list[str]:
 
 
 def _validate_runtime(out: list[str], runtime) -> None:
+    if not valid_secret_files(runtime.secret_files, len(runtime.secret_env)):
+        out.append("runtime.secret_files: invalid secret file declaration")
     if len(runtime.secret_env) > 64:
         out.append("runtime.secret_env: at most 64 secret references")
     for target, name in runtime.secret_env.items():

@@ -34,6 +34,7 @@ from .models import (
     VolumeMount,
 )
 from .process import Process
+from .secret_files import RuntimeSecretFile
 from .template_spec import TemplateSpec
 from .warning import (
     SandboxWarning,
@@ -277,6 +278,7 @@ class Sandbox:
         image: str | Image | None = None,
         from_template_spec: str | Template | None = None,
         direct_runtime: TemplateSpec | None = None,
+        secret_files: list[RuntimeSecretFile] | None = None,
         secret_overrides: dict[str, str] | None = None,
         setup_env: dict[str, str] | None = None,
         setup_secrets: dict[str, str] | None = None,
@@ -329,6 +331,7 @@ class Sandbox:
                 from_template_spec=from_template_spec,
                 direct_runtime=direct_runtime,
                 secret_overrides=secret_overrides,
+                secret_files=secret_files,
                 setup_env=setup_env,
                 setup_secrets=setup_secrets,
                 enable_opencode=enable_opencode,

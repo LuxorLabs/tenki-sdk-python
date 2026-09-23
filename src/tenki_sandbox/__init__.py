@@ -85,6 +85,7 @@ from .models import (
 from .sandbox import Sandbox
 from .ssh import SSHConn
 from .template_spec import TemplateSpec
+from .secret_files import RuntimeSecretFile, RuntimeSecretReference
 from .warning import SandboxWarning, SandboxWarningCode, SandboxWarningNotification, WarningHandler
 
 __all__ = [
@@ -168,6 +169,8 @@ __all__ = [
     "Template",
     "TemplateBuild",
     "TemplateSpec",
+    "RuntimeSecretFile",
+    "RuntimeSecretReference",
     "TemplateBuildEvent",
     "TemplateBuildFailure",
     "TemplateBuildLogEvent",

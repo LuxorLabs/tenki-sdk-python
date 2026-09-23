@@ -22,6 +22,7 @@ from .preview_url import PreviewUrls
 from .registry import Registry
 from .resources import Snapshots, Templates, Volumes
 from .sandbox import Sandbox
+from .secret_files import RuntimeSecretFile, valid_secret_files
 from .template_spec import TemplateSpec
 from .warning import (
     WarningHandler,
@@ -103,6 +104,7 @@ class Client:
         setup_env: dict[str, str] | None = None,
         setup_secrets: dict[str, str] | None = None,
         direct_runtime: TemplateSpec | None = None,
+        secret_files: list[RuntimeSecretFile] | None = None,
         secret_overrides: dict[str, str] | None = None,
         enable_opencode: bool = False,
         clone_repo_url: str | None = None,
@@ -149,6 +151,7 @@ class Client:
             setup_secrets=setup_secrets,
             direct_runtime=direct_runtime,
             secret_overrides=secret_overrides,
+            secret_files=secret_files,
             enable_opencode=enable_opencode,
             clone_repo_url=clone_repo_url,
             volumes=volumes,
@@ -342,6 +345,7 @@ def build_create_session_request(
     setup_env: dict[str, str] | None = None,
     setup_secrets: dict[str, str] | None = None,
     direct_runtime: TemplateSpec | None = None,
+    secret_files: list[RuntimeSecretFile] | None = None,
     secret_overrides: dict[str, str] | None = None,
     enable_opencode: bool = False,
     clone_repo_url: str | None = None,
@@ -370,7 +374,10 @@ def build_create_session_request(
         setup_env=dict(setup_env or {}),
         setup_secrets=dict(setup_secrets or {}),
         secret_overrides=dict(secret_overrides or {}),
+        secret_files=list(secret_files or []),
     )
+    if not valid_secret_files(req.secret_files, 0) or any(file.WhichOneof("format") == "source" for file in req.secret_files):
+        raise ValueError("Invalid direct secret files; image source paths require a template build")
     if name:
         req.name = name
     if workspace_id and workspace_id.strip():

@@ -9,6 +9,7 @@ from .errors import CommandFailedError
 
 if TYPE_CHECKING:
     from .template_spec import TemplateSpec
+    from .secret_files import RuntimeSecretFile
 
 
 @dataclass(frozen=True)
@@ -410,6 +411,8 @@ class RegistryImageDetail:
     masked_env_var_keys: tuple[str, ...] = ()
     metadata: Mapping[str, str] = field(default_factory=dict)
     env_vars: Mapping[str, str] = field(default_factory=dict)
+    runtime_secret_env: Mapping[str,str] = field(default_factory=dict)
+    runtime_secret_files: tuple[RuntimeSecretFile,...] = ()
 
 
 @dataclass(frozen=True)

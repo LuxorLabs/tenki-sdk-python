@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from google.protobuf.json_format import MessageToDict
+
 from ._pb import pb, registry_pb, template_pb
 from ._time import datetime_from_proto
 from .models import (
@@ -571,6 +573,8 @@ def registry_image_detail(proto) -> RegistryImageDetail:
         masked_env_var_keys=tuple(proto.masked_env_var_keys),
         metadata=dict(proto.metadata),
         env_vars=dict(proto.env_vars),
+        runtime_secret_env=dict(proto.runtime_secret_env),
+        runtime_secret_files=tuple(MessageToDict(file) for file in proto.runtime_secret_files),
     )
 
 
