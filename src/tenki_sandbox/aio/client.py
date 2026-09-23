@@ -123,7 +123,8 @@ class AsyncClient:
     ) -> AsyncSandbox:
         """Create a sandbox.
 
-        ``cpu_cores`` is 1-16 and ``memory_mb`` is 128-65536 and must be even.
+        ``cpu_cores`` is 1-128 and ``memory_mb`` is 128-524288 and must be even;
+        the workspace's size limit may be lower.
         ``disk_size_gb`` is 5-100: a create with no ``image``, ``snapshot_id`` or
         ``from_template_spec`` defaults to 5, while one with a source inherits
         that source's disk unless this is set.

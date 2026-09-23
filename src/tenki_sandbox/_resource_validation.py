@@ -3,10 +3,10 @@ from __future__ import annotations
 from .errors import InvalidResourceConfigError
 
 MIN_CPU_CORES = 1
-MAX_CPU_CORES = 16
+MAX_CPU_CORES = 128
 MIN_CREATE_MEMORY_MB = 128
 MIN_PROVISION_MEMORY_MB = 512
-MAX_MEMORY_MB = 65536
+MAX_MEMORY_MB = 524288
 MIN_DISK_SIZE_GB = 5
 MAX_DISK_SIZE_GB = 100
 

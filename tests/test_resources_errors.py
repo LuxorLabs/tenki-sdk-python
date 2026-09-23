@@ -94,19 +94,19 @@ def test_template_create_rejects_invalid_resources():
 
     client.templates.create(workspace_id="ws-1", name="python", cpu_cores=2, memory_mb=4096)
 
-    with pytest.raises(InvalidResourceConfigError, match="cpu_cores must be between 1 and 16"):
-        client.templates.create(workspace_id="ws-1", name="python", cpu_cores=17)
+    with pytest.raises(InvalidResourceConfigError, match="cpu_cores must be between 1 and 128"):
+        client.templates.create(workspace_id="ws-1", name="python", cpu_cores=129)
 
-    with pytest.raises(InvalidResourceConfigError, match="cpu_cores must be between 1 and 16"):
+    with pytest.raises(InvalidResourceConfigError, match="cpu_cores must be between 1 and 128"):
         client.templates.create(workspace_id="ws-1", name="python", cpu_cores=False)
 
     with pytest.raises(InvalidResourceConfigError, match="memory_mb must be aligned to 2 MiB"):
         client.templates.create(workspace_id="ws-1", name="python", memory_mb=8089)
 
-    with pytest.raises(InvalidResourceConfigError, match="memory_mb must be between 512 and 65536"):
+    with pytest.raises(InvalidResourceConfigError, match="memory_mb must be between 512 and 524288"):
         client.templates.create(workspace_id="ws-1", name="python", memory_mb=128)
 
-    with pytest.raises(InvalidResourceConfigError, match="memory_mb must be between 512 and 65536"):
+    with pytest.raises(InvalidResourceConfigError, match="memory_mb must be between 512 and 524288"):
         client.templates.create(workspace_id="ws-1", name="python", memory_mb=False)
 
     with pytest.raises(InvalidResourceConfigError, match="disk_size_gb must be between 5 and 100"):

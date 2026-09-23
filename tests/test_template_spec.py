@@ -355,7 +355,7 @@ def test_process_compose_runtime():
 
 
 def test_resources_bounds():
-    bad = TemplateSpec().resources(cpu_cores=64, memory_mb=513, disk_size_gb=2)
+    bad = TemplateSpec().resources(cpu_cores=129, memory_mb=513, disk_size_gb=2)
     with pytest.raises(TemplateSpecValidationError) as err:
         bad.validate()
     assert len(err.value.violations) >= 3

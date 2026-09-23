@@ -943,10 +943,10 @@ def _validate_spec(p) -> list[str]:
 
     if p.HasField("resources"):
         res = p.resources
-        if not 0 <= res.cpu_cores <= 16:
-            out.append("resources.cpu_cores: must be between 0 and 16")
-        if res.memory_mb != 0 and not 512 <= res.memory_mb <= 65536:
-            out.append("resources.memory_mb: must be 0 or between 512 and 65536")
+        if not 0 <= res.cpu_cores <= 128:
+            out.append("resources.cpu_cores: must be between 0 and 128")
+        if res.memory_mb != 0 and not 512 <= res.memory_mb <= 524288:
+            out.append("resources.memory_mb: must be 0 or between 512 and 524288")
         if res.memory_mb % 2 != 0:
             out.append("resources.memory_mb: must be aligned to 2 MiB")
         if res.disk_size_gb != 0 and not 5 <= res.disk_size_gb <= 100:

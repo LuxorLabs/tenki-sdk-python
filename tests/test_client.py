@@ -654,9 +654,9 @@ def test_create_rejects_invalid_resources():
     client.create(workspace_id="ws-1", wait=False, cpu_cores=2, memory_mb=4096)
 
     with pytest.raises(
-        InvalidResourceConfigError, match="cpu_cores must be between 1 and 16"
+        InvalidResourceConfigError, match="cpu_cores must be between 1 and 128"
     ):
-        client.create(workspace_id="ws-1", wait=False, cpu_cores=17)
+        client.create(workspace_id="ws-1", wait=False, cpu_cores=129)
 
     with pytest.raises(
         InvalidResourceConfigError, match="memory_mb must be aligned to 2 MiB"
