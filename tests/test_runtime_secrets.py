@@ -142,3 +142,34 @@ def test_source_marker_grammar():
     assert secret_file_names(r"a=secrets://TOKEN,b=secrets://TOKEN,literal=\secrets://IGNORE,header=\secrets://API") == ["TOKEN"]
     for text in ["secrets://", "secrets://9bad", "secrets://"+"a"*129, "bad\x00"]:
         assert secret_file_names(text) is None
+
+@pytest.mark.parametrize("kind", ["start", "argv", "compose"])
+def test_header_binding_roundtrip(kind):
+    from tenki import SecretHeaderBinding
+    rule: SecretHeaderBinding = {"name": "token", "secret_name": "API_TOKEN", "origin": "https://api.example.com", "methods": ["POST"], "path_prefix": "/v1/", "header": "Authorization"}
+    spec = TemplateSpec().process_compose("compose.yaml", secret_headers=[rule]) if kind == "compose" else TemplateSpec().start(["app"] if kind == "argv" else "app", secret_headers=[rule])
+    rule["methods"].append("DELETE")
+    runtime = TemplateSpec.from_json(spec.to_json())._to_direct_runtime_proto()
+    assert list(runtime.secret_headers[0].methods) == ["POST"]
+    assert runtime.secret_headers[0].secret_name == "API_TOKEN"
+
+@pytest.mark.parametrize("asynchronous", [False, True])
+@pytest.mark.parametrize("shortcut", [False, True])
+async def test_header_binding_launch_contract(asynchronous, shortcut, monkeypatch):
+    seen = []
+    def create(request):
+        seen.append(pb.CreateSessionRequest.FromString(request.SerializeToString()))
+        return pb.CreateSessionResponse(session=pb.SandboxSession(id="session", state=pb.SESSION_STATE_RUNNING))
+    class RPC:
+        def create_session(self, request): return create(request)
+    class AsyncRPC:
+        async def create_session(self, request): return create(request)
+    client = AsyncClient(rpc=AsyncRPC()) if asynchronous else Client(rpc=RPC())
+    launcher = client
+    if shortcut:
+        monkeypatch.setattr("tenki_sandbox.aio.client.AsyncClient" if asynchronous else "tenki_sandbox.client.Client", lambda **_kwargs: client)
+        launcher = AsyncSandbox if asynchronous else Sandbox
+    result = launcher.create(secret_headers=[{"name":"token", "secret_name":"API_TOKEN", "origin":"https://api.example.com", "methods":["POST"], "path_prefix":"/v1/", "header":"Authorization"}], wait=False)
+    if inspect.isawaitable(result): await result
+    assert not seen[0].HasField("runtime")
+    assert seen[0].secret_headers[0].secret_name == "API_TOKEN"

@@ -213,3 +213,7 @@ __all__ += [
     "SecretDeliveryMode",
     "SecretDestinationMode",
 ]
+
+from .secret_headers import SecretHeaderBinding
+
+__all__ += ["SecretHeaderBinding"]
