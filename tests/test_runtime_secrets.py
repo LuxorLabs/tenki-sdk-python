@@ -179,4 +179,3 @@ async def test_request_binding_launch_contract(asynchronous, shortcut, monkeypat
     assert seen[0].secret_requests[0].secret_name == "API_TOKEN"
     for key, value in location.items():
         assert getattr(seen[0].secret_requests[0], key) == value
-
