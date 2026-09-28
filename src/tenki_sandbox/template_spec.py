@@ -17,7 +17,7 @@ from typing import Any, Callable
 from google.protobuf import json_format
 
 from ._pb import template_pb
-from .secret_headers import SecretHeaderBinding
+from .secret_requests import SecretRequestBinding
 from .secret_files import RuntimeSecretFile, valid_secret_files
 from .errors import TemplateSpecValidationError
 
@@ -499,7 +499,7 @@ class TemplateSpec:
         ready_when: Any | None = None,
         snapshot_mode: str | None = None,
         stop_grace_seconds: int | None = None,
-        secret_headers: Sequence[SecretHeaderBinding] | None = None,
+        secret_requests: Sequence[SecretRequestBinding] | None = None,
         secret_env: Mapping[str, str] | None = None,
         secret_files: Sequence[RuntimeSecretFile] | None = None,
     ) -> "TemplateSpec":
@@ -525,10 +525,10 @@ class TemplateSpec:
                 del p.runtime.secret_files[:]
                 for file in secret_files:
                     json_format.ParseDict(dict(file), p.runtime.secret_files.add())
-            if secret_headers is not None:
-                del p.runtime.secret_headers[:]
-                for rule in secret_headers:
-                    json_format.ParseDict(dict(rule), p.runtime.secret_headers.add())
+            if secret_requests is not None:
+                del p.runtime.secret_requests[:]
+                for rule in secret_requests:
+                    json_format.ParseDict(dict(rule), p.runtime.secret_requests.add())
             if secret_env is not None:
                 p.runtime.secret_env.clear()
                 p.runtime.secret_env.update(dict(secret_env))
@@ -546,7 +546,7 @@ class TemplateSpec:
         ready_when: Any | None = None,
         snapshot_mode: str | None = None,
         stop_grace_seconds: int | None = None,
-        secret_headers: Sequence[SecretHeaderBinding] | None = None,
+        secret_requests: Sequence[SecretRequestBinding] | None = None,
         secret_env: Mapping[str, str] | None = None,
         secret_files: Sequence[RuntimeSecretFile] | None = None,
     ) -> "TemplateSpec":
@@ -567,10 +567,10 @@ class TemplateSpec:
                 del p.runtime.secret_files[:]
                 for file in secret_files:
                     json_format.ParseDict(dict(file), p.runtime.secret_files.add())
-            if secret_headers is not None:
-                del p.runtime.secret_headers[:]
-                for rule in secret_headers:
-                    json_format.ParseDict(dict(rule), p.runtime.secret_headers.add())
+            if secret_requests is not None:
+                del p.runtime.secret_requests[:]
+                for rule in secret_requests:
+                    json_format.ParseDict(dict(rule), p.runtime.secret_requests.add())
             if secret_env is not None:
                 p.runtime.secret_env.clear()
                 p.runtime.secret_env.update(dict(secret_env))

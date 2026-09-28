@@ -214,6 +214,6 @@ __all__ += [
     "SecretDestinationMode",
 ]
 
-from .secret_headers import SecretHeaderBinding
+from .secret_requests import SecretRequestBinding
 
-__all__ += ["SecretHeaderBinding"]
+__all__ += ["SecretRequestBinding"]

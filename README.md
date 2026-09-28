@@ -599,7 +599,7 @@ Guest values remain frozen across retries, restart, and ordinary resume; replace
 ```python
 sandbox = client.create(
     workspace_id=workspace_id,
-    secret_headers=[{
+    secret_requests=[{
         "name": "token", "secret_name": "API_TOKEN",
         "origin": "https://api.example.com", "methods": ["POST"],
         "path_prefix": "/v1/", "header": "Authorization",

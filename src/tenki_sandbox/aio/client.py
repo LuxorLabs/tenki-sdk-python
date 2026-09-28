@@ -22,7 +22,7 @@ from ..constants import ENV_GATEWAY_URL
 from ..errors import WaitReadyFailedError, map_rpc_error
 from ..models import Identity, Image, SessionMetrics, Template, WorkspaceUsageLimit
 from ..secret_files import RuntimeSecretFile
-from ..secret_headers import SecretHeaderBinding
+from ..secret_requests import SecretRequestBinding
 from ..template_spec import TemplateSpec
 from ..warning import (
     WarningHandler,
@@ -113,7 +113,7 @@ class AsyncClient:
         setup_secrets: dict[str, str] | None = None,
         direct_runtime: TemplateSpec | None = None,
         secret_files: list[RuntimeSecretFile] | None = None,
-        secret_headers: list[SecretHeaderBinding] | None = None,
+        secret_requests: list[SecretRequestBinding] | None = None,
         secret_overrides: dict[str, str] | None = None,
         enable_opencode: bool = False,
         clone_repo_url: str | None = None,
@@ -162,7 +162,7 @@ class AsyncClient:
             direct_runtime=direct_runtime,
             secret_overrides=secret_overrides,
             secret_files=secret_files,
-            secret_headers=secret_headers,
+            secret_requests=secret_requests,
             enable_opencode=enable_opencode,
             clone_repo_url=clone_repo_url,
             volumes=volumes,

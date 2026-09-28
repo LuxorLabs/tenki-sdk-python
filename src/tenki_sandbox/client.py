@@ -23,7 +23,7 @@ from .registry import Registry
 from .resources import Snapshots, Templates, Volumes
 from .sandbox import Sandbox
 from .secret_files import RuntimeSecretFile, valid_secret_files
-from .secret_headers import SecretHeaderBinding
+from .secret_requests import SecretRequestBinding
 from .template_spec import TemplateSpec
 from .warning import (
     WarningHandler,
@@ -107,7 +107,7 @@ class Client:
         direct_runtime: TemplateSpec | None = None,
         secret_files: list[RuntimeSecretFile] | None = None,
         secret_overrides: dict[str, str] | None = None,
-        secret_headers: list[SecretHeaderBinding] | None = None,
+        secret_requests: list[SecretRequestBinding] | None = None,
         enable_opencode: bool = False,
         clone_repo_url: str | None = None,
         volumes: list[dict | tuple] | None = None,
@@ -155,7 +155,7 @@ class Client:
             direct_runtime=direct_runtime,
             secret_overrides=secret_overrides,
             secret_files=secret_files,
-            secret_headers=secret_headers,
+            secret_requests=secret_requests,
             enable_opencode=enable_opencode,
             clone_repo_url=clone_repo_url,
             volumes=volumes,
@@ -350,7 +350,7 @@ def build_create_session_request(
     setup_secrets: dict[str, str] | None = None,
     direct_runtime: TemplateSpec | None = None,
     secret_files: list[RuntimeSecretFile] | None = None,
-    secret_headers: list[SecretHeaderBinding] | None = None,
+    secret_requests: list[SecretRequestBinding] | None = None,
     secret_overrides: dict[str, str] | None = None,
     enable_opencode: bool = False,
     clone_repo_url: str | None = None,
@@ -380,7 +380,7 @@ def build_create_session_request(
         setup_secrets=dict(setup_secrets or {}),
         secret_overrides=dict(secret_overrides or {}),
         secret_files=list(secret_files or []),
-        secret_headers=list(secret_headers or []),
+        secret_requests=list(secret_requests or []),
     )
     if not valid_secret_files(req.secret_files, 0) or any(file.WhichOneof("format") == "source" for file in req.secret_files):
         raise ValueError("Invalid direct secret files; image source paths require a template build")

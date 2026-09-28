@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'tenki/sandbox/v1/secret_injection.proto\x12\x10tenki.sandbox.v1\"\xc4\x01\n\x13SecretHeaderBinding\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n\x0bsecret_name\x18\x02 \x01(\tR\nsecretName\x12\x16\n\x06origin\x18\x04 \x01(\tR\x06origin\x12\x18\n\x07methods\x18\x05 \x03(\tR\x07methods\x12\x1f\n\x0bpath_prefix\x18\x06 \x01(\tR\npathPrefix\x12\x16\n\x06header\x18\x07 \x01(\tR\x06headerJ\x04\x08\x03\x10\x04R\x07versionB\xe3\x01\n\x14\x63om.tenki.sandbox.v1B\x14SecretInjectionProtoP\x01ZSgithub.com/LuxorLabs/tenki-sdk-go/sandbox/internal/proto/tenki/sandbox/v1;sandboxv1\xa2\x02\x03TSX\xaa\x02\x10Tenki.Sandbox.V1\xca\x02\x10Tenki\\Sandbox\\V1\xe2\x02\x1cTenki\\Sandbox\\V1\\GPBMetadata\xea\x02\x12Tenki::Sandbox::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\'tenki/sandbox/v1/secret_injection.proto\x12\x10tenki.sandbox.v1\"\x91\x02\n\x14SecretRequestBinding\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n\x0bsecret_name\x18\x02 \x01(\tR\nsecretName\x12\x16\n\x06origin\x18\x04 \x01(\tR\x06origin\x12\x18\n\x07methods\x18\x05 \x03(\tR\x07methods\x12\x1f\n\x0bpath_prefix\x18\x06 \x01(\tR\npathPrefix\x12\x16\n\x06header\x18\x07 \x01(\tR\x06header\x12\'\n\x0fquery_parameter\x18\x08 \x01(\tR\x0equeryParameter\x12!\n\x0cjson_pointer\x18\t \x01(\tR\x0bjsonPointerJ\x04\x08\x03\x10\x04R\x07versionB\xe3\x01\n\x14\x63om.tenki.sandbox.v1B\x14SecretInjectionProtoP\x01ZSgithub.com/LuxorLabs/tenki-sdk-go/sandbox/internal/proto/tenki/sandbox/v1;sandboxv1\xa2\x02\x03TSX\xaa\x02\x10Tenki.Sandbox.V1\xca\x02\x10Tenki\\Sandbox\\V1\xe2\x02\x1cTenki\\Sandbox\\V1\\GPBMetadata\xea\x02\x12Tenki::Sandbox::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,6 +32,6 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'tenki.sandbox.v1.secret_inj
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\024com.tenki.sandbox.v1B\024SecretInjectionProtoP\001ZSgithub.com/LuxorLabs/tenki-sdk-go/sandbox/internal/proto/tenki/sandbox/v1;sandboxv1\242\002\003TSX\252\002\020Tenki.Sandbox.V1\312\002\020Tenki\\Sandbox\\V1\342\002\034Tenki\\Sandbox\\V1\\GPBMetadata\352\002\022Tenki::Sandbox::V1'
-  _globals['_SECRETHEADERBINDING']._serialized_start=62
-  _globals['_SECRETHEADERBINDING']._serialized_end=258
+  _globals['_SECRETREQUESTBINDING']._serialized_start=62
+  _globals['_SECRETREQUESTBINDING']._serialized_end=335
 # @@protoc_insertion_point(module_scope)
