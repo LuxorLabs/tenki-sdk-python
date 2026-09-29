@@ -8,8 +8,8 @@ import grpc
 import pytest
 from tenki import (
     AsyncWorkspaceClient,
-    SecretPolicy,
     WorkspaceClient,
+    SecretRequestRule,
     WorkspaceSecretError,
 )
 from tenki_sandbox._internal.proto.tenki.cloud.workspace.v1beta1 import (
@@ -25,10 +25,6 @@ def metadata():
         name="TOKEN",
         active_version=1,
         revision=2,
-        policy=pb.SecretPolicy(
-            delivery_mode=pb.SECRET_DELIVERY_MODE_GUEST_AND_INJECTION,
-            destination_mode=pb.SECRET_DESTINATION_MODE_UNSET,
-        ),
     )
 
 
@@ -47,6 +43,10 @@ def endpoint():
             headers.append(dict(context.invocation_metadata()))
             if failure:
                 context.abort(failure[0], "revision conflict")
+            if name == "ListSecretPolicies":
+                return pb.ListSecretPoliciesResponse(policies=[policy_metadata()], next_cursor="next")
+            if name.endswith("SecretPolicy"):
+                return getattr(pb, name + "Response")(policy=policy_metadata())
             if name == "ListSecrets":
                 return pb.ListSecretsResponse(secrets=[metadata()], next_cursor="next")
             if name == "ListSecretVersions":
@@ -58,6 +58,11 @@ def endpoint():
         return call
 
     for name in (
+        "CreateSecretPolicy",
+        "UpdateSecretPolicy",
+        "GetSecretPolicy",
+        "ListSecretPolicies",
+        "DeleteSecretPolicy",
         "CreateSecret",
         "UpdateSecret",
         "GetSecret",
@@ -86,17 +91,15 @@ async def invoke(client, name, *args, **kwargs):
 async def test_wire_contract(endpoint, client_type, workspace_id):
     url, requests, headers, _ = endpoint
     client = client_type(workspace_id=workspace_id, auth_token="tk_test", base_url=url)
-    policy = SecretPolicy("guest_and_injection", "unset")
     try:
         result = await invoke(
             client,
             "create",
             "TOKEN",
             b"\x00\xff\n\x80",
-            policy,
             request_id="00000000-0000-4000-8000-000000000001",
         )
-        await invoke(client, "create", "EMPTY", b"", policy)
+        await invoke(client, "create", "EMPTY", b"")
         await invoke(client, "update", "secret", expected_revision=2)
         await invoke(
             client,
@@ -155,7 +158,7 @@ async def test_wire_contract(endpoint, client_type, workspace_id):
         assert requests[9].version == 1 and requests[9].expected_revision == 2
         assert requests[10].request_id == "00000000-0000-4000-8000-000000000005"
         assert "value" not in asdict(result) and "ciphertext" not in asdict(result)
-        assert result.policy == policy
+        assert "policy" not in asdict(result)
     finally:
         await invoke(client, "close")
 
@@ -274,3 +277,61 @@ def test_async_client_close_before_first_use():
             await client.secrets.get("secret")
 
     asyncio.run(close_unused())
+
+
+def policy_metadata():
+    return pb.SecretAccessPolicy(
+        id="policy-id", workspace_id="workspace", name="claude",
+        revision=3, attached_session_count=2,
+        rules=[pb.SecretRequestRule(
+            origin="https://api.example.com", methods=["POST"], path_prefix="/v1/",
+            header="Authorization", secrets=["TOKEN", "SECOND"],
+        )],
+    )
+
+
+@pytest.mark.parametrize("client_type", [WorkspaceClient, AsyncWorkspaceClient])
+@pytest.mark.parametrize("workspace_id", ["workspace", ""])
+async def test_policy_wire_contract(endpoint, client_type, workspace_id):
+    url, requests, headers, failure = endpoint
+    client = client_type(workspace_id=workspace_id, auth_token="tk_test", base_url=url)
+    policies = client.secrets.policies
+
+    async def call(name, *args, **kwargs):
+        result = getattr(policies, name)(*args, **kwargs)
+        return await result if inspect.isawaitable(result) else result
+
+    rules = [SecretRequestRule(
+        origin="https://api.example.com", methods=["POST"], path_prefix="/v1/",
+        header="Authorization", secrets=["TOKEN", "SECOND"],
+    )]
+    request_id = "00000000-0000-4000-8000-000000000001"
+    try:
+        result = await call("create", "claude", rules, request_id=request_id)
+        assert result.name == "claude" and result.attached_session_count == 2
+        assert result.rules[0].secrets == ["TOKEN", "SECOND"]
+        await call("update", result.id, rules, expected_revision=3, request_id=request_id)
+        await call("get", "claude")
+        page = await call("list", page_size=2, cursor="current")
+        assert page.next_cursor == "next" and len(page.policies) == 1
+        await call("delete", result.id, expected_revision=3, request_id=request_id)
+        assert all(r.workspace_id == workspace_id for r in requests)
+        assert all(h["authorization"] == "Bearer tk_test" for h in headers)
+        assert requests[0].rules[0] == policy_metadata().rules[0]
+        assert requests[0].request_id == request_id
+        assert requests[1].expected_revision == 3 and requests[1].policy_id == result.id
+        assert requests[2].policy_id == "claude"
+        assert requests[3].cursor == "current" and requests[3].page_size == 2
+        assert requests[4].expected_revision == 3 and requests[4].request_id == request_id
+        failure.append(grpc.StatusCode.ABORTED)
+        for _ in range(2):
+            with pytest.raises(WorkspaceSecretError) as caught:
+                await call("update", result.id, rules, expected_revision=3, request_id=request_id)
+            assert caught.value.code == grpc.StatusCode.ABORTED
+        assert len(requests) == 7
+        assert [r.request_id for r in requests[5:]] == [request_id, request_id]
+        failure.clear()
+        await call("list")
+        assert requests[-1].page_size == 0
+    finally:
+        await invoke(client, "close")

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Literal
 from uuid import uuid4
 
 import grpc
@@ -23,17 +22,6 @@ def _workspace_secret_error(error):
     return WorkspaceSecretError(error.details(), error.code())
 
 
-SecretDeliveryMode = Literal["guest_and_injection", "injection_only"]
-SecretDestinationMode = Literal["unset", "allowlist", "allow_any"]
-
-
-@dataclass(frozen=True)
-class SecretPolicy:
-    delivery_mode: SecretDeliveryMode
-    destination_mode: SecretDestinationMode
-    allowed_hosts: tuple[str, ...] = ()
-
-
 @dataclass(frozen=True)
 class WorkspaceSecret:
     id: str
@@ -41,7 +29,6 @@ class WorkspaceSecret:
     name: str
     active_version: int
     revision: int
-    policy: SecretPolicy
     created_at: datetime | None = None
     updated_at: datetime | None = None
     revoked_at: datetime | None = None
@@ -67,30 +54,6 @@ class SecretVersionPage:
     next_cursor: str
 
 
-_DELIVERY = {
-    "guest_and_injection": pb.SECRET_DELIVERY_MODE_GUEST_AND_INJECTION,
-    "injection_only": pb.SECRET_DELIVERY_MODE_INJECTION_ONLY,
-}
-_DESTINATION = {
-    "unset": pb.SECRET_DESTINATION_MODE_UNSET,
-    "allowlist": pb.SECRET_DESTINATION_MODE_ALLOWLIST,
-    "allow_any": pb.SECRET_DESTINATION_MODE_ALLOW_ANY,
-}
-
-
-def _policy(policy: SecretPolicy):
-    if (
-        policy.delivery_mode not in _DELIVERY
-        or policy.destination_mode not in _DESTINATION
-    ):
-        raise ValueError("Invalid secret policy mode")
-    return pb.SecretPolicy(
-        delivery_mode=_DELIVERY[policy.delivery_mode],
-        destination_mode=_DESTINATION[policy.destination_mode],
-        allowed_hosts=policy.allowed_hosts,
-    )
-
-
 def _time(message, field):
     return (
         getattr(message, field).ToDatetime(tzinfo=timezone.utc)
@@ -100,21 +63,12 @@ def _time(message, field):
 
 
 def _metadata(secret) -> WorkspaceSecret:
-    delivery = {value: key for key, value in _DELIVERY.items()}.get(
-        secret.policy.delivery_mode
-    )
-    destination = {value: key for key, value in _DESTINATION.items()}.get(
-        secret.policy.destination_mode
-    )
-    if delivery is None or destination is None:
-        raise ValueError("Unknown secret policy mode")
     return WorkspaceSecret(
         id=secret.id,
         workspace_id=secret.workspace_id,
         name=secret.name,
         active_version=secret.active_version,
         revision=secret.revision,
-        policy=SecretPolicy(delivery, destination, tuple(secret.policy.allowed_hosts)),
         created_at=_time(secret, "created_at"),
         updated_at=_time(secret, "updated_at"),
         revoked_at=_time(secret, "revoked_at"),
@@ -151,11 +105,15 @@ class _Secrets(_SecretsBase):
     automatic retries are performed. The cloud endpoint is configured independently.
     """
 
+    @property
+    def policies(self):
+        from .secret_policies import _SecretPolicies
+        return _SecretPolicies(self)
+
     def create(
         self,
         name: str,
         value: bytes,
-        policy: SecretPolicy,
         *,
         request_id: str | None = None,
     ) -> WorkspaceSecret:
@@ -165,7 +123,6 @@ class _Secrets(_SecretsBase):
             workspace_id=self._workspace_id,
             name=name,
             value=value,
-            policy=_policy(policy),
             request_id=request_id if request_id is not None else str(uuid4()),
         )
         try:
@@ -182,7 +139,6 @@ class _Secrets(_SecretsBase):
         *,
         expected_revision: int,
         value: bytes | None = None,
-        policy: SecretPolicy | None = None,
         active_version: int | None = None,
         request_id: str | None = None,
     ) -> WorkspaceSecret:
@@ -197,8 +153,6 @@ class _Secrets(_SecretsBase):
             if not isinstance(value, bytes):
                 raise TypeError("Secret value must be bytes")
             request.value = value
-        if policy is not None:
-            request.policy.CopyFrom(_policy(policy))
         if active_version is not None:
             request.active_version = active_version
         try:
@@ -307,11 +261,15 @@ class _AsyncSecrets(_SecretsBase):
     automatic retries are performed. The cloud endpoint is configured independently.
     """
 
+    @property
+    def policies(self):
+        from .secret_policies import _AsyncSecretPolicies
+        return _AsyncSecretPolicies(self)
+
     async def create(
         self,
         name: str,
         value: bytes,
-        policy: SecretPolicy,
         *,
         request_id: str | None = None,
     ) -> WorkspaceSecret:
@@ -321,7 +279,6 @@ class _AsyncSecrets(_SecretsBase):
             workspace_id=self._workspace_id,
             name=name,
             value=value,
-            policy=_policy(policy),
             request_id=request_id if request_id is not None else str(uuid4()),
         )
         try:
@@ -338,7 +295,6 @@ class _AsyncSecrets(_SecretsBase):
         *,
         expected_revision: int,
         value: bytes | None = None,
-        policy: SecretPolicy | None = None,
         active_version: int | None = None,
         request_id: str | None = None,
     ) -> WorkspaceSecret:
@@ -353,8 +309,6 @@ class _AsyncSecrets(_SecretsBase):
             if not isinstance(value, bytes):
                 raise TypeError("Secret value must be bytes")
             request.value = value
-        if policy is not None:
-            request.policy.CopyFrom(_policy(policy))
         if active_version is not None:
             request.active_version = active_version
         try:

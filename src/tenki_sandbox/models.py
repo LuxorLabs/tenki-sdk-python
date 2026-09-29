@@ -467,7 +467,7 @@ class RegistryImageDetail:
     metadata: Mapping[str, str] = field(default_factory=dict)
     env_vars: Mapping[str, str] = field(default_factory=dict)
     runtime_secret_env: Mapping[str,str] = field(default_factory=dict)
-    runtime_secret_requests: tuple[dict, ...] = ()
+    runtime_secret_policies: tuple[str, ...] = ()
     runtime_secret_files: tuple[RuntimeSecretFile,...] = ()
 
 

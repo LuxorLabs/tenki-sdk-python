@@ -14,6 +14,31 @@ class WorkspaceSecretsServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.CreateSecretPolicy = channel.unary_unary(
+                '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/CreateSecretPolicy',
+                request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.CreateSecretPolicyRequest.SerializeToString,
+                response_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.CreateSecretPolicyResponse.FromString,
+                _registered_method=True)
+        self.UpdateSecretPolicy = channel.unary_unary(
+                '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/UpdateSecretPolicy',
+                request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.UpdateSecretPolicyRequest.SerializeToString,
+                response_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.UpdateSecretPolicyResponse.FromString,
+                _registered_method=True)
+        self.GetSecretPolicy = channel.unary_unary(
+                '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/GetSecretPolicy',
+                request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretPolicyRequest.SerializeToString,
+                response_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretPolicyResponse.FromString,
+                _registered_method=True)
+        self.ListSecretPolicies = channel.unary_unary(
+                '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/ListSecretPolicies',
+                request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretPoliciesRequest.SerializeToString,
+                response_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretPoliciesResponse.FromString,
+                _registered_method=True)
+        self.DeleteSecretPolicy = channel.unary_unary(
+                '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/DeleteSecretPolicy',
+                request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.DeleteSecretPolicyRequest.SerializeToString,
+                response_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.DeleteSecretPolicyResponse.FromString,
+                _registered_method=True)
         self.CreateSecret = channel.unary_unary(
                 '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/CreateSecret',
                 request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.CreateSecretRequest.SerializeToString,
@@ -53,6 +78,36 @@ class WorkspaceSecretsServiceStub(object):
 
 class WorkspaceSecretsServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
+
+    def CreateSecretPolicy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateSecretPolicy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSecretPolicy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListSecretPolicies(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteSecretPolicy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def CreateSecret(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -99,6 +154,31 @@ class WorkspaceSecretsServiceServicer(object):
 
 def add_WorkspaceSecretsServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'CreateSecretPolicy': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateSecretPolicy,
+                    request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.CreateSecretPolicyRequest.FromString,
+                    response_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.CreateSecretPolicyResponse.SerializeToString,
+            ),
+            'UpdateSecretPolicy': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateSecretPolicy,
+                    request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.UpdateSecretPolicyRequest.FromString,
+                    response_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.UpdateSecretPolicyResponse.SerializeToString,
+            ),
+            'GetSecretPolicy': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSecretPolicy,
+                    request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretPolicyRequest.FromString,
+                    response_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretPolicyResponse.SerializeToString,
+            ),
+            'ListSecretPolicies': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListSecretPolicies,
+                    request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretPoliciesRequest.FromString,
+                    response_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretPoliciesResponse.SerializeToString,
+            ),
+            'DeleteSecretPolicy': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteSecretPolicy,
+                    request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.DeleteSecretPolicyRequest.FromString,
+                    response_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.DeleteSecretPolicyResponse.SerializeToString,
+            ),
             'CreateSecret': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateSecret,
                     request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.CreateSecretRequest.FromString,
@@ -144,6 +224,141 @@ def add_WorkspaceSecretsServiceServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class WorkspaceSecretsService(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def CreateSecretPolicy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/CreateSecretPolicy',
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.CreateSecretPolicyRequest.SerializeToString,
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.CreateSecretPolicyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateSecretPolicy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/UpdateSecretPolicy',
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.UpdateSecretPolicyRequest.SerializeToString,
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.UpdateSecretPolicyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSecretPolicy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/GetSecretPolicy',
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretPolicyRequest.SerializeToString,
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretPolicyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListSecretPolicies(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/ListSecretPolicies',
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretPoliciesRequest.SerializeToString,
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretPoliciesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteSecretPolicy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/DeleteSecretPolicy',
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.DeleteSecretPolicyRequest.SerializeToString,
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.DeleteSecretPolicyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
 
     @staticmethod
     def CreateSecret(request,

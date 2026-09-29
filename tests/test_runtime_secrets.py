@@ -144,22 +144,16 @@ def test_source_marker_grammar():
         assert secret_file_names(text) is None
 
 @pytest.mark.parametrize("kind", ["start", "argv", "compose"])
-@pytest.mark.parametrize("location", [{"header": "Authorization"}, {"query_parameter": "token"}, {"json_pointer": "/auth/token"}])
-def test_request_binding_roundtrip(kind, location):
-    from tenki import SecretRequestBinding
-    rule: SecretRequestBinding = {"name": "token", "secret_name": "API_TOKEN", "origin": "https://api.example.com", "methods": ["POST"], "path_prefix": "/v1/", **location}
-    spec = TemplateSpec().process_compose("compose.yaml", secret_requests=[rule]) if kind == "compose" else TemplateSpec().start(["app"] if kind == "argv" else "app", secret_requests=[rule])
-    rule["methods"].append("DELETE")
+def test_policy_selection_roundtrip(kind):
+    names = ["claude", "github"]
+    spec = TemplateSpec().process_compose("compose.yaml", secret_policies=names) if kind == "compose" else TemplateSpec().start(["app"] if kind == "argv" else "app", secret_policies=names)
+    names.append("mutated")
     runtime = TemplateSpec.from_json(spec.to_json())._to_direct_runtime_proto()
-    assert list(runtime.secret_requests[0].methods) == ["POST"]
-    assert runtime.secret_requests[0].secret_name == "API_TOKEN"
-    for key, value in location.items():
-        assert getattr(runtime.secret_requests[0], key) == value
+    assert list(runtime.secret_policies) == ["claude", "github"]
 
 @pytest.mark.parametrize("asynchronous", [False, True])
 @pytest.mark.parametrize("shortcut", [False, True])
-@pytest.mark.parametrize("location", [{"header": "Authorization"}, {"query_parameter": "token"}, {"json_pointer": "/auth/token"}])
-async def test_request_binding_launch_contract(asynchronous, shortcut, monkeypatch, location):
+async def test_policy_selection_launch_contract(asynchronous, shortcut, monkeypatch):
     seen = []
     def create(request):
         seen.append(pb.CreateSessionRequest.FromString(request.SerializeToString()))
@@ -173,9 +167,7 @@ async def test_request_binding_launch_contract(asynchronous, shortcut, monkeypat
     if shortcut:
         monkeypatch.setattr("tenki_sandbox.aio.client.AsyncClient" if asynchronous else "tenki_sandbox.client.Client", lambda **_kwargs: client)
         launcher = AsyncSandbox if asynchronous else Sandbox
-    result = launcher.create(secret_requests=[{"name":"token", "secret_name":"API_TOKEN", "origin":"https://api.example.com", "methods":["POST"], "path_prefix":"/v1/", **location}], wait=False)
+    result = launcher.create(secret_policies=["claude", "github"], wait=False)
     if inspect.isawaitable(result): await result
     assert not seen[0].HasField("runtime")
-    assert seen[0].secret_requests[0].secret_name == "API_TOKEN"
-    for key, value in location.items():
-        assert getattr(seen[0].secret_requests[0], key) == value
+    assert list(seen[0].secret_policies) == ["claude", "github"]

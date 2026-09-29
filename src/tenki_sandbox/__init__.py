@@ -205,10 +205,7 @@ __all__ = [
 
 from .workspace import AsyncWorkspaceClient, WorkspaceClient
 from .workspace_secrets import (
-    SecretDeliveryMode,
-    SecretDestinationMode,
     SecretPage,
-    SecretPolicy,
     SecretVersionPage,
     WorkspaceSecret,
     WorkspaceSecretError,
@@ -219,15 +216,14 @@ __all__ += [
     "WorkspaceSecretError",
     "WorkspaceClient",
     "AsyncWorkspaceClient",
-    "SecretPolicy",
     "WorkspaceSecret",
     "WorkspaceSecretVersion",
     "SecretPage",
     "SecretVersionPage",
-    "SecretDeliveryMode",
-    "SecretDestinationMode",
 ]
 
-from .secret_requests import SecretRequestBinding
 
-__all__ += ["SecretRequestBinding"]
+
+from .secret_policies import SecretRequestRule, WorkspaceSecretPolicy, SecretPolicyPage
+
+__all__ += ["SecretRequestRule", "WorkspaceSecretPolicy", "SecretPolicyPage"]

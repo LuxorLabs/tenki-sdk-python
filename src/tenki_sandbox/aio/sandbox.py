@@ -32,7 +32,6 @@ from ..models import (
 )
 from ..sandbox import _is_unimplemented
 from ..secret_files import RuntimeSecretFile
-from ..secret_requests import SecretRequestBinding
 from ..template_spec import TemplateSpec
 from ..warning import (
     SandboxWarning,
@@ -306,7 +305,7 @@ class AsyncSandbox:
         from_template_spec: str | Template | None = None,
         direct_runtime: TemplateSpec | None = None,
         secret_files: list[RuntimeSecretFile] | None = None,
-        secret_requests: list[SecretRequestBinding] | None = None,
+        secret_policies: list[str] | None = None,
         secret_overrides: dict[str, str] | None = None,
         setup_env: dict[str, str] | None = None,
         setup_secrets: dict[str, str] | None = None,
@@ -362,7 +361,7 @@ class AsyncSandbox:
                 direct_runtime=direct_runtime,
                 secret_overrides=secret_overrides,
                 secret_files=secret_files,
-                secret_requests=secret_requests,
+                secret_policies=secret_policies,
                 setup_env=setup_env,
                 setup_secrets=setup_secrets,
                 enable_opencode=enable_opencode,

@@ -29,7 +29,6 @@ from ..models import (
 	WorkspaceUsageLimit,
 )
 from ..secret_files import RuntimeSecretFile
-from ..secret_requests import SecretRequestBinding
 from ..template_spec import TemplateSpec
 from ..warning import (
     WarningHandler,
@@ -120,7 +119,7 @@ class AsyncClient:
         setup_secrets: dict[str, str] | None = None,
         direct_runtime: TemplateSpec | None = None,
         secret_files: list[RuntimeSecretFile] | None = None,
-        secret_requests: list[SecretRequestBinding] | None = None,
+        secret_policies: list[str] | None = None,
         secret_overrides: dict[str, str] | None = None,
         enable_opencode: bool = False,
         clone_repo_url: str | None = None,
@@ -170,7 +169,7 @@ class AsyncClient:
             direct_runtime=direct_runtime,
             secret_overrides=secret_overrides,
             secret_files=secret_files,
-            secret_requests=secret_requests,
+            secret_policies=secret_policies,
             enable_opencode=enable_opencode,
             clone_repo_url=clone_repo_url,
             volumes=volumes,
