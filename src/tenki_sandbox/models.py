@@ -56,10 +56,64 @@ class VolumeMount:
 
 @dataclass(frozen=True)
 class SessionEgressPolicy:
-    """Outbound allowlist echoed back on a session. Both lists empty means unrestricted."""
+    """Empty allowlists follow the session's tailnet policy when attached; otherwise they are unrestricted."""
 
     allow_domains: tuple[str, ...] = ()
     allow_cidrs: tuple[str, ...] = ()
+
+
+class TailnetAuthKey:
+    __slots__ = ("_value",)
+
+    def __init__(self, value: str) -> None:
+        if not value.strip():
+            raise ValueError("tailnet auth key is required")
+        self._value = value
+
+    def __repr__(self) -> str:
+        return "TailnetAuthKey('[REDACTED]')"
+
+    def __str__(self) -> str:
+        return "[REDACTED]"
+
+    def _wire_value(self) -> str:
+        return self._value
+
+
+TailnetExitPolicy = Literal["tenki_allowlist", "exit_node_managed"]
+TailnetEphemeralPausePolicy = Literal["reject", "recreate_on_resume"]
+TailnetState = Literal["pending", "joining", "online", "offline", "error", "detached"]
+TailnetProvider = Literal["tailscale"]
+
+
+@dataclass(frozen=True)
+class TailnetAttachment:
+    auth_key: TailnetAuthKey
+    hostname: str = ""
+    tags: tuple[str, ...] = ()
+    ephemeral: bool = False
+    control_url: str = ""
+    exit_node: str = ""
+    accept_routes: bool = False
+    wake_on_connect: bool = False
+    expose_ports: tuple[int, ...] = ()
+    wait_for_online: bool = False
+    exit_policy: TailnetExitPolicy | None = None
+    ephemeral_pause_policy: TailnetEphemeralPausePolicy | None = None
+    provider: TailnetProvider = "tailscale"
+
+
+@dataclass(frozen=True)
+class TailnetStatus:
+    state: TailnetState
+    node_id: str = ""
+    fqdn: str = ""
+    ips: tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
+    owner: str = ""
+    error: str = ""
+    device_retained: bool = False
+    provider: str = "tailscale"
 
 
 @dataclass(frozen=True)
@@ -95,6 +149,7 @@ class SandboxInfo:
     pause_retention: timedelta | None = None
     last_resume_error: str = ""
     terminal_error: str = ""
+    tailnet_status: TailnetStatus | None = None
 
 
 # Numeric durations use seconds, matching Python timeout and TTL APIs.

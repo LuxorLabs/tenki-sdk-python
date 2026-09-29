@@ -17,7 +17,15 @@ from ._transport import (
 )
 from .constants import ENV_GATEWAY_URL
 from .errors import WaitReadyFailedError, map_rpc_error
-from .models import Identity, Image, SessionMetrics, Template, WorkspaceUsageLimit
+from .models import (
+    Identity,
+    Image,
+    SessionMetrics,
+    TailnetAttachment,
+    TailnetAuthKey,
+    Template,
+    WorkspaceUsageLimit,
+)
 from .preview_url import PreviewUrls
 from .registry import Registry
 from .resources import Snapshots, Templates, Volumes
@@ -114,6 +122,7 @@ class Client:
         github_token: str | None = None,
         sticky: bool = False,
         wait_for_runtime: bool = False,
+        tailnet: TailnetAttachment | None = None,
         _owns_client: bool = False,
     ) -> Sandbox:
         """Create a sandbox.
@@ -165,6 +174,7 @@ class Client:
             # prewarm the data plane while provisioning continues.
             wait_ready=wait and wait_for_runtime,
             wait_for_runtime=wait_for_runtime,
+            tailnet=tailnet,
         )
 
         try:
@@ -359,6 +369,7 @@ def build_create_session_request(
     sticky: bool = False,
     wait_ready: bool = False,
     wait_for_runtime: bool = False,
+    tailnet: TailnetAttachment | None = None,
 ) -> "pb.CreateSessionRequest":
     """Build a CreateSessionRequest. Shared by the sync and async clients."""
     validate_create_resources(cpu_cores, memory_mb, disk_size_gb)
@@ -447,7 +458,51 @@ def build_create_session_request(
         req.runtime.CopyFrom(direct_runtime._to_direct_runtime_proto())
         if any(target in req.env for target in req.runtime.secret_env):
             raise ValueError("secret target conflicts with session environment")
+    if tailnet is not None:
+        req.tailnet.CopyFrom(_tailnet_attachment_proto(tailnet))
     return req
+
+
+def _tailnet_attachment_proto(attachment: TailnetAttachment):
+    if attachment.provider != "tailscale":
+        raise ValueError("unsupported tailnet provider")
+    if not isinstance(attachment.auth_key, TailnetAuthKey):
+        raise TypeError("tailnet auth_key must be a TailnetAuthKey")
+    exit_policies = {
+        None: pb.TAILNET_EXIT_POLICY_UNSPECIFIED,
+        "tenki_allowlist": pb.TAILNET_EXIT_POLICY_TENKI_ALLOWLIST,
+        "exit_node_managed": pb.TAILNET_EXIT_POLICY_EXIT_NODE_MANAGED,
+    }
+    pause_policies = {
+        None: pb.TAILNET_EPHEMERAL_PAUSE_POLICY_UNSPECIFIED,
+        "reject": pb.TAILNET_EPHEMERAL_PAUSE_POLICY_REJECT,
+        "recreate_on_resume": pb.TAILNET_EPHEMERAL_PAUSE_POLICY_RECREATE_ON_RESUME,
+    }
+    try:
+        exit_policy = exit_policies[attachment.exit_policy]
+    except KeyError as err:
+        raise ValueError(f"unsupported tailnet exit policy {attachment.exit_policy!r}") from err
+    try:
+        pause_policy = pause_policies[attachment.ephemeral_pause_policy]
+    except KeyError as err:
+        raise ValueError(
+            f"unsupported tailnet ephemeral pause policy {attachment.ephemeral_pause_policy!r}"
+        ) from err
+    return pb.TailnetAttachment(
+        provider=attachment.provider,
+        hostname=attachment.hostname,
+        tags=attachment.tags,
+        ephemeral=attachment.ephemeral,
+        control_url=attachment.control_url,
+        exit_node=attachment.exit_node,
+        accept_routes=attachment.accept_routes,
+        wake_on_connect=attachment.wake_on_connect,
+        expose_ports=attachment.expose_ports,
+        wait_for_online=attachment.wait_for_online,
+        auth_key=attachment.auth_key._wire_value(),
+        exit_policy=exit_policy,
+        ephemeral_pause_policy=pause_policy,
+    )
 
 
 def _create_wait_timeout(timeout: float | None, from_template_spec: str | Template | None) -> float:

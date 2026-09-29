@@ -30,6 +30,8 @@ from .models import (
     SandboxInfo,
     SessionEgressPolicy,
     SessionMetrics,
+    TailnetAttachment,
+    TailnetStatus,
     Template,
     VolumeMount,
 )
@@ -290,6 +292,7 @@ class Sandbox:
         github_token: str | None = None,
         sticky: bool = False,
         wait_for_runtime: bool = False,
+        tailnet: TailnetAttachment | None = None,
     ) -> "Sandbox":
         """Create a sandbox on a client this sandbox owns and closes.
 
@@ -343,6 +346,7 @@ class Sandbox:
                 github_token=github_token,
                 sticky=sticky,
                 wait_for_runtime=wait_for_runtime,
+                tailnet=tailnet,
                 _owns_client=True,
             )
         except WaitReadyFailedError:
@@ -376,6 +380,10 @@ class Sandbox:
     @property
     def egress(self) -> SessionEgressPolicy:
         return self._info.egress
+
+    @property
+    def tailnet_status(self) -> TailnetStatus | None:
+        return self._info.tailnet_status
 
     def __enter__(self) -> "Sandbox":
         return self

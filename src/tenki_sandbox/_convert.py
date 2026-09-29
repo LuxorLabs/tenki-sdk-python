@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from google.protobuf.json_format import MessageToDict
 
 from ._pb import pb, registry_pb, template_pb
@@ -35,6 +37,8 @@ from .models import (
     TemplateBuildProvenance,
     TemplateBuildStepReference,
     TemplateResources,
+    TailnetState,
+    TailnetStatus,
     Volume,
     VolumeAttachment,
     VolumeMount,
@@ -145,6 +149,20 @@ def session_egress_policy(proto) -> SessionEgressPolicy:
     )
 
 
+def tailnet_status(proto) -> TailnetStatus:
+    return TailnetStatus(
+        provider=proto.provider or "tailscale",
+        state=cast(TailnetState, proto.state),
+        node_id=proto.node_id,
+        fqdn=proto.fqdn,
+        ips=tuple(proto.ips),
+        tags=tuple(proto.tags),
+        owner=proto.owner,
+        error=proto.error,
+        device_retained=proto.device_retained,
+    )
+
+
 def sandbox_info(proto) -> SandboxInfo:
     return SandboxInfo(
         id=proto.id,
@@ -220,6 +238,11 @@ def sandbox_info(proto) -> SandboxInfo:
             "TEMPLATE_RUNTIME_STATE_"
         ),
         runtime_error=proto.runtime_error if proto.HasField("runtime_error") else None,
+        tailnet_status=(
+            tailnet_status(proto.tailnet_status)
+            if proto.HasField("tailnet_status")
+            else None
+        ),
     )
 
 

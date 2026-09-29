@@ -50,6 +50,31 @@ with Sandbox.create(cpu_cores=2, memory_mb=4096) as sb:
 
 The API key determines the Workspace automatically; ordinary Sandbox calls do not require a Workspace ID.
 
+## Tailnet attachment
+
+Use `TailnetAuthKey` so `str()` and `repr()` redact the credential.
+`wait_for_online` keeps the sandbox in creation until Tenki verifies the registered node.
+
+```python
+import os
+
+from tenki import Sandbox, TailnetAttachment, TailnetAuthKey
+
+sb = Sandbox.create(
+    tailnet=TailnetAttachment(
+        auth_key=TailnetAuthKey(os.environ["TAILNET_AUTH_KEY"]),
+        tags=("tag:sandbox",),
+        expose_ports=(3000,),
+        accept_routes=True,
+        wait_for_online=True,
+    )
+)
+print(sb.tailnet_status.state, sb.tailnet_status.fqdn)
+```
+
+The direct key is write-only and never appears in `SandboxInfo`.
+The server may reject options from later milestones, including wake-on-connect and recreate-on-resume.
+
 ## Durable pause
 
 `pause_async()` returns after the service durably accepts the request and moves the sandbox to `PAUSING` on a node that supports asynchronous pause.

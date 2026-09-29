@@ -25,6 +25,8 @@ from ..models import (
     SandboxInfo,
     SessionEgressPolicy,
     SessionMetrics,
+    TailnetAttachment,
+    TailnetStatus,
     Template,
     VolumeMount,
 )
@@ -314,6 +316,7 @@ class AsyncSandbox:
         github_token: str | None = None,
         sticky: bool = False,
         wait_for_runtime: bool = False,
+        tailnet: TailnetAttachment | None = None,
     ) -> "AsyncSandbox":
         """Create a sandbox on a client this sandbox owns and closes.
 
@@ -368,6 +371,7 @@ class AsyncSandbox:
                 github_token=github_token,
                 sticky=sticky,
                 wait_for_runtime=wait_for_runtime,
+                tailnet=tailnet,
                 _owns_client=True,
             )
         except WaitReadyFailedError:
@@ -401,6 +405,10 @@ class AsyncSandbox:
     @property
     def egress(self) -> SessionEgressPolicy:
         return self._info.egress
+
+    @property
+    def tailnet_status(self) -> TailnetStatus | None:
+        return self._info.tailnet_status
 
     async def __aenter__(self) -> "AsyncSandbox":
         return self

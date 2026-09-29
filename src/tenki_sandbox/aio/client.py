@@ -20,7 +20,14 @@ from ..client import (
 )
 from ..constants import ENV_GATEWAY_URL
 from ..errors import WaitReadyFailedError, map_rpc_error
-from ..models import Identity, Image, SessionMetrics, Template, WorkspaceUsageLimit
+from ..models import (
+    Identity,
+    Image,
+    SessionMetrics,
+    TailnetAttachment,
+    Template,
+	WorkspaceUsageLimit,
+)
 from ..secret_files import RuntimeSecretFile
 from ..secret_requests import SecretRequestBinding
 from ..template_spec import TemplateSpec
@@ -121,6 +128,7 @@ class AsyncClient:
         github_token: str | None = None,
         sticky: bool = False,
         wait_for_runtime: bool = False,
+        tailnet: TailnetAttachment | None = None,
         _owns_client: bool = False,
     ) -> AsyncSandbox:
         """Create a sandbox.
@@ -172,6 +180,7 @@ class AsyncClient:
             # prewarm the data plane while provisioning continues.
             wait_ready=wait and wait_for_runtime,
             wait_for_runtime=wait_for_runtime,
+            tailnet=tailnet,
         )
 
         try:
