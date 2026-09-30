@@ -564,7 +564,8 @@ workspace key's scope; other callers must specify one.
 metadata only. Values are `bytes`; omitted or `None` on update retains the value,
 while `b""` creates an empty value. Update, revoke, and delete require
 `expected_revision`. To select an existing version, update `active_version` with
-`value` omitted. Revoking without `version` irreversibly revokes the entire secret.
+`value` omitted. Revoking without `version` revokes every version. Revoking the active version revokes
+the secret until a new value or an unrevoked version is made active.
 
 Mutations generate a request ID when none is supplied. For retries after an
 uncertain result, supply and reuse the same request ID and identical arguments.
