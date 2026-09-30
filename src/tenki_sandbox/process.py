@@ -326,10 +326,13 @@ class Process:
                 try:
                     responses = rpc.run(self._request_iter())
                     for frame in responses:
+                        kind = frame.WhichOneof("payload")
+                        if kind == "keepalive":
+                            # Not a response: keep the establishment retry open.
+                            continue
                         received_response = True
                         self._sandbox._mark_data_plane_serving(rpc)
                         self._disable_start_replay()
-                        kind = frame.WhichOneof("payload")
                         if kind == "started":
                             self._pid = int(frame.started.pid)
                             self._started.set()

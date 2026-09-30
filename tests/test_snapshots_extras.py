@@ -6,7 +6,13 @@ from datetime import datetime, timezone
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
 
-from tenki_sandbox import Client, SnapshotNotDurableError, SnapshotNotFoundError
+from tenki_sandbox import (
+    Client,
+    SnapshotFailedError,
+    SnapshotNotDurableError,
+    SnapshotNotFoundError,
+    SnapshotWaitTimeoutError,
+)
 from tenki_sandbox._pb import pb
 
 
@@ -46,6 +52,7 @@ class FakeRPC:
         self.update_req = None
         self.download_url_req = None
         self._get_snap = None
+        self.create_req = None
 
     def list_session_snapshots(self, req):
         self.list_session_req = req
@@ -62,6 +69,12 @@ class FakeRPC:
     def update_snapshot(self, req):
         self.update_req = req
         return pb.UpdateSnapshotResponse(snapshot=_snap(snapshot_id=req.snapshot_id))
+
+    def create_snapshot(self, req):
+        self.create_req = req
+        return pb.CreateSnapshotResponse(
+            snapshot=_snap(session_id=req.session_id, state=pb.SNAPSHOT_STATE_CREATING)
+        )
 
     def get_snapshot(self, req):
         return pb.GetSnapshotResponse(snapshot=self._get_snap or _snap())
@@ -293,3 +306,35 @@ def test_snapshot_model_new_fields():
     assert s.memory_mb == 4096
     assert s.disk_size_gb == 20
     assert s.memory_bytes == 1024 * 1024
+
+
+def test_create_and_wait_submits_async():
+    rpc = FakeRPC()
+    snapshot = Client(rpc=rpc).snapshots.create_and_wait("sess-1", timeout=5)
+
+    assert getattr(rpc.create_req, "async") is True
+    assert snapshot.id == "snap-1"
+    assert snapshot.state == "READY"
+
+
+def test_wait_ready_reports_failure_reason():
+    rpc = FakeRPC()
+    rpc._get_snap = _snap(
+        state=pb.SNAPSHOT_STATE_FAILED, failure_reason="rootfs capture failed"
+    )
+
+    with pytest.raises(SnapshotFailedError, match="rootfs capture failed") as excinfo:
+        Client(rpc=rpc).snapshots.wait_ready("snap-1", timeout=5)
+    assert excinfo.value.failure_reason == "rootfs capture failed"
+    assert isinstance(excinfo.value, RuntimeError)
+
+
+def test_wait_ready_timeout_explains_how_to_keep_waiting():
+    rpc = FakeRPC()
+    rpc._get_snap = _snap(state=pb.SNAPSHOT_STATE_CREATING)
+
+    with pytest.raises(
+        SnapshotWaitTimeoutError, match=r"wait_ready\('snap-1'\)"
+    ) as excinfo:
+        Client(rpc=rpc).snapshots.wait_ready("snap-1", timeout=0.01)
+    assert isinstance(excinfo.value, TimeoutError)

@@ -10,8 +10,10 @@ from ._pagination import advance_page_token
 from ._resource_validation import validate_template_resources
 from ._time import timestamp
 from .errors import (
+    SnapshotFailedError,
     SnapshotNotDurableError,
     SnapshotNotFoundError,
+    SnapshotWaitTimeoutError,
     TemplateBuildFailedError,
     TemplateBuildWaitCancelledError,
     VolumeNotFoundError,
@@ -168,7 +170,8 @@ class Snapshots:
     def create_and_wait(
         self, session_id: str, *, timeout: float = 300, name: str | None = None
     ) -> Snapshot:
-        created = self.create(session_id, name=name)
+        # Submit asynchronously so a slow capture cannot outlive a gateway timeout.
+        created = self.create(session_id, name=name, async_=True)
         return self.wait_ready(created.id, timeout=timeout)
 
     def get(self, snapshot_id: str) -> Snapshot:
@@ -317,10 +320,19 @@ class Snapshots:
             snap = self.get(snapshot_id)
             if snap.state == "READY":
                 return snap
-            if snap.state in {"FAILED", "DELETING", "DELETED"}:
+            if snap.state == "FAILED":
+                reason = f": {snap.failure_reason}" if snap.failure_reason else ""
+                raise SnapshotFailedError(
+                    f"snapshot entered terminal state: FAILED{reason}",
+                    failure_reason=snap.failure_reason,
+                )
+            if snap.state in {"DELETING", "DELETED"}:
                 raise RuntimeError(f"snapshot entered terminal state: {snap.state}")
             time.sleep(0.5)
-        raise TimeoutError(f"timeout waiting for snapshot {snapshot_id}")
+        raise SnapshotWaitTimeoutError(
+            f"timeout waiting for snapshot {snapshot_id}; it is still being created, "
+            f"call wait_ready({snapshot_id!r}) to keep waiting"
+        )
 
 
 class Templates:

@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from tenki_sandbox import AsyncClient, VolumeNotFoundError
+from tenki_sandbox import (
+    AsyncClient,
+    SnapshotFailedError,
+    SnapshotWaitTimeoutError,
+    VolumeNotFoundError,
+)
 from tenki_sandbox._pb import pb
 
 from _async_fakes import FakeControlRPC
@@ -66,6 +71,65 @@ async def test_async_snapshot_create_async_sets_dispatch_flag():
 
     assert snapshot.id == "snap-1"
     assert getattr(rpc.requests["create_snapshot"][-1], "async") is True
+
+
+async def test_async_snapshot_create_and_wait_submits_async():
+    class SnapshotRPC(FakeControlRPC):
+        async def get_snapshot(self, req):
+            self._record("get_snapshot", req)
+            return pb.GetSnapshotResponse(
+                snapshot=pb.Snapshot(
+                    id=req.snapshot_id,
+                    session_id="session-1",
+                    state=pb.SNAPSHOT_STATE_READY,
+                )
+            )
+
+    rpc = SnapshotRPC()
+    snapshot = await AsyncClient(rpc=rpc).snapshots.create_and_wait(
+        "session-1", timeout=5
+    )
+
+    assert getattr(rpc.requests["create_snapshot"][-1], "async") is True
+    assert snapshot.id == "snap-1"
+    assert snapshot.state == "READY"
+
+
+async def test_async_snapshot_wait_ready_reports_failure_reason():
+    class FailedSnapshotRPC(FakeControlRPC):
+        async def get_snapshot(self, req):
+            return pb.GetSnapshotResponse(
+                snapshot=pb.Snapshot(
+                    id=req.snapshot_id,
+                    state=pb.SNAPSHOT_STATE_FAILED,
+                    failure_reason="rootfs capture failed",
+                )
+            )
+
+    with pytest.raises(SnapshotFailedError, match="rootfs capture failed") as excinfo:
+        await AsyncClient(rpc=FailedSnapshotRPC()).snapshots.wait_ready(
+            "snap-1", timeout=5
+        )
+    assert excinfo.value.failure_reason == "rootfs capture failed"
+    assert isinstance(excinfo.value, RuntimeError)
+
+
+async def test_async_snapshot_wait_ready_timeout_explains_how_to_keep_waiting():
+    class CreatingSnapshotRPC(FakeControlRPC):
+        async def get_snapshot(self, req):
+            return pb.GetSnapshotResponse(
+                snapshot=pb.Snapshot(
+                    id=req.snapshot_id, state=pb.SNAPSHOT_STATE_CREATING
+                )
+            )
+
+    with pytest.raises(
+        SnapshotWaitTimeoutError, match=r"wait_ready\('snap-1'\)"
+    ) as excinfo:
+        await AsyncClient(rpc=CreatingSnapshotRPC()).snapshots.wait_ready(
+            "snap-1", timeout=0.01
+        )
+    assert isinstance(excinfo.value, TimeoutError)
 
 
 async def test_async_template_build_forwards_environment_and_secrets():

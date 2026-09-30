@@ -110,6 +110,18 @@ class SnapshotNotDurableError(SandboxError):
     pass
 
 
+class SnapshotFailedError(SandboxError, RuntimeError):
+    """A waited-on snapshot reached FAILED; also a RuntimeError for older callers."""
+
+    def __init__(self, message: str, failure_reason: str = "") -> None:
+        super().__init__(message)
+        self.failure_reason = failure_reason
+
+
+class SnapshotWaitTimeoutError(SandboxError, TimeoutError):
+    """A snapshot wait timed out; also a TimeoutError for older callers."""
+
+
 class PauseFailedError(SandboxError):
     pass
 
