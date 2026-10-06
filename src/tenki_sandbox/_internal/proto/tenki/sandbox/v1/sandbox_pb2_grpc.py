@@ -325,6 +325,16 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListActiveTemplateBuildsRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListActiveTemplateBuildsResponse.FromString,
                 _registered_method=True)
+        self.ListTemplateBuilds = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/ListTemplateBuilds',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplateBuildsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplateBuildsResponse.FromString,
+                _registered_method=True)
+        self.DeleteTemplateBuild = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/DeleteTemplateBuild',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.DeleteTemplateBuildRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.DeleteTemplateBuildResponse.FromString,
+                _registered_method=True)
         self.PublishRegistryImage = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/PublishRegistryImage',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_registry__pb2.PublishRegistryImageRequest.SerializeToString,
@@ -766,6 +776,18 @@ class SandboxServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListTemplateBuilds(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteTemplateBuild(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def PublishRegistryImage(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1146,6 +1168,16 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.ListActiveTemplateBuilds,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListActiveTemplateBuildsRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListActiveTemplateBuildsResponse.SerializeToString,
+            ),
+            'ListTemplateBuilds': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListTemplateBuilds,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplateBuildsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplateBuildsResponse.SerializeToString,
+            ),
+            'DeleteTemplateBuild': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteTemplateBuild,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.DeleteTemplateBuildRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_template__pb2.DeleteTemplateBuildResponse.SerializeToString,
             ),
             'PublishRegistryImage': grpc.unary_unary_rpc_method_handler(
                     servicer.PublishRegistryImage,
@@ -2859,6 +2891,60 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/ListActiveTemplateBuilds',
             tenki_dot_sandbox_dot_v1_dot_template__pb2.ListActiveTemplateBuildsRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_template__pb2.ListActiveTemplateBuildsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListTemplateBuilds(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/ListTemplateBuilds',
+            tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplateBuildsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_template__pb2.ListTemplateBuildsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteTemplateBuild(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/DeleteTemplateBuild',
+            tenki_dot_sandbox_dot_v1_dot_template__pb2.DeleteTemplateBuildRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_template__pb2.DeleteTemplateBuildResponse.FromString,
             options,
             channel_credentials,
             insecure,
