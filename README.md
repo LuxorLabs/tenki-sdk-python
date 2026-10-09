@@ -117,6 +117,40 @@ Unless the sandbox uses outbound secret injection, HTTPS is not decrypted, so an
 Ports other than 80 and 443 are open to any address an allowed name resolved to.
 Read the allowlist back from `sb.info.egress`.
 
+### Inspecting HTTPS requests
+
+With `intercept_https=True`, the egress proxy terminates the session's HTTPS with a managed CA the guest trusts, and a request whose `Host` differs from the TLS server name gets 421.
+It requires `allow_domains`.
+The `http_rules` then decide which requests pass: each HTTP request must match one rule's domains, methods and path, or it gets 403 `egress_http_rule_denied`.
+Domains use the allowlist grammar plus `*`, empty methods match any method, and the path is exact, a prefix, or an RE2 regex that must match the whole escaped path (the query is not matched).
+Without rules, every request to an allowed domain passes.
+
+Read-only access to package registries, plus `git clone` (but not `git push`) from GitHub:
+
+```python
+from tenki_sandbox import EgressHttpRule, Sandbox
+
+registries = ("github.com", "codeload.github.com", "pypi.org", "files.pythonhosted.org")
+sb = Sandbox.create(
+    allow_domains=list(registries),
+    intercept_https=True,
+    http_rules=[
+        EgressHttpRule(domains=registries, methods=("GET", "HEAD")),
+        EgressHttpRule(
+            domains=("github.com",),
+            methods=("POST",),
+            path_regex=r"^/[^/]+/[^/]+(\.git)?/git-upload-pack$",
+        ),
+    ],
+)
+```
+
+HTTP rules apply only to ports 80 and 443; other ports follow the domain and CIDR allowlist alone.
+Interception speaks HTTP/1.1 only, and WebSocket upgrades get 501.
+Git smart HTTP, pip, npm, cargo, Go modules and Maven all work over HTTP/1.1.
+The CA is installed at `/usr/local/share/ca-certificates/tenki-egress.crt` and added to the system bundle; unless you set them, `NODE_EXTRA_CA_CERTS` points at the CA and `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE` at the system bundle.
+The JVM reads none of those: for Maven or Gradle, import the CA into the JVM truststore (`keytool -importcert -cacerts -noprompt -alias tenki-egress -file /usr/local/share/ca-certificates/tenki-egress.crt`) or pass a truststore that has it through `JAVA_TOOL_OPTIONS`.
+
 ## What survives a pause
 
 Pause captures the VM's full memory, not only its disk: a resumed sandbox is the

@@ -21,6 +21,7 @@ from ..client import (
 from ..constants import ENV_GATEWAY_URL
 from ..errors import WaitReadyFailedError, map_rpc_error
 from ..models import (
+    EgressHttpRule,
     Identity,
     Image,
     SessionMetrics,
@@ -102,6 +103,8 @@ class AsyncClient:
         allow_outbound: bool = True,
         allow_domains: list[str] | None = None,
         allow_cidrs: list[str] | None = None,
+        intercept_https: bool = False,
+        http_rules: list[EgressHttpRule] | None = None,
         max_duration: float | int | object | None = None,
         idle_timeout_minutes: int | None = None,
         pause_retention: float | int | object | None = None,
@@ -139,7 +142,11 @@ class AsyncClient:
         that source's disk unless this is set.
 
         ``allow_domains``/``allow_cidrs`` restrict outbound access; both are
-        ignored when ``allow_outbound`` is false.
+        ignored when ``allow_outbound`` is false. ``intercept_https`` (requires
+        ``allow_domains``) terminates HTTPS at the egress proxy so each request's
+        Host must match the TLS server name; ``http_rules`` (requires
+        ``intercept_https``) refuses with 403 any HTTP request on ports 80 and
+        443 that matches none of the rules.
 
         ``idle_timeout_minutes`` is deprecated and ignored: sandboxes do not
         auto-pause on idle.
@@ -151,6 +158,8 @@ class AsyncClient:
             allow_outbound=allow_outbound,
             allow_domains=allow_domains,
             allow_cidrs=allow_cidrs,
+            intercept_https=intercept_https,
+            http_rules=http_rules,
             max_duration=max_duration,
             idle_timeout_minutes=idle_timeout_minutes,
             pause_retention=pause_retention,

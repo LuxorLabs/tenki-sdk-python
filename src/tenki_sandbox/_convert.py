@@ -7,6 +7,7 @@ from google.protobuf.json_format import MessageToDict
 from ._pb import pb, registry_pb, template_pb
 from ._time import datetime_from_proto
 from .models import (
+    EgressHttpRule,
     ExposedPort,
     FileInfo,
     Identity,
@@ -146,7 +147,26 @@ def session_egress_policy(proto) -> SessionEgressPolicy:
     return SessionEgressPolicy(
         allow_domains=tuple(proto.allow_domains),
         allow_cidrs=tuple(proto.allow_cidrs),
+        intercept_https=proto.intercept_https,
+        http_rules=tuple(
+            EgressHttpRule(
+                domains=tuple(rule.domains),
+                methods=tuple(rule.methods),
+                path_exact=rule.exact,
+                path_prefix=rule.prefix,
+                path_regex=rule.regex,
+            )
+            for rule in proto.http_rules
+        ),
     )
+
+
+def egress_http_rule_proto(rule: EgressHttpRule) -> "pb.SessionEgressHttpRule":
+    paths = {"exact": rule.path_exact, "prefix": rule.path_prefix, "regex": rule.path_regex}
+    chosen = {field: value for field, value in paths.items() if value}
+    if len(chosen) > 1:
+        raise ValueError("an egress HTTP rule may set only one of path_exact, path_prefix, path_regex")
+    return pb.SessionEgressHttpRule(domains=list(rule.domains), methods=list(rule.methods), **chosen)
 
 
 def tailnet_status(proto) -> TailnetStatus:

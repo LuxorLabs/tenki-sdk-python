@@ -20,6 +20,7 @@ from ..errors import (
 )
 from ..models import (
     CommandResult,
+    EgressHttpRule,
     ExposedPort,
     Image,
     SandboxInfo,
@@ -290,6 +291,8 @@ class AsyncSandbox:
         allow_outbound: bool = True,
         allow_domains: list[str] | None = None,
         allow_cidrs: list[str] | None = None,
+        intercept_https: bool = False,
+        http_rules: list[EgressHttpRule] | None = None,
         max_duration: float | int | object | None = None,
         idle_timeout_minutes: int | None = None,
         pause_retention: float | int | object | None = None,
@@ -345,6 +348,8 @@ class AsyncSandbox:
                 allow_outbound=allow_outbound,
                 allow_domains=allow_domains,
                 allow_cidrs=allow_cidrs,
+                intercept_https=intercept_https,
+                http_rules=http_rules,
                 max_duration=max_duration,
                 idle_timeout_minutes=idle_timeout_minutes,
                 pause_retention=pause_retention,

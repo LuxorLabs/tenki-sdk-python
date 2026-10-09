@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import warnings
 
-from ._convert import identity, sandbox_info, session_metrics, workspace_usage_limit
+from ._convert import egress_http_rule_proto, identity, sandbox_info, session_metrics, workspace_usage_limit
 from ._pagination import advance_page_token
 from ._pb import pb
 from ._resource_validation import validate_create_resources
@@ -18,6 +18,7 @@ from ._transport import (
 from .constants import ENV_GATEWAY_URL
 from .errors import WaitReadyFailedError, map_rpc_error
 from .models import (
+    EgressHttpRule,
     Identity,
     Image,
     SessionMetrics,
@@ -96,6 +97,8 @@ class Client:
         allow_outbound: bool = True,
         allow_domains: list[str] | None = None,
         allow_cidrs: list[str] | None = None,
+        intercept_https: bool = False,
+        http_rules: list[EgressHttpRule] | None = None,
         max_duration: float | int | object | None = None,
         idle_timeout_minutes: int | None = None,
         pause_retention: float | int | object | None = None,
@@ -133,7 +136,11 @@ class Client:
         that source's disk unless this is set.
 
         ``allow_domains``/``allow_cidrs`` restrict outbound access; both are
-        ignored when ``allow_outbound`` is false.
+        ignored when ``allow_outbound`` is false. ``intercept_https`` (requires
+        ``allow_domains``) terminates HTTPS at the egress proxy so each request's
+        Host must match the TLS server name; ``http_rules`` (requires
+        ``intercept_https``) refuses with 403 any HTTP request on ports 80 and
+        443 that matches none of the rules.
 
         ``idle_timeout_minutes`` is deprecated and ignored: sandboxes do not
         auto-pause on idle.
@@ -145,6 +152,8 @@ class Client:
             allow_outbound=allow_outbound,
             allow_domains=allow_domains,
             allow_cidrs=allow_cidrs,
+            intercept_https=intercept_https,
+            http_rules=http_rules,
             max_duration=max_duration,
             idle_timeout_minutes=idle_timeout_minutes,
             pause_retention=pause_retention,
@@ -342,6 +351,8 @@ def build_create_session_request(
     allow_outbound: bool = True,
     allow_domains: list[str] | None = None,
     allow_cidrs: list[str] | None = None,
+    intercept_https: bool = False,
+    http_rules: list[EgressHttpRule] | None = None,
     max_duration: float | int | object | None = None,
     idle_timeout_minutes: int | None = None,
     pause_retention: float | int | object | None = None,
@@ -400,11 +411,13 @@ def build_create_session_request(
         req.workspace_id = workspace_id.strip()
     if tags:
         req.tags.extend(_normalize_tags(tags))
-    if allow_domains or allow_cidrs:
+    if allow_domains or allow_cidrs or intercept_https or http_rules:
         req.egress.CopyFrom(
             pb.SessionEgressPolicy(
                 allow_domains=list(allow_domains or []),
                 allow_cidrs=list(allow_cidrs or []),
+                intercept_https=intercept_https,
+                http_rules=[egress_http_rule_proto(rule) for rule in http_rules or []],
             )
         )
     if max_duration is not None:

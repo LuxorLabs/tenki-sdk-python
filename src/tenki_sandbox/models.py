@@ -55,11 +55,29 @@ class VolumeMount:
 
 
 @dataclass(frozen=True)
+class EgressHttpRule:
+    """Admits matching HTTP requests on an intercepting session.
+
+    ``domains`` take the ``allow_domains`` grammar plus ``"*"``; empty ``methods``
+    match any method. Set at most one path field; ``path_regex`` is RE2 and must
+    match the whole path.
+    """
+
+    domains: tuple[str, ...]
+    methods: tuple[str, ...] = ()
+    path_exact: str = ""
+    path_prefix: str = ""
+    path_regex: str = ""
+
+
+@dataclass(frozen=True)
 class SessionEgressPolicy:
     """Empty allowlists follow the session's tailnet policy when attached; otherwise they are unrestricted."""
 
     allow_domains: tuple[str, ...] = ()
     allow_cidrs: tuple[str, ...] = ()
+    intercept_https: bool = False
+    http_rules: tuple[EgressHttpRule, ...] = ()
 
 
 class TailnetAuthKey:

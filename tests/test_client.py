@@ -13,6 +13,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import tenki_sandbox
 from tenki_sandbox import (
     Client,
+    EgressHttpRule,
     InvalidAuthTokenError,
     InvalidResourceConfigError,
     MissingAuthTokenError,
@@ -531,6 +532,71 @@ def test_sandbox_info_reports_server_network_policy():
     assert info.outbound_enabled is False
 
 
+def test_create_sets_https_interception_and_http_rules():
+    rpc = FakeRPC()
+    client = Client(rpc=rpc)
+
+    client.create(
+        workspace_id="ws-1",
+        wait=False,
+        allow_domains=["github.com"],
+        intercept_https=True,
+        http_rules=[
+            EgressHttpRule(domains=("github.com",), methods=("GET", "HEAD")),
+            EgressHttpRule(
+                domains=("github.com",),
+                methods=("POST",),
+                path_regex=r"^/[^/]+/[^/]+(\.git)?/git-upload-pack$",
+            ),
+            EgressHttpRule(domains=("*",), path_prefix="/simple/"),
+        ],
+    )
+    egress = rpc.requests["create_session"][-1].egress
+    assert egress.intercept_https is True
+    assert [list(rule.domains) for rule in egress.http_rules] == [["github.com"], ["github.com"], ["*"]]
+    assert list(egress.http_rules[0].methods) == ["GET", "HEAD"]
+    assert egress.http_rules[0].WhichOneof("path") is None
+    assert egress.http_rules[1].regex == r"^/[^/]+/[^/]+(\.git)?/git-upload-pack$"
+    assert egress.http_rules[2].WhichOneof("path") == "prefix"
+    # Field numbers are the wire contract: intercept_https = 3, http_rules = 4, regex = 5.
+    assert (
+        pb.SessionEgressPolicy(
+            intercept_https=True,
+            http_rules=[pb.SessionEgressHttpRule(domains=["x"], regex="r")],
+        ).SerializeToString()
+        == b'\x18\x01"\x06\n\x01x*\x01r'
+    )
+
+
+def test_sandbox_create_forwards_https_interception_and_http_rules(monkeypatch):
+    rpc = FakeRPC()
+    client = Client(rpc=rpc)
+    monkeypatch.setattr("tenki_sandbox.client.Client", lambda **_kwargs: client)
+
+    Sandbox.create(
+        wait=False,
+        allow_domains=["github.com"],
+        intercept_https=True,
+        http_rules=[EgressHttpRule(domains=("github.com",), methods=("GET",))],
+    )
+    egress = rpc.requests["create_session"][-1].egress
+    assert egress.intercept_https is True
+    assert list(egress.http_rules[0].methods) == ["GET"]
+
+
+def test_create_rejects_http_rule_with_two_paths():
+    rpc = FakeRPC()
+    with pytest.raises(ValueError, match="only one of"):
+        Client(rpc=rpc).create(
+            workspace_id="ws-1",
+            wait=False,
+            allow_domains=["github.com"],
+            intercept_https=True,
+            http_rules=[EgressHttpRule(domains=("github.com",), path_exact="/a", path_prefix="/b")],
+        )
+    assert not rpc.requests.get("create_session")
+
+
 def test_sandbox_info_reports_egress_policy():
     info = sandbox_info(
         pb.SandboxSession(
@@ -547,6 +613,27 @@ def test_sandbox_info_reports_egress_policy():
     unrestricted = sandbox_info(pb.SandboxSession(id="s"))
     assert unrestricted.egress.allow_domains == ()
     assert unrestricted.egress.allow_cidrs == ()
+    assert unrestricted.egress.intercept_https is False
+    assert unrestricted.egress.http_rules == ()
+
+    intercepting = sandbox_info(
+        pb.SandboxSession(
+            id="s",
+            egress=pb.SessionEgressPolicy(
+                allow_domains=["github.com"],
+                intercept_https=True,
+                http_rules=[
+                    pb.SessionEgressHttpRule(domains=["github.com"], methods=["POST"], regex="^/a$"),
+                    pb.SessionEgressHttpRule(domains=["*"], exact="/b"),
+                ],
+            ),
+        )
+    )
+    assert intercepting.egress.intercept_https is True
+    assert intercepting.egress.http_rules == (
+        EgressHttpRule(domains=("github.com",), methods=("POST",), path_regex="^/a$"),
+        EgressHttpRule(domains=("*",), path_exact="/b"),
+    )
 
 
 def test_sandbox_info_reports_lifecycle_state():

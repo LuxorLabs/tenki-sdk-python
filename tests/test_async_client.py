@@ -9,6 +9,7 @@ import pytest
 from tenki_sandbox import (
     AsyncClient,
     AsyncSandbox,
+    EgressHttpRule,
     InvalidAuthTokenError,
     MissingAuthTokenError,
     PauseFailedError,
@@ -221,6 +222,31 @@ async def test_async_create_without_wait_maps_options():
     assert req.registry_ref == "pub/polyglot:prod"
     assert req.wait_ready is False
     assert list(req.tags) == ["nightly", "gpu"]
+
+
+async def test_async_sandbox_create_forwards_https_interception_and_http_rules(monkeypatch):
+    rpc = FakeControlRPC()
+    client = AsyncClient(rpc=rpc)
+    monkeypatch.setattr("tenki_sandbox.aio.client.AsyncClient", lambda **_kwargs: client)
+
+    async with await AsyncSandbox.create(
+        wait=False,
+        allow_domains=["github.com"],
+        intercept_https=True,
+        http_rules=[EgressHttpRule(domains=("github.com",), methods=("POST",), path_prefix="/o/")],
+    ):
+        egress = rpc.requests["create_session"][-1].egress
+        assert egress.intercept_https is True
+        assert list(egress.http_rules[0].methods) == ["POST"]
+        assert egress.http_rules[0].prefix == "/o/"
+
+    with pytest.raises(ValueError, match="only one of"):
+        await AsyncClient(rpc=FakeControlRPC()).create(
+            wait=False,
+            allow_domains=["github.com"],
+            intercept_https=True,
+            http_rules=[EgressHttpRule(domains=("github.com",), path_exact="/a", path_regex="b")],
+        )
 
 
 async def test_async_get_session_metrics_maps_optional_values_and_window():

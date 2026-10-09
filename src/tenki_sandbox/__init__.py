@@ -49,6 +49,7 @@ from .errors import (
 from .disk import DiskUsage
 from .models import (
     CommandResult,
+    EgressHttpRule,
     ExposedPort,
     FileInfo,
     Identity,
@@ -172,6 +173,7 @@ __all__ = [
     "Image",
     "PreviewUrl",
     "SandboxInfo",
+    "EgressHttpRule",
     "TailnetAttachment",
     "TailnetAuthKey",
     "TailnetEphemeralPausePolicy",
