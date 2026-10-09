@@ -29,6 +29,7 @@ from .models import (
 )
 from .preview_url import PreviewUrls
 from .registry import Registry
+from .egress_policies import EgressPolicies
 from .resources import Snapshots, Templates, Volumes
 from .sandbox import Sandbox
 from .secret_files import RuntimeSecretFile, valid_secret_files
@@ -71,6 +72,7 @@ class Client:
         self._warning_handler = warning_handler
         self.preview_urls = PreviewUrls(self._rpc)
         self.volumes = Volumes(self._rpc)
+        self.egress_policies = EgressPolicies(self._rpc)
         self.snapshots = Snapshots(self._rpc)
         self.templates = Templates(self._rpc)
         self.registry = Registry(self._rpc)
@@ -99,6 +101,7 @@ class Client:
         allow_cidrs: list[str] | None = None,
         intercept_https: bool = False,
         http_rules: list[EgressHttpRule] | None = None,
+        egress_policies: list[str] | None = None,
         max_duration: float | int | object | None = None,
         idle_timeout_minutes: int | None = None,
         pause_retention: float | int | object | None = None,
@@ -140,7 +143,8 @@ class Client:
         ``allow_domains``) terminates HTTPS at the egress proxy so each request's
         Host must match the TLS server name; ``http_rules`` (requires
         ``intercept_https``) refuses with 403 any HTTP request on ports 80 and
-        443 that matches none of the rules.
+        443 that matches none of the rules. ``egress_policies`` pins named
+        workspace egress policies that the server merges with these options.
 
         ``idle_timeout_minutes`` is deprecated and ignored: sandboxes do not
         auto-pause on idle.
@@ -154,6 +158,7 @@ class Client:
             allow_cidrs=allow_cidrs,
             intercept_https=intercept_https,
             http_rules=http_rules,
+            egress_policies=egress_policies,
             max_duration=max_duration,
             idle_timeout_minutes=idle_timeout_minutes,
             pause_retention=pause_retention,
@@ -353,6 +358,7 @@ def build_create_session_request(
     allow_cidrs: list[str] | None = None,
     intercept_https: bool = False,
     http_rules: list[EgressHttpRule] | None = None,
+    egress_policies: list[str] | None = None,
     max_duration: float | int | object | None = None,
     idle_timeout_minutes: int | None = None,
     pause_retention: float | int | object | None = None,
@@ -402,6 +408,7 @@ def build_create_session_request(
         secret_overrides=dict(secret_overrides or {}),
         secret_files=list(secret_files or []),
         secret_policies=list(secret_policies or []),
+        egress_policies=list(egress_policies or []),
     )
     if not valid_secret_files(req.secret_files, 0) or any(file.WhichOneof("format") == "source" for file in req.secret_files):
         raise ValueError("Invalid direct secret files; image source paths require a template build")

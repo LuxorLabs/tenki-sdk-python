@@ -11,6 +11,7 @@ from .git import AsyncSandboxGit
 from .preview_url import AsyncPreviewUrls
 from .process import AsyncProcess, AsyncProcessStream
 from .registry import AsyncRegistry
+from ..egress_policies import AsyncEgressPolicies
 from .resources import AsyncSnapshots, AsyncTemplates, AsyncVolumes
 from .sandbox import AsyncSandbox
 from .ssh import AsyncSSHConn
@@ -29,6 +30,7 @@ __all__ = [
     "AsyncSandboxFS",
     "AsyncSandboxGit",
     "AsyncVolumes",
+    "AsyncEgressPolicies",
     "AsyncSnapshots",
     "AsyncTemplates",
     "AsyncRegistry",

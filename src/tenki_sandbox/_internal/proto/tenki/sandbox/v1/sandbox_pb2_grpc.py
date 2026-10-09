@@ -390,6 +390,31 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_registry__pb2.UnshareRegistryImageRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_registry__pb2.UnshareRegistryImageResponse.FromString,
                 _registered_method=True)
+        self.CreateEgressPolicy = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/CreateEgressPolicy',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyResponse.FromString,
+                _registered_method=True)
+        self.UpdateEgressPolicy = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/UpdateEgressPolicy',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyResponse.FromString,
+                _registered_method=True)
+        self.GetEgressPolicy = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/GetEgressPolicy',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetEgressPolicyRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetEgressPolicyResponse.FromString,
+                _registered_method=True)
+        self.ListEgressPolicies = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/ListEgressPolicies',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListEgressPoliciesRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListEgressPoliciesResponse.FromString,
+                _registered_method=True)
+        self.DeleteEgressPolicy = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/DeleteEgressPolicy',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteEgressPolicyRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteEgressPolicyResponse.FromString,
+                _registered_method=True)
         self.WhoAmI = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/WhoAmI',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.WhoAmIRequest.SerializeToString,
@@ -854,6 +879,37 @@ class SandboxServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateEgressPolicy(self, request, context):
+        """Named workspace egress policies that sessions pin by name at create.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateEgressPolicy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetEgressPolicy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListEgressPolicies(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteEgressPolicy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def WhoAmI(self, request, context):
         """Returns the authenticated caller's identity (owner type, owner ID).
         """
@@ -1233,6 +1289,31 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.UnshareRegistryImage,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_registry__pb2.UnshareRegistryImageRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_registry__pb2.UnshareRegistryImageResponse.SerializeToString,
+            ),
+            'CreateEgressPolicy': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateEgressPolicy,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyResponse.SerializeToString,
+            ),
+            'UpdateEgressPolicy': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateEgressPolicy,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyResponse.SerializeToString,
+            ),
+            'GetEgressPolicy': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetEgressPolicy,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetEgressPolicyRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetEgressPolicyResponse.SerializeToString,
+            ),
+            'ListEgressPolicies': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListEgressPolicies,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListEgressPoliciesRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListEgressPoliciesResponse.SerializeToString,
+            ),
+            'DeleteEgressPolicy': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteEgressPolicy,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteEgressPolicyRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteEgressPolicyResponse.SerializeToString,
             ),
             'WhoAmI': grpc.unary_unary_rpc_method_handler(
                     servicer.WhoAmI,
@@ -3242,6 +3323,141 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/UnshareRegistryImage',
             tenki_dot_sandbox_dot_v1_dot_registry__pb2.UnshareRegistryImageRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_registry__pb2.UnshareRegistryImageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateEgressPolicy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/CreateEgressPolicy',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateEgressPolicy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/UpdateEgressPolicy',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetEgressPolicy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/GetEgressPolicy',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetEgressPolicyRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetEgressPolicyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListEgressPolicies(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/ListEgressPolicies',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListEgressPoliciesRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListEgressPoliciesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteEgressPolicy(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/DeleteEgressPolicy',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteEgressPolicyRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteEgressPolicyResponse.FromString,
             options,
             channel_credentials,
             insecure,

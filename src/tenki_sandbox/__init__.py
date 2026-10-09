@@ -45,11 +45,15 @@ from .errors import (
     VolumeNotFoundError,
     VolumeSyncPendingError,
     WaitReadyFailedError,
+    EgressPolicyNotFoundError,
 )
+from .egress_policies import EgressPolicies
 from .disk import DiskUsage
 from .models import (
     CommandResult,
     EgressHttpRule,
+    EgressPolicy,
+    SessionEgressPolicy,
     ExposedPort,
     FileInfo,
     Identity,
@@ -174,6 +178,10 @@ __all__ = [
     "PreviewUrl",
     "SandboxInfo",
     "EgressHttpRule",
+    "EgressPolicy",
+    "EgressPolicies",
+    "EgressPolicyNotFoundError",
+    "SessionEgressPolicy",
     "TailnetAttachment",
     "TailnetAuthKey",
     "TailnetEphemeralPausePolicy",

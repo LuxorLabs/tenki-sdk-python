@@ -142,7 +142,7 @@ def snapshot_durability_state(value: int) -> str:
     )
 
 
-def session_egress_policy(proto) -> SessionEgressPolicy:
+def session_egress_policy(proto, policy_names=()) -> SessionEgressPolicy:
     # An unset optional message field yields an empty default instance, never None.
     return SessionEgressPolicy(
         allow_domains=tuple(proto.allow_domains),
@@ -158,6 +158,7 @@ def session_egress_policy(proto) -> SessionEgressPolicy:
             )
             for rule in proto.http_rules
         ),
+        policy_names=tuple(policy_names),
     )
 
 
@@ -223,7 +224,7 @@ def sandbox_info(proto) -> SandboxInfo:
         terminal_error=proto.terminal_error,
         metadata=dict(proto.metadata),
         tags=tuple(proto.tags),
-        egress=session_egress_policy(proto.egress),
+        egress=session_egress_policy(proto.egress, proto.egress_policies),
         volume_mounts=tuple(
             VolumeMount(
                 volume_id=mount.volume_id,

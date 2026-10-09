@@ -94,6 +94,10 @@ class VolumeNotFoundError(SandboxError):
     pass
 
 
+class EgressPolicyNotFoundError(SandboxError):
+    pass
+
+
 class VolumeInUseError(SandboxError):
     pass
 
@@ -441,6 +445,9 @@ def map_rpc_error(err: Exception) -> SandboxError:
     if code_name == "PERMISSION_DENIED":
         return PermissionDeniedError(details)
     if code_name == "NOT_FOUND":
+        # Matched as a prefix first: the message ends with caller-chosen policy names.
+        if msg.startswith("egress polic"):
+            return EgressPolicyNotFoundError(details)
         if "template" in msg:
             return TemplateNotFoundError(details)
         if "snapshot" in msg:

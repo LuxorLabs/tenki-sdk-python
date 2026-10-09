@@ -151,6 +151,39 @@ Git smart HTTP, pip, npm, cargo, Go modules and Maven all work over HTTP/1.1.
 The CA is installed at `/usr/local/share/ca-certificates/tenki-egress.crt` and added to the system bundle; unless you set them, `NODE_EXTRA_CA_CERTS` points at the CA and `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE` at the system bundle.
 The JVM reads none of those: for Maven or Gradle, import the CA into the JVM truststore (`keytool -importcert -cacerts -noprompt -alias tenki-egress -file /usr/local/share/ca-certificates/tenki-egress.crt`) or pass a truststore that has it through `JAVA_TOOL_OPTIONS`.
 
+### Named egress policies
+
+Save a policy once per workspace, from the SDK or with `tenki sandbox egress-policies create`:
+
+```python
+from tenki_sandbox import Client, EgressHttpRule
+
+policy = Client().egress_policies.create(
+    "registries",
+    allow_domains=["github.com", "pypi.org", "files.pythonhosted.org"],
+    intercept_https=True,
+    http_rules=[EgressHttpRule(domains=("*",), methods=("GET", "HEAD"))],
+)
+```
+
+`egress_policies.get`, `list`, `update` and `delete` take a name or ID; `update` and `delete` need the current `expected_revision` and fail when another change landed first.
+`AsyncClient().egress_policies` has the same methods.
+Then pin policies by name:
+
+```python
+sb = Sandbox.create(
+    egress_policies=["registries", "github-read"],
+    allow_domains=["api.example.com"],
+)
+```
+
+The server merges the named policies with the inline options: domains and CIDRs are combined, HTTPS interception is on if any of them asks for it, and the HTTP rules are concatenated.
+The merged policy must pass the same checks and limits as an inline one.
+An unknown name fails the create with `NotFound` naming every missing policy.
+The session keeps the merged copy, so editing or deleting a named policy later does not change it.
+`sb.info.egress.policy_names` reads the pinned names back, and the other fields of `sb.info.egress` hold the merged policy.
+`AsyncSandbox.create` takes the same `egress_policies` argument.
+
 ## What survives a pause
 
 Pause captures the VM's full memory, not only its disk: a resumed sandbox is the

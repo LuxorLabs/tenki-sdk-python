@@ -584,6 +584,50 @@ def test_sandbox_create_forwards_https_interception_and_http_rules(monkeypatch):
     assert list(egress.http_rules[0].methods) == ["GET"]
 
 
+def test_create_sends_egress_policy_names_next_to_inline_egress():
+    rpc = FakeRPC()
+    client = Client(rpc=rpc)
+
+    client.create(
+        workspace_id="ws-1",
+        wait=False,
+        egress_policies=["registries", "github-read"],
+        allow_domains=["pypi.org"],
+    )
+    req = rpc.requests["create_session"][-1]
+    assert list(req.egress_policies) == ["registries", "github-read"]
+    assert list(req.egress.allow_domains) == ["pypi.org"]
+
+    client.create(workspace_id="ws-1", wait=False, egress_policies=["registries"])
+    names_only = rpc.requests["create_session"][-1]
+    assert list(names_only.egress_policies) == ["registries"]
+    assert not names_only.HasField("egress")
+    # Field number 41 is the wire contract for egress_policies.
+    assert pb.CreateSessionRequest(egress_policies=["registries"]).SerializeToString() == b"\xca\x02\nregistries"
+
+
+def test_sandbox_create_forwards_egress_policies(monkeypatch):
+    rpc = FakeRPC()
+    client = Client(rpc=rpc)
+    monkeypatch.setattr("tenki_sandbox.client.Client", lambda **_kwargs: client)
+
+    Sandbox.create(wait=False, egress_policies=["registries"])
+    assert list(rpc.requests["create_session"][-1].egress_policies) == ["registries"]
+
+
+def test_sandbox_info_reports_egress_policy_names():
+    info = sandbox_info(
+        pb.SandboxSession(
+            id="s",
+            egress=pb.SessionEgressPolicy(allow_domains=["github.com", "pypi.org"]),
+            egress_policies=["github-read", "registries"],
+        )
+    )
+    assert info.egress.allow_domains == ("github.com", "pypi.org")
+    assert info.egress.policy_names == ("github-read", "registries")
+    assert sandbox_info(pb.SandboxSession(id="s")).egress.policy_names == ()
+
+
 def test_create_rejects_http_rule_with_two_paths():
     rpc = FakeRPC()
     with pytest.raises(ValueError, match="only one of"):

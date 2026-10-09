@@ -78,6 +78,25 @@ class SessionEgressPolicy:
     allow_cidrs: tuple[str, ...] = ()
     intercept_https: bool = False
     http_rules: tuple[EgressHttpRule, ...] = ()
+    # Named workspace egress policies pinned at create; the fields above hold their merged expansion.
+    policy_names: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class EgressPolicy:
+    """A named workspace egress policy that sandboxes pin with ``egress_policies``."""
+
+    id: str
+    workspace_id: str
+    name: str
+    revision: int
+    # The stored policy; its policy_names is always empty.
+    egress: SessionEgressPolicy
+    # Sandboxes not yet terminated that pinned this policy.
+    active_session_count: int = 0
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    deleted_at: datetime | None = None
 
 
 class TailnetAuthKey:

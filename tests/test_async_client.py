@@ -249,6 +249,21 @@ async def test_async_sandbox_create_forwards_https_interception_and_http_rules(m
         )
 
 
+async def test_async_create_forwards_egress_policies(monkeypatch):
+    rpc = FakeControlRPC()
+    client = AsyncClient(rpc=rpc)
+    await client.create(wait=False, egress_policies=["registries", "github-read"], allow_domains=["pypi.org"])
+    req = rpc.requests["create_session"][-1]
+    assert list(req.egress_policies) == ["registries", "github-read"]
+    assert list(req.egress.allow_domains) == ["pypi.org"]
+
+    monkeypatch.setattr("tenki_sandbox.aio.client.AsyncClient", lambda **_kwargs: client)
+    async with await AsyncSandbox.create(wait=False, egress_policies=["registries"]):
+        names_only = rpc.requests["create_session"][-1]
+        assert list(names_only.egress_policies) == ["registries"]
+        assert not names_only.HasField("egress")
+
+
 async def test_async_get_session_metrics_maps_optional_values_and_window():
     rpc = FakeControlRPC()
     metrics = await AsyncClient(rpc=rpc).get_session_metrics("session-1", window=300)

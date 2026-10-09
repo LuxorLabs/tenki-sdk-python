@@ -40,6 +40,7 @@ from ..warning import (
 from ._transport import AsyncGrpcSandboxRPC
 from .preview_url import AsyncPreviewUrls
 from .registry import AsyncRegistry
+from ..egress_policies import AsyncEgressPolicies
 from .resources import AsyncSnapshots, AsyncTemplates, AsyncVolumes
 from .sandbox import AsyncSandbox
 
@@ -74,6 +75,7 @@ class AsyncClient:
         self._warning_handler = warning_handler
         self.preview_urls = AsyncPreviewUrls(self._rpc)
         self.volumes = AsyncVolumes(self._rpc)
+        self.egress_policies = AsyncEgressPolicies(self._rpc)
         self.snapshots = AsyncSnapshots(self._rpc)
         self.templates = AsyncTemplates(self._rpc)
         self.registry = AsyncRegistry(self._rpc)
@@ -105,6 +107,7 @@ class AsyncClient:
         allow_cidrs: list[str] | None = None,
         intercept_https: bool = False,
         http_rules: list[EgressHttpRule] | None = None,
+        egress_policies: list[str] | None = None,
         max_duration: float | int | object | None = None,
         idle_timeout_minutes: int | None = None,
         pause_retention: float | int | object | None = None,
@@ -146,7 +149,8 @@ class AsyncClient:
         ``allow_domains``) terminates HTTPS at the egress proxy so each request's
         Host must match the TLS server name; ``http_rules`` (requires
         ``intercept_https``) refuses with 403 any HTTP request on ports 80 and
-        443 that matches none of the rules.
+        443 that matches none of the rules. ``egress_policies`` pins named
+        workspace egress policies that the server merges with these options.
 
         ``idle_timeout_minutes`` is deprecated and ignored: sandboxes do not
         auto-pause on idle.
@@ -160,6 +164,7 @@ class AsyncClient:
             allow_cidrs=allow_cidrs,
             intercept_https=intercept_https,
             http_rules=http_rules,
+            egress_policies=egress_policies,
             max_duration=max_duration,
             idle_timeout_minutes=idle_timeout_minutes,
             pause_retention=pause_retention,
