@@ -526,7 +526,7 @@ Notes:
 
 ## Disk space
 
-The root disk defaults to 5 GB and holds the base image as well as your work, so a fresh
+The root disk defaults to 5 GiB and holds the base image as well as your work, so a fresh
 sandbox already reports around 56% used. It is fixed at create time and cannot be grown in
 place — pass `disk_size_gb` (5–100) to `create` if you need more. Budget for it before a
 large install.

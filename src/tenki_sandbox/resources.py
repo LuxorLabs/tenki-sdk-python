@@ -354,6 +354,11 @@ class Templates:
         memory_mb: int | None = None,
         disk_size_gb: int | None = None,
     ) -> Template:
+        """Create a template.
+
+        ``memory_mb`` is in MiB; ``disk_size_gb`` must be 0 or 5-100 GiB, where 0
+        leaves the template without a disk default.
+        """
         req = build_create_template_request(
             name=name,
             spec=spec,
@@ -388,6 +393,11 @@ class Templates:
         memory_mb: int | None = None,
         disk_size_gb: int | None = None,
     ) -> Template:
+        """Update a template.
+
+        ``memory_mb`` is in MiB; ``disk_size_gb`` must be 0 or 5-100 GiB, where 0
+        leaves the template without a disk default.
+        """
         req = build_update_template_request(
             template_id=template_id_of(template_ref),
             name=name,
