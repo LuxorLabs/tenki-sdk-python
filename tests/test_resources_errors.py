@@ -121,6 +121,12 @@ def test_rpc_error_mapping_uses_grpc_code_names():
     assert isinstance(map_rpc_error(FakeRpcError("RESOURCE_EXHAUSTED", "quota exceeded")), QuotaExceededError)
 
 
+def test_unconfigured_session_metrics_is_not_retryable():
+    mapped = map_rpc_error(FakeRpcError("FAILED_PRECONDITION", "sandbox session metrics are not configured"))
+    assert isinstance(mapped, InvalidStateError)
+    assert not getattr(mapped, "retryable", False)
+
+
 @pytest.mark.parametrize(
     ("reason", "want_terminated", "want_cause"),
     [
