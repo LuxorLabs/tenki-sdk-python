@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
@@ -126,7 +126,7 @@ def auth_metadata(auth_token: str) -> tuple[tuple[str, str], ...]:
 @dataclass
 class GrpcConfig:
     base_url: str
-    auth_token: str
+    auth_token: str = field(repr=False)
     timeout: float | None = None
 
 

@@ -80,6 +80,9 @@ class AsyncClient:
         self.templates = AsyncTemplates(self._rpc)
         self.registry = AsyncRegistry(self._rpc)
 
+    def __repr__(self) -> str:
+        return f"AsyncClient(base_url={self.base_url!r}, auth_token='[REDACTED]')"
+
     async def close(self) -> None:
         close = getattr(self._rpc, "close", None)
         if close is None:

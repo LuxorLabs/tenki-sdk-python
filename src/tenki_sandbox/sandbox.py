@@ -363,6 +363,9 @@ class Sandbox:
             client.close()
             raise
 
+    def __repr__(self) -> str:
+        return f"Sandbox(id={self.id!r}, name={self.name!r}, state={self.state!r})"
+
     @property
     def id(self) -> str:
         return self._info.id

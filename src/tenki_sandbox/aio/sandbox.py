@@ -388,6 +388,9 @@ class AsyncSandbox:
             await client.close()
             raise
 
+    def __repr__(self) -> str:
+        return f"AsyncSandbox(id={self.id!r}, name={self.name!r}, state={self.state!r})"
+
     @property
     def id(self) -> str:
         return self._info.id

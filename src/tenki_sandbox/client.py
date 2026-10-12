@@ -77,6 +77,9 @@ class Client:
         self.templates = Templates(self._rpc)
         self.registry = Registry(self._rpc)
 
+    def __repr__(self) -> str:
+        return f"Client(base_url={self.base_url!r}, auth_token='[REDACTED]')"
+
     def close(self) -> None:
         close = getattr(self._rpc, "close", None)
         if callable(close):
