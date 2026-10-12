@@ -252,6 +252,12 @@ async def test_credential_renew_stops_on_permanent_error():
         id = "sess-1"
         _client = FakeClient()
 
+        async def _renew_data_plane(self):
+            # The manager renews through the sandbox so a relocated session
+            # rebinds its transport; mirror that seam here.
+            await self._client._rpc.create_session_credential(None)
+            return ""
+
     mgr = AsyncDataPlaneCredentialManager(FakeSandbox())
     with pytest.raises(PermissionDeniedError):
         await mgr._renew_loop(0)  # permanent error -> raise, do not loop
@@ -276,6 +282,12 @@ async def test_credential_renew_records_permanent_error_via_done_callback():
     class FakeSandbox:
         id = "sess-1"
         _client = FakeClient()
+
+        async def _renew_data_plane(self):
+            # The manager renews through the sandbox so a relocated session
+            # rebinds its transport; mirror that seam here.
+            await self._client._rpc.create_session_credential(None)
+            return ""
 
     mgr = AsyncDataPlaneCredentialManager(FakeSandbox())
     loop = asyncio.get_running_loop()

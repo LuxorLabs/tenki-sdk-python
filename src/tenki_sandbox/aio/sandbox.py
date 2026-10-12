@@ -74,6 +74,11 @@ class AsyncSandbox:
         self._data_plane_rpc: AsyncGrpcDataPlaneRPC | None = None
         self._data_plane_verified = False
         self._data_plane_from_hint = False
+        # Set by close(); keeps a late response from re-arming a closed sandbox.
+        self._data_plane_closed = False
+        # Serializes close() so concurrent callers issue one TerminateSession.
+        self._close_lock = asyncio.Lock()
+        self._close_done = False
         # A FAILED route carries a stale/dead endpoint; leave _data_plane_rpc
         # unset so first use re-bootstraps via CreateSessionCredential (mirrors
         # the sync client). Binding it would route every fs/exec/dial to a dead
@@ -99,7 +104,7 @@ class AsyncSandbox:
         endpoint = (endpoint or "").strip()
         if credential is not None and self._data_plane_credentials is None:
             self._data_plane_credentials = AsyncDataPlaneCredentialManager(
-                self, credential
+                self, credential, endpoint
             )
         if not endpoint:
             hint = self._data_plane_endpoint_hints.current()
@@ -112,10 +117,11 @@ class AsyncSandbox:
             self._data_plane_endpoint_hints.remember(endpoint)
         if credential is not None or self._data_plane_credentials is None:
             self._data_plane_credentials = AsyncDataPlaneCredentialManager(
-                self, credential
+                self, credential, endpoint
             )
+        self._data_plane_credentials.adopt_endpoint(endpoint)
         self._data_plane_rpc = AsyncGrpcDataPlaneRPC(
-            endpoint, self._data_plane_credentials
+            endpoint, self._data_plane_credentials, self.id
         )
         self._data_plane_from_hint = from_hint
         self._data_plane_verified = route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED
@@ -133,9 +139,11 @@ class AsyncSandbox:
         if route_status == pb.DATA_PLANE_ROUTE_STATUS_FAILED:
             return
         endpoint = (endpoint or "").strip()
+        if self._data_plane_closed:
+            return
         if credential is not None and self._data_plane_credentials is None:
             self._data_plane_credentials = AsyncDataPlaneCredentialManager(
-                self, credential
+                self, credential, endpoint
             )
         if not endpoint:
             hint = self._data_plane_endpoint_hints.current()
@@ -152,7 +160,7 @@ class AsyncSandbox:
                 and getattr(self._data_plane_rpc, "endpoint", "") == endpoint
             ):
                 if credential is not None and self._data_plane_credentials is not None:
-                    self._data_plane_credentials.set(credential)
+                    self._data_plane_credentials.set(credential, endpoint)
                 self._data_plane_from_hint = from_hint
                 if route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED:
                     self._data_plane_verified = True
@@ -163,10 +171,11 @@ class AsyncSandbox:
                 self._data_plane_credentials.stop()
             if credential is not None or self._data_plane_credentials is None:
                 self._data_plane_credentials = AsyncDataPlaneCredentialManager(
-                    self, credential
+                    self, credential, endpoint
                 )
+            self._data_plane_credentials.adopt_endpoint(endpoint)
             self._data_plane_rpc = AsyncGrpcDataPlaneRPC(
-                endpoint, self._data_plane_credentials
+                endpoint, self._data_plane_credentials, self.id
             )
             self._data_plane_from_hint = from_hint
             self._data_plane_verified = (
@@ -572,17 +581,31 @@ class AsyncSandbox:
         return await self.exec("bash", "-lc", command, **kwargs)
 
     async def close(self) -> None:
-        # Tear down under the lock and null the fields (like resume()), so a
-        # closed channel is never left referenced for a later data-plane call.
-        await self._reset_data_plane()
-        try:
-            resp = await self._client._rpc.terminate_session(
-                pb.TerminateSessionRequest(session_id=self.id)
-            )
+        """Terminate this sandbox.
+
+        Idempotent and safe to call concurrently: the first successful call
+        terminates and every later one is a no-op. A failed call stays
+        retryable.
+        """
+        async with self._close_lock:
+            if self._close_done:
+                return
+            # Latch the data plane shut before terminating, so a renewal in
+            # flight cannot revive the renewal task or the channel. Tear down
+            # under the lock and null the fields (like resume()), so a closed
+            # channel is never left referenced for a later data-plane call.
+            self._data_plane_closed = True
+            await self._reset_data_plane()
+            try:
+                resp = await self._client._rpc.terminate_session(
+                    pb.TerminateSessionRequest(session_id=self.id)
+                )
+            except Exception as err:
+                self._data_plane_closed = False
+                raise map_rpc_error(err) from err
+            self._close_done = True
             if resp.session:
                 self._info = sandbox_info(resp.session)
-        except Exception as err:
-            raise map_rpc_error(err) from err
 
     terminate = close
 

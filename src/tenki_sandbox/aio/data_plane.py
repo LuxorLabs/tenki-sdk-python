@@ -10,8 +10,10 @@ from .._pb import pb
 from .._transport import grpc_target
 from ..data_plane import (
     DATA_PLANE_CREDENTIAL_HEADER,
+    _authorize_data_plane_request,
     _is_edge_not_ready,
     _unwrap_field,
+    _validate_request_session,
     _wrap_frame,
     _wrap_unary_request,
 )
@@ -144,23 +146,41 @@ def _credential_error_is_retryable(err: Exception) -> bool:
 class AsyncDataPlaneCredentialManager:
     """Async twin of DataPlaneCredentialManager — renews via an asyncio task."""
 
-    def __init__(self, sandbox, credential=None) -> None:
+    def __init__(self, sandbox, credential=None, endpoint: str = "") -> None:
         self._sandbox = sandbox
         self._credential = ""
+        # The endpoint ``_credential`` was minted for; see the sync manager.
+        self._endpoint = ""
         self._expires_at: datetime | None = None
         self._stopped = False
         self._task: asyncio.Task | None = None
         self._renew_error: Exception | None = None
         if credential is not None:
-            self.set(credential)
+            self.set(credential, endpoint)
 
     def current(self) -> str:
         return self._credential
 
-    def set(self, credential) -> None:
+    def current_for(self, endpoint: str) -> tuple[str, bool]:
+        """The credential and whether it may be sent to ``endpoint``."""
+        if not self._credential:
+            return "", True
+        if self._endpoint != endpoint:
+            return "", False
+        return self._credential, True
+
+    def adopt_endpoint(self, endpoint: str) -> None:
+        """Bind an unbound credential to the first endpoint that resolves."""
+        if self._credential and not self._endpoint:
+            self._endpoint = endpoint
+
+    def set(self, credential, endpoint: str = "") -> None:
         if credential is None or not getattr(credential, "credential", ""):
             return
+        if self._stopped:
+            return
         self._credential = credential.credential
+        self._endpoint = endpoint
         self._expires_at = (
             credential.expires_at.ToDatetime(tzinfo=timezone.utc)
             if credential.HasField("expires_at")
@@ -217,10 +237,11 @@ class AsyncDataPlaneCredentialManager:
             backoff = 1.0
             while not self._stopped:
                 try:
-                    resp = await self._sandbox._client._rpc.create_session_credential(
-                        pb.CreateSessionCredentialRequest(session_id=self._sandbox.id)
-                    )
-                    self.set(resp.credential)
+                    # Go through the sandbox so a renewal that relocates the
+                    # session rebuilds the transport for the new node; minting
+                    # here and dropping the endpoint would leave the credential
+                    # bound to a node this manager's rpc no longer targets.
+                    await self._sandbox._renew_data_plane()
                     return
                 except Exception as err:
                     # Retry transient failures (still provisioning); stop on
@@ -251,13 +272,17 @@ class AsyncGrpcDataPlaneRPC:
     }
 
     def __init__(
-        self, endpoint: str, credentials: AsyncDataPlaneCredentialManager
+        self,
+        endpoint: str,
+        credentials: AsyncDataPlaneCredentialManager,
+        session_id: str = "",
     ) -> None:
         target, secure = grpc_target(endpoint)
         self.endpoint = endpoint
         self._target = target
         self._secure = secure
         self._credentials = credentials
+        self._session_id = session_id
         self._channel = None
         self._stub = None
         self._release_channel = None
@@ -302,15 +327,18 @@ class AsyncGrpcDataPlaneRPC:
         if last is not None:
             raise last
 
-    def _auth_metadata(self, kwargs: dict) -> tuple:
+    def _auth_metadata(self, kwargs: dict, request=None) -> tuple:
         metadata = tuple(kwargs.pop("metadata", ()))
-        credential = self._credentials.current().strip()
+        credential = _authorize_data_plane_request(
+            self._credentials, self.endpoint, self._session_id, request
+        )
         if credential:
             metadata += ((DATA_PLANE_CREDENTIAL_HEADER, credential),)
         return metadata
 
     async def _wrap_stream(self, name: str, request):
         async for frame in request:
+            _validate_request_session(self._session_id, frame)
             yield _wrap_frame(name, frame)
 
     def __getattr__(self, name: str):
@@ -338,13 +366,13 @@ class AsyncGrpcDataPlaneRPC:
         )
 
     async def _call_unary(self, name: str, rpc_name: str, request, kwargs: dict):
-        metadata = self._auth_metadata(kwargs)
+        metadata = self._auth_metadata(kwargs, request)
         method = getattr(self._ensure_stub(), rpc_name)
         resp = await method(self._wrap(name, request), metadata=metadata, **kwargs)
         return resp.response
 
     async def _call_stream(self, name: str, rpc_name: str, request, kwargs: dict):
-        metadata = self._auth_metadata(kwargs)
+        metadata = self._auth_metadata(kwargs, request)
         method = getattr(self._ensure_stub(), rpc_name)
         field = _unwrap_field(name)
         call = method(self._wrap(name, request), metadata=metadata, **kwargs)

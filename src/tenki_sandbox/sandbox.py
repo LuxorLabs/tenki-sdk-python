@@ -82,6 +82,16 @@ class Sandbox:
         self._data_plane_verified = False
         self._data_plane_from_hint = False
         self._data_plane_warm_started = False
+        # Set by close(). A renewal or data-plane response that lands afterwards
+        # must not re-arm the sandbox: without it a response in flight across
+        # close revives both the renewal thread and a pooled channel for a
+        # session that is already terminated.
+        self._data_plane_closed = False
+        # _close_lock serializes close() so concurrent callers issue one
+        # TerminateSession; _close_done short-circuits every call after the
+        # first that succeeds, while a failed close stays retryable.
+        self._close_lock = threading.RLock()
+        self._close_done = False
         self._apply_data_plane_response(
             data_plane_endpoint, data_plane_credential, data_plane_route_status
         )
@@ -104,9 +114,13 @@ class Sandbox:
             return
         endpoint = (endpoint or "").strip()
         with self._data_plane_lock:
+            # A terminated sandbox must not acquire a transport or a renewal
+            # thread, however late the response that got here.
+            if self._data_plane_closed:
+                return
             if credential is not None and self._data_plane_credentials is None:
                 self._data_plane_credentials = DataPlaneCredentialManager(
-                    self, credential
+                    self, credential, endpoint
                 )
             if not endpoint:
                 hint = self._data_plane_endpoint_hints.current()
@@ -122,7 +136,7 @@ class Sandbox:
                 and getattr(self._data_plane_rpc, "endpoint", "") == endpoint
             ):
                 if credential is not None and self._data_plane_credentials is not None:
-                    self._data_plane_credentials.set(credential)
+                    self._data_plane_credentials.set(credential, endpoint)
                 self._data_plane_from_hint = from_hint
                 if route_status == pb.DATA_PLANE_ROUTE_STATUS_VERIFIED:
                     self._data_plane_verified = True
@@ -133,10 +147,14 @@ class Sandbox:
                 self._data_plane_credentials.stop()
             if credential is not None or self._data_plane_credentials is None:
                 self._data_plane_credentials = DataPlaneCredentialManager(
-                    self, credential
+                    self, credential, endpoint
                 )
+            # A credential the engine returned before the endpoint was known is
+            # unbound; this endpoint adopts it. One already bound to another
+            # node is left alone and the transport refuses to send it here.
+            self._data_plane_credentials.adopt_endpoint(endpoint)
             self._data_plane_rpc = GrpcDataPlaneRPC(
-                endpoint, self._data_plane_credentials
+                endpoint, self._data_plane_credentials, self.id
             )
             self._data_plane_from_hint = from_hint
             self._data_plane_verified = (
@@ -551,15 +569,32 @@ class Sandbox:
         return self.exec("bash", "-lc", command, **kwargs)
 
     def close(self) -> None:
-        self._reset_data_plane()
-        try:
-            resp = self._client._rpc.terminate_session(
-                pb.TerminateSessionRequest(session_id=self.id)
-            )
+        """Terminate this sandbox.
+
+        Idempotent and safe to call concurrently: the first successful call
+        terminates and every later one is a no-op. A call that fails leaves the
+        sandbox closeable again, so a caller can retry.
+        """
+        with self._close_lock:
+            if self._close_done:
+                return
+            # Latch the data plane shut and stop renewal before terminating, so
+            # a response in flight cannot revive either.
+            with self._data_plane_lock:
+                self._data_plane_closed = True
+            self._reset_data_plane()
+            try:
+                resp = self._client._rpc.terminate_session(
+                    pb.TerminateSessionRequest(session_id=self.id)
+                )
+            except Exception as err:
+                # Let a failed close be retried.
+                with self._data_plane_lock:
+                    self._data_plane_closed = False
+                raise map_rpc_error(err) from err
+            self._close_done = True
             if resp.session:
                 self._info = sandbox_info(resp.session)
-        except Exception as err:
-            raise map_rpc_error(err) from err
 
     terminate = close
 

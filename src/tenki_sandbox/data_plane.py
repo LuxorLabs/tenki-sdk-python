@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Iterable
 
 import grpc
+from google.protobuf.message import Message
 
 from ._pb import pb
 from ._transport import grpc_target
@@ -127,24 +128,48 @@ def _is_edge_not_ready(err) -> bool:
 
 
 class DataPlaneCredentialManager:
-    def __init__(self, sandbox, credential=None) -> None:
+    def __init__(self, sandbox, credential=None, endpoint: str = "") -> None:
         self._sandbox = sandbox
         self._credential = ""
+        # The endpoint ``_credential`` was minted for. A data-plane credential
+        # authorizes one session on one node, so it is only ever attached to a
+        # request aimed at that endpoint. An empty value means the engine
+        # returned it before the endpoint was known, and the first endpoint the
+        # session resolves to adopts it.
+        self._endpoint = ""
         self._expires_at: datetime | None = None
         self._stopped = threading.Event()
         self._lock = threading.Lock()
         if credential is not None:
-            self.set(credential)
+            self.set(credential, endpoint)
 
     def current(self) -> str:
         with self._lock:
             return self._credential
 
-    def set(self, credential) -> None:
+    def current_for(self, endpoint: str) -> tuple[str, bool]:
+        """The credential and whether it may be sent to ``endpoint``."""
+        with self._lock:
+            if not self._credential:
+                return "", True
+            if self._endpoint != endpoint:
+                return "", False
+            return self._credential, True
+
+    def adopt_endpoint(self, endpoint: str) -> None:
+        """Bind an unbound credential to the first endpoint that resolves."""
+        with self._lock:
+            if self._credential and not self._endpoint:
+                self._endpoint = endpoint
+
+    def set(self, credential, endpoint: str = "") -> None:
         if credential is None or not getattr(credential, "credential", ""):
+            return
+        if self._stopped.is_set():
             return
         with self._lock:
             self._credential = credential.credential
+            self._endpoint = endpoint
             self._expires_at = (
                 credential.expires_at.ToDatetime(tzinfo=timezone.utc)
                 if credential.HasField("expires_at")
@@ -172,10 +197,11 @@ class DataPlaneCredentialManager:
         backoff = 1.0
         while not self._stopped.is_set():
             try:
-                resp = self._sandbox._client._rpc.create_session_credential(
-                    pb.CreateSessionCredentialRequest(session_id=self._sandbox.id)
-                )
-                self.set(resp.credential)
+                # Go through the sandbox so a renewal that relocates the session
+                # rebuilds the transport for the new node. Minting here and
+                # dropping the endpoint would leave the credential bound to a
+                # node this manager's rpc no longer targets.
+                self._sandbox._renew_data_plane()
                 return
             except grpc.RpcError as err:
                 if not _credential_error_is_retryable(err):
@@ -186,6 +212,51 @@ class DataPlaneCredentialManager:
             if self._stopped.wait(backoff):
                 return
             backoff = min(backoff * 2, 30.0)
+
+
+class DataPlaneCredentialMisroutedError(PermissionError):
+    """A data-plane credential was about to be sent to the wrong destination.
+
+    A credential authorizes one session on one node. Attaching it to a request
+    for another session, or to a client aimed at another endpoint, would
+    disclose it, so the request is refused before it leaves the process.
+    """
+
+
+def _request_session_id(request, depth: int = 3) -> str:
+    session_id = getattr(request, "session_id", None)
+    if isinstance(session_id, str) and session_id:
+        return session_id
+    if depth > 0 and isinstance(request, Message):
+        for _, value in request.ListFields():
+            if isinstance(value, Message):
+                nested = _request_session_id(value, depth - 1)
+                if nested:
+                    return nested
+    return ""
+
+
+def _validate_request_session(session_id: str, request) -> None:
+    requested = _request_session_id(request)
+    if requested and requested != session_id:
+        raise DataPlaneCredentialMisroutedError(
+            f"refusing to send a data-plane credential to the wrong destination: "
+            f"request targets session {requested} on a client credentialed for "
+            f"session {session_id}"
+        )
+
+
+def _authorize_data_plane_request(
+    credentials, endpoint: str, session_id: str, request
+) -> str:
+    _validate_request_session(session_id, request)
+    credential, bound = credentials.current_for(endpoint)
+    if not bound:
+        raise DataPlaneCredentialMisroutedError(
+            f"refusing to send a data-plane credential to the wrong destination: "
+            f"credential was minted for another endpoint, not {endpoint}"
+        )
+    return credential.strip()
 
 
 class GrpcDataPlaneRPC:
@@ -203,13 +274,19 @@ class GrpcDataPlaneRPC:
         "host_port_tunnel": "HostPortTunnel",
     }
 
-    def __init__(self, endpoint: str, credentials: DataPlaneCredentialManager) -> None:
+    def __init__(
+        self,
+        endpoint: str,
+        credentials: DataPlaneCredentialManager,
+        session_id: str = "",
+    ) -> None:
         from tenki_sandbox._internal.proto.tenki.sandbox.v1 import sandbox_pb2_grpc
 
         self.endpoint = endpoint
         self._channel, self._release_channel = _acquire_shared_channel(endpoint)
         self._stub = sandbox_pb2_grpc.SandboxSessionDataPlaneServiceStub(self._channel)
         self._credentials = credentials
+        self._session_id = session_id
 
     def close(self) -> None:
         self._release_channel()
@@ -240,10 +317,12 @@ class GrpcDataPlaneRPC:
 
         def call(request, *args, **kwargs):
             metadata = tuple(kwargs.pop("metadata", ()))
-            credential = self._credentials.current().strip()
+            credential = _authorize_data_plane_request(
+                self._credentials, self.endpoint, self._session_id, request
+            )
             if credential:
                 metadata += ((DATA_PLANE_CREDENTIAL_HEADER, credential),)
-            wrapped = _wrap_request(name, request)
+            wrapped = _wrap_request(name, request, self._session_id)
             resp = method(wrapped, *args, metadata=metadata, **kwargs)
             return _unwrap_response(name, resp)
 
@@ -288,9 +367,15 @@ def _unwrap_field(name: str) -> str:
     return "frame" if name in _FRAME_RESPONSE else "response"
 
 
-def _wrap_request(name: str, request):
+def _wrap_request(name: str, request, session_id: str):
     if name in _STREAM_REQUEST_TYPES:
-        return (_wrap_frame(name, frame) for frame in request)
+
+        def frames():
+            for frame in request:
+                _validate_request_session(session_id, frame)
+                yield _wrap_frame(name, frame)
+
+        return frames()
     return _wrap_unary_request(name, request)
 
 
