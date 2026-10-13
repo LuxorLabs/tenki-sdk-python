@@ -10,13 +10,6 @@ on:
       - "src/**"
       - "tests/**"
   pull_request:
-    paths:
-      - ".github/workflows/test.yml"
-      - "examples/**"
-      - "pyproject.toml"
-      - "scripts/**"
-      - "src/**"
-      - "tests/**"
   workflow_dispatch:
 
 concurrency:
@@ -63,3 +56,22 @@ jobs:
 
       - name: Test
         run: python ${{ matrix.warning_args }} -m pytest
+
+  # Aggregate gate: this job's name is the required status check ("Test"). It
+  # runs on every pull request (the matrix above is path-filtered on push, but
+  # a required check has to report on every PR or the PR hangs forever), and it
+  # passes only if the protobuf matrix passed.
+  test:
+    name: Test
+    runs-on: tenki-standard-small-2c-4g
+    needs: protobuf-compatibility
+    if: always()
+    steps:
+      - name: Require the protobuf matrix to pass
+        run: |
+          result="${{ needs.protobuf-compatibility.result }}"
+          echo "protobuf-compatibility result: ${result}"
+          if [ "${result}" != "success" ]; then
+            echo "::error::protobuf compatibility matrix did not pass"
+            exit 1
+          fi
