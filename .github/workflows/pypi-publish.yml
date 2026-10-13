@@ -52,6 +52,22 @@ jobs:
       - name: Check package
         run: twine check dist/*
 
+      - name: Check LICENSE is packaged
+        shell: python
+        run: |
+          import glob, sys, tarfile, zipfile
+
+          missing = []
+          for whl in glob.glob("dist/*.whl"):
+              if not any(n.endswith(".dist-info/licenses/LICENSE") for n in zipfile.ZipFile(whl).namelist()):
+                  missing.append(whl)
+          for sdist in glob.glob("dist/*.tar.gz"):
+              if not any(n.count("/") == 1 and n.endswith("/LICENSE") for n in tarfile.open(sdist).getnames()):
+                  missing.append(sdist)
+          for path in missing:
+              print(f"::error::{path} does not include LICENSE")
+          sys.exit(1 if missing else 0)
+
       - name: Verify tag matches version
         if: github.event_name == 'push'
         run: |
