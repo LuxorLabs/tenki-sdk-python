@@ -202,6 +202,7 @@ class GrpcSandboxRPC:
         "list_active_template_builds": "ListActiveTemplateBuilds",
         "cancel_template_build": "CancelTemplateBuild",
         "who_am_i": "WhoAmI",
+        "list_ci_runner_sizes": "ListCIRunnerSizes",
         "get_workspace_sandbox_usage": "GetWorkspaceSandboxUsage",
         "publish_registry_image": "PublishRegistryImage",
         "set_registry_image_visibility": "SetRegistryImageVisibility",

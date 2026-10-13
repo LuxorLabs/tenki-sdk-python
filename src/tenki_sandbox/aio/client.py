@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from .._convert import identity, sandbox_info, session_metrics, workspace_usage_limit
+from .._convert import ci_runner_sizes, identity, sandbox_info, session_metrics, workspace_usage_limit
 from .._pagination import advance_page_token
 from .._pb import pb
 from .._time import duration
@@ -21,6 +21,7 @@ from ..client import (
 from ..constants import ENV_GATEWAY_URL
 from ..errors import WaitReadyFailedError, map_rpc_error
 from ..models import (
+    CIRunnerSizes,
     EgressHttpRule,
     Identity,
     Image,
@@ -289,6 +290,13 @@ class AsyncClient:
     async def who_am_i(self) -> Identity:
         try:
             return identity(await self._rpc.who_am_i(pb.WhoAmIRequest()))
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def list_ci_runner_sizes(self) -> CIRunnerSizes:
+        """Tenki CI runner sizes for the API key's workspace, within its job-size limits."""
+        try:
+            return ci_runner_sizes(await self._rpc.list_ci_runner_sizes(pb.ListCIRunnerSizesRequest()))
         except Exception as err:
             raise map_rpc_error(err) from err
 

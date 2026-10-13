@@ -125,6 +125,12 @@ class FakeControlRPC:
         self._record("who_am_i", req)
         return pb.WhoAmIResponse(owner_type="USER", owner_id="user-1")
 
+    async def list_ci_runner_sizes(self, req):
+        self._record("list_ci_runner_sizes", req)
+        resp = pb.ListCIRunnerSizesResponse(default_runs_on_label="tenki-small-2c-4g")
+        resp.sizes.append(pb.CIRunnerSize(runs_on_label="tenki-small-2c-4g", cpu=2, memory=4))
+        return resp
+
     async def build_template(self, req):
         self._record("build_template", req)
         return template_pb.BuildTemplateResponse(

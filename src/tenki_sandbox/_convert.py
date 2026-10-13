@@ -7,6 +7,8 @@ from google.protobuf.json_format import MessageToDict
 from ._pb import pb, registry_pb, template_pb
 from ._time import datetime_from_proto
 from .models import (
+    CIRunnerSize,
+    CIRunnerSizes,
     EgressHttpRule,
     ExposedPort,
     FileInfo,
@@ -528,6 +530,16 @@ def identity(proto) -> Identity:
         owner_type=proto.owner_type,
         owner_id=proto.owner_id,
         workspaces=tuple(workspaces),
+    )
+
+
+def ci_runner_sizes(proto) -> CIRunnerSizes:
+    return CIRunnerSizes(
+        sizes=tuple(
+            CIRunnerSize(runs_on_label=size.runs_on_label, cpu=size.cpu, memory_gib=size.memory)
+            for size in proto.sizes
+        ),
+        default_runs_on_label=proto.default_runs_on_label,
     )
 
 

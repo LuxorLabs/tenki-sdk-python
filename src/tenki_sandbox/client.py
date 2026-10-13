@@ -3,7 +3,14 @@ from __future__ import annotations
 import os
 import warnings
 
-from ._convert import egress_http_rule_proto, identity, sandbox_info, session_metrics, workspace_usage_limit
+from ._convert import (
+    ci_runner_sizes,
+    egress_http_rule_proto,
+    identity,
+    sandbox_info,
+    session_metrics,
+    workspace_usage_limit,
+)
 from ._pagination import advance_page_token
 from ._pb import pb
 from ._resource_validation import validate_create_resources
@@ -18,6 +25,7 @@ from ._transport import (
 from .constants import ENV_GATEWAY_URL
 from .errors import WaitReadyFailedError, map_rpc_error
 from .models import (
+    CIRunnerSizes,
     EgressHttpRule,
     Identity,
     Image,
@@ -283,6 +291,13 @@ class Client:
     def who_am_i(self) -> Identity:
         try:
             return identity(self._rpc.who_am_i(pb.WhoAmIRequest()))
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    def list_ci_runner_sizes(self) -> CIRunnerSizes:
+        """Tenki CI runner sizes for the API key's workspace, within its job-size limits."""
+        try:
+            return ci_runner_sizes(self._rpc.list_ci_runner_sizes(pb.ListCIRunnerSizesRequest()))
         except Exception as err:
             raise map_rpc_error(err) from err
 

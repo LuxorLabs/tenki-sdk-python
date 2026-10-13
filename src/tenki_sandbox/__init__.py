@@ -50,6 +50,8 @@ from .errors import (
 from .egress_policies import EgressPolicies
 from .disk import DiskUsage
 from .models import (
+    CIRunnerSize,
+    CIRunnerSizes,
     CommandResult,
     EgressHttpRule,
     EgressPolicy,
@@ -173,6 +175,8 @@ __all__ = [
     "ExposedPort",
     "FileInfo",
     "Identity",
+    "CIRunnerSize",
+    "CIRunnerSizes",
     "IdentityWorkspace",
     "Image",
     "PreviewUrl",

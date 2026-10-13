@@ -344,6 +344,23 @@ class Identity:
 
 
 @dataclass(frozen=True)
+class CIRunnerSize:
+    """A Linux x64 runner size a Tenki CI job can run on."""
+
+    runs_on_label: str
+    cpu: int
+    memory_gib: int
+
+
+@dataclass(frozen=True)
+class CIRunnerSizes:
+    """The sizes Tenki CI can run for a workspace, within its job-size limits, smallest first."""
+
+    sizes: tuple["CIRunnerSize", ...] = ()
+    default_runs_on_label: str = ""
+
+
+@dataclass(frozen=True)
 class TemplateResources:
     cpu_cores: int = 0
     memory_mb: int = 0

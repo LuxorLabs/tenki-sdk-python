@@ -420,6 +420,11 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.WhoAmIRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.WhoAmIResponse.FromString,
                 _registered_method=True)
+        self.ListCIRunnerSizes = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/ListCIRunnerSizes',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListCIRunnerSizesRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListCIRunnerSizesResponse.FromString,
+                _registered_method=True)
 
 
 class SandboxServiceServicer(object):
@@ -917,6 +922,13 @@ class SandboxServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListCIRunnerSizes(self, request, context):
+        """Linux x64 runner sizes Tenki CI can run for the workspace, within its job-size limits.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_SandboxServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -1319,6 +1331,11 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.WhoAmI,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.WhoAmIRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.WhoAmIResponse.SerializeToString,
+            ),
+            'ListCIRunnerSizes': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListCIRunnerSizes,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListCIRunnerSizesRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListCIRunnerSizesResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -3485,6 +3502,33 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/WhoAmI',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.WhoAmIRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.WhoAmIResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListCIRunnerSizes(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/ListCIRunnerSizes',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListCIRunnerSizesRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListCIRunnerSizesResponse.FromString,
             options,
             channel_credentials,
             insecure,

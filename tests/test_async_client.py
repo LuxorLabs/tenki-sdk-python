@@ -754,6 +754,12 @@ async def test_async_who_am_i():
     assert ident.owner_id == "user-1"
 
 
+async def test_async_list_ci_runner_sizes():
+    sizes = await AsyncClient(rpc=FakeControlRPC()).list_ci_runner_sizes()
+    assert sizes.default_runs_on_label == "tenki-small-2c-4g"
+    assert sizes.sizes[0].memory_gib == 4
+
+
 async def test_async_get_usage():
     rpc = FakeControlRPC()
     limits = await AsyncClient(rpc=rpc).get_usage()
