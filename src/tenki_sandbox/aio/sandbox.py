@@ -79,6 +79,7 @@ class AsyncSandbox:
         # Serializes close() so concurrent callers issue one TerminateSession.
         self._close_lock = asyncio.Lock()
         self._close_done = False
+        self._released = False
         # A FAILED route carries a stale/dead endpoint; leave _data_plane_rpc
         # unset so first use re-bootstraps via CreateSessionCredential (mirrors
         # the sync client). Binding it would route every fs/exec/dial to a dead
@@ -139,22 +140,22 @@ class AsyncSandbox:
         if route_status == pb.DATA_PLANE_ROUTE_STATUS_FAILED:
             return
         endpoint = (endpoint or "").strip()
-        if self._data_plane_closed:
-            return
-        if credential is not None and self._data_plane_credentials is None:
-            self._data_plane_credentials = AsyncDataPlaneCredentialManager(
-                self, credential, endpoint
-            )
-        if not endpoint:
-            hint = self._data_plane_endpoint_hints.current()
-            if hint and self._data_plane_credentials is not None:
-                endpoint = hint
-                from_hint = True
-            else:
-                return
-        if not from_hint:
-            self._data_plane_endpoint_hints.remember(endpoint)
         async with self._data_plane_lock:
+            if self._data_plane_closed:
+                return
+            if credential is not None and self._data_plane_credentials is None:
+                self._data_plane_credentials = AsyncDataPlaneCredentialManager(
+                    self, credential, endpoint
+                )
+            if not endpoint:
+                hint = self._data_plane_endpoint_hints.current()
+                if hint and self._data_plane_credentials is not None:
+                    endpoint = hint
+                    from_hint = True
+                else:
+                    return
+            if not from_hint:
+                self._data_plane_endpoint_hints.remember(endpoint)
             if (
                 self._data_plane_rpc is not None
                 and getattr(self._data_plane_rpc, "endpoint", "") == endpoint
@@ -167,6 +168,8 @@ class AsyncSandbox:
                 return
             if self._data_plane_rpc is not None:
                 await self._data_plane_rpc.close()
+                if self._data_plane_closed:
+                    return
             if credential is not None and self._data_plane_credentials is not None:
                 self._data_plane_credentials.stop()
             if credential is not None or self._data_plane_credentials is None:
@@ -210,6 +213,8 @@ class AsyncSandbox:
     async def _ensure_data_plane(self, *, verify_serving: bool = True):
         # CreateSessionResponse returns the endpoint empty pre-provision; bootstrap
         # via CreateSessionCredential on first data-plane use (mirrors the Go SDK).
+        if self._data_plane_closed:
+            raise RuntimeError("sandbox session handle closed or released")
         if self._data_plane_rpc is not None:
             if verify_serving:
                 await self._verify_serving()
@@ -536,6 +541,7 @@ class AsyncSandbox:
         timeout: float | int | object | None = None,
         stdin: bytes | str | None = None,
         privileged: bool = False,
+        stream_only: bool = False,
     ) -> AsyncProcess:
         rpc = await self._ensure_data_plane(verify_serving=False)
         if rpc is None:
@@ -549,6 +555,7 @@ class AsyncSandbox:
             timeout=timeout,
             stdin=stdin,
             privileged=privileged,
+            stream_only=stream_only,
         )
 
     async def exec(
@@ -580,6 +587,14 @@ class AsyncSandbox:
         """
         return await self.exec("bash", "-lc", command, **kwargs)
 
+    async def release(self) -> None:
+        # Permanently free the local data plane without terminating the sandbox.
+        async with self._close_lock:
+            self._released = True
+            self._detached = True
+            self._data_plane_closed = True
+            await self._reset_data_plane()
+
     async def close(self) -> None:
         """Terminate this sandbox.
 
@@ -601,7 +616,7 @@ class AsyncSandbox:
                     pb.TerminateSessionRequest(session_id=self.id)
                 )
             except Exception as err:
-                self._data_plane_closed = False
+                self._data_plane_closed = self._released
                 raise map_rpc_error(err) from err
             self._close_done = True
             if resp.session:

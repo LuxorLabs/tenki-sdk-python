@@ -21,6 +21,8 @@ from .disk import DiskUsage
 from .models import CommandResult
 
 _RUN_ESTABLISHMENT_TIMEOUT = 30.0
+_STREAM_QUEUE_CAPACITY = 16
+_STREAM_CHUNK_BYTES = 4096
 
 
 def _stringifies_to_a_repr(value: object) -> bool:
@@ -178,20 +180,43 @@ def _is_retryable_run_establishment_error(
 
 
 class ProcessStream(Iterable[bytes]):
-    def __init__(self) -> None:
-        self._queue: queue.Queue[bytes | Exception | None] = queue.Queue()
+    def __init__(self, *, stream_only: bool = False) -> None:
+        self._queue: queue.Queue[bytes | Exception | None] = queue.Queue(
+            maxsize=_STREAM_QUEUE_CAPACITY if stream_only else 0
+        )
         self._chunks: list[bytes] = []
+        self._stream_only = stream_only
+        self._cancelled = threading.Event()
 
     def push(self, data: bytes) -> None:
-        if data:
+        if not data:
+            return
+        if not self._stream_only:
             self._chunks.append(data)
-            self._queue.put(data)
+        chunk_size = _STREAM_CHUNK_BYTES if self._stream_only else len(data)
+        for offset in range(0, len(data), chunk_size):
+            if self._cancelled.is_set():
+                return
+            self._queue.put(data[offset : offset + chunk_size])
 
     def close(self) -> None:
-        self._queue.put(None)
+        if not self._cancelled.is_set():
+            self._queue.put(None)
 
     def fail(self, err: Exception) -> None:
-        self._queue.put(err)
+        if not self._cancelled.is_set():
+            self._queue.put(err)
+
+    def cancel(self, err: Exception | None = None) -> None:
+        self._cancelled.set()
+        while True:
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
+        if err is not None:
+            self._queue.put_nowait(err)
+        self._queue.put_nowait(None)
 
     def __iter__(self) -> Iterator[bytes]:
         while True:
@@ -221,10 +246,12 @@ class Process:
         timeout: float | int | object | None = None,
         stdin: bytes | str | None = None,
         privileged: bool = False,
+        stream_only: bool = False,
     ) -> None:
         self.argv = normalize_argv(argv)
-        self.stdout = ProcessStream()
-        self.stderr = ProcessStream()
+        self._stream_only = stream_only
+        self.stdout = ProcessStream(stream_only=stream_only)
+        self.stderr = ProcessStream(stream_only=stream_only)
         self._outbound: queue.Queue[pb.RunRequest | None] = queue.Queue()
         self._started = threading.Event()
         self._done = threading.Event()
@@ -299,7 +326,11 @@ class Process:
         """
         if not self._done.wait(timeout=timeout):
             self.kill()
-            raise TimeoutError("timed out waiting for command")
+            err = TimeoutError("timed out waiting for command")
+            if self._stream_only:
+                self.stdout.cancel(err)
+                self.stderr.cancel(err)
+            raise err
         if self._error:
             raise self._error
         assert self._result is not None
@@ -379,10 +410,10 @@ class Process:
             self.stderr.fail(self._error)
         finally:
             self._started.set()
-            self._done.set()
             self.stdout.close()
             self.stderr.close()
             self._outbound.put(None)
+            self._done.set()
 
     def _wait_started(self) -> None:
         if not self._started.wait(timeout=30):

@@ -13,6 +13,8 @@ from ..errors import (
 )
 from ..models import CommandResult
 from ..process import (
+    _STREAM_CHUNK_BYTES,
+    _STREAM_QUEUE_CAPACITY,
     _command_result_from_exit,
     _is_provisioning_session_not_found,
     _is_retryable_run_establishment_error,
@@ -43,20 +45,43 @@ class _StaticAsyncProcessSandbox:
 class AsyncProcessStream:
     """Async-iterable byte stream backed by an asyncio.Queue."""
 
-    def __init__(self) -> None:
-        self._queue: asyncio.Queue = asyncio.Queue()
+    def __init__(self, *, stream_only: bool = False) -> None:
+        self._queue: asyncio.Queue = asyncio.Queue(
+            maxsize=_STREAM_QUEUE_CAPACITY if stream_only else 0
+        )
         self._chunks: list[bytes] = []
+        self._stream_only = stream_only
+        self._cancelled = False
 
-    def push(self, data: bytes) -> None:
-        if data:
+    async def push(self, data: bytes) -> None:
+        if not data:
+            return
+        if not self._stream_only:
             self._chunks.append(data)
-            self._queue.put_nowait(data)
+        chunk_size = _STREAM_CHUNK_BYTES if self._stream_only else len(data)
+        for offset in range(0, len(data), chunk_size):
+            if self._cancelled:
+                return
+            await self._queue.put(data[offset : offset + chunk_size])
 
-    def close(self) -> None:
+    async def close(self) -> None:
+        if not self._cancelled:
+            await self._queue.put(None)
+
+    async def fail(self, err: Exception) -> None:
+        if not self._cancelled:
+            await self._queue.put(err)
+
+    async def cancel(self, err: Exception | None = None) -> None:
+        self._cancelled = True
+        while True:
+            try:
+                self._queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        if err is not None:
+            self._queue.put_nowait(err)
         self._queue.put_nowait(None)
-
-    def fail(self, err: Exception) -> None:
-        self._queue.put_nowait(err)
 
     def __aiter__(self) -> "AsyncProcessStream":
         return self
@@ -86,10 +111,12 @@ class AsyncProcess:
         env: dict[str, str] | None = None,
         timeout: float | int | object | None = None,
         privileged: bool = False,
+        stream_only: bool = False,
     ) -> None:
         self.argv = normalize_argv(argv)
-        self.stdout = AsyncProcessStream()
-        self.stderr = AsyncProcessStream()
+        self._stream_only = stream_only
+        self.stdout = AsyncProcessStream(stream_only=stream_only)
+        self.stderr = AsyncProcessStream(stream_only=stream_only)
         self._outbound: asyncio.Queue = asyncio.Queue()
         self._started = asyncio.Event()
         self._done = asyncio.Event()
@@ -124,8 +151,17 @@ class AsyncProcess:
         timeout: float | int | object | None = None,
         stdin: bytes | str | None = None,
         privileged: bool = False,
+        stream_only: bool = False,
     ) -> "AsyncProcess":
-        proc = cls(session_id, argv, cwd=cwd, env=env, timeout=timeout, privileged=privileged)
+        proc = cls(
+            session_id,
+            argv,
+            cwd=cwd,
+            env=env,
+            timeout=timeout,
+            privileged=privileged,
+            stream_only=stream_only,
+        )
         proc._sandbox = (
             sandbox
             if hasattr(sandbox, "_ensure_data_plane")
@@ -186,7 +222,11 @@ class AsyncProcess:
             await asyncio.wait_for(self._done.wait(), timeout=timeout)
         except asyncio.TimeoutError:
             await self.kill()
-            raise TimeoutError("timed out waiting for command")
+            err = TimeoutError("timed out waiting for command")
+            if self._stream_only:
+                await self.stdout.cancel(err)
+                await self.stderr.cancel(err)
+            raise err
         if self._error:
             raise self._error
         assert self._result is not None
@@ -225,9 +265,9 @@ class AsyncProcess:
                             self._pid = int(frame.started.pid)
                             self._started.set()
                         elif kind == "stdout":
-                            self.stdout.push(bytes(frame.stdout))
+                            await self.stdout.push(bytes(frame.stdout))
                         elif kind == "stderr":
-                            self.stderr.push(bytes(frame.stderr))
+                            await self.stderr.push(bytes(frame.stderr))
                         elif kind == "exit":
                             self._result = _command_result_from_exit(
                                 frame.exit, self.argv, self.stdout.read(), self.stderr.read()
@@ -263,14 +303,14 @@ class AsyncProcess:
                 )
                 else err
             )
-            self.stdout.fail(self._error)
-            self.stderr.fail(self._error)
+            await self.stdout.fail(self._error)
+            await self.stderr.fail(self._error)
         finally:
             self._started.set()
-            self._done.set()
-            self.stdout.close()
-            self.stderr.close()
+            await self.stdout.close()
+            await self.stderr.close()
             self._outbound.put_nowait(None)
+            self._done.set()
 
     async def _wait_started(self) -> None:
         # Gate before sending stdin/signals: raise on timeout or start error.

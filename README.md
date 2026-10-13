@@ -50,6 +50,28 @@ with Sandbox.create(cpu_cores=2, memory_mb=4096) as sb:
 
 The API key determines the Workspace automatically; ordinary Sandbox calls do not require a Workspace ID.
 
+## Streaming without retaining output
+
+Pass `stream_only=True` to `sandbox.start(...)` to receive stdout and stderr chunks without retaining their history.
+Consume both `proc.stdout` and `proc.stderr` while the command runs.
+Streaming-only mode bounds each unread output queue and pauses the producer when that queue is full until its reader frees capacity.
+Waiting without consuming stdout and stderr can block completion.
+Cancel an unused output stream with `proc.stdout.cancel()` or `proc.stderr.cancel()`; the async API uses `await` for these calls.
+A `wait(timeout=...)` timeout in streaming-only mode cancels output delivery to unblock the pump while SIGKILL terminates the command, and a later `wait()` can return its exit metadata.
+`proc.wait()` returns exit status, timing, and disk metadata, with empty stdout and stderr.
+The default remains output collection, including `sandbox.exec(...)`.
+The asyncio API accepts the same option and requires consuming both streams with `async for`.
+
+## Releasing a sandbox handle
+
+Call `sandbox.release()` or `await sandbox.release()` for the asyncio API after finishing active commands.
+Release stops credential renewal and frees this handle's local data-plane connection while the sandbox keeps running.
+It is idempotent and prevents context-manager exit from terminating the sandbox.
+The released handle cannot start new data-plane operations; use `client.get(sandbox.id)` or its async equivalent to obtain another handle.
+An explicit `close()` still terminates the sandbox after release.
+Release does not close the shared SDK client.
+`detach()` continues to skip context-manager termination while keeping the handle usable; use `release()` when you also want to free its data plane.
+
 ## Tailnet attachment
 
 Use `TailnetAuthKey` so `str()` and `repr()` redact the credential.

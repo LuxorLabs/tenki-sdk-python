@@ -92,6 +92,7 @@ class Sandbox:
         # first that succeeds, while a failed close stays retryable.
         self._close_lock = threading.RLock()
         self._close_done = False
+        self._released = False
         self._apply_data_plane_response(
             data_plane_endpoint, data_plane_credential, data_plane_route_status
         )
@@ -185,6 +186,8 @@ class Sandbox:
         # CreateSessionResponse returns the endpoint empty pre-provision; bootstrap
         # via CreateSessionCredential on first data-plane use (mirrors the Go SDK).
         with self._data_plane_lock:
+            if self._data_plane_closed:
+                raise RuntimeError("sandbox session handle closed or released")
             if self._data_plane_rpc is None:
                 if (
                     self._data_plane_credentials is not None
@@ -524,6 +527,7 @@ class Sandbox:
         timeout: float | int | object | None = None,
         stdin: bytes | str | None = None,
         privileged: bool = False,
+        stream_only: bool = False,
     ) -> Process:
         rpc = self._ensure_data_plane(verify_serving=False)
         if rpc is None:
@@ -537,6 +541,7 @@ class Sandbox:
             timeout=timeout,
             stdin=stdin,
             privileged=privileged,
+            stream_only=stream_only,
         )
 
     def exec(
@@ -568,6 +573,15 @@ class Sandbox:
         """
         return self.exec("bash", "-lc", command, **kwargs)
 
+    def release(self) -> None:
+        # Permanently free the local data plane without terminating the sandbox.
+        with self._close_lock:
+            self._released = True
+            self._detached = True
+            with self._data_plane_lock:
+                self._data_plane_closed = True
+            self._reset_data_plane()
+
     def close(self) -> None:
         """Terminate this sandbox.
 
@@ -590,7 +604,7 @@ class Sandbox:
             except Exception as err:
                 # Let a failed close be retried.
                 with self._data_plane_lock:
-                    self._data_plane_closed = False
+                    self._data_plane_closed = self._released
                 raise map_rpc_error(err) from err
             self._close_done = True
             if resp.session:
