@@ -111,6 +111,7 @@ class Client:
         allow_domains: list[str] | None = None,
         allow_cidrs: list[str] | None = None,
         intercept_https: bool = False,
+        allowed_ports: list[int] | None = None,
         http_rules: list[EgressHttpRule] | None = None,
         egress_policies: list[str] | None = None,
         max_duration: float | int | object | None = None,
@@ -168,6 +169,7 @@ class Client:
             allow_domains=allow_domains,
             allow_cidrs=allow_cidrs,
             intercept_https=intercept_https,
+            allowed_ports=allowed_ports,
             http_rules=http_rules,
             egress_policies=egress_policies,
             max_duration=max_duration,
@@ -375,6 +377,7 @@ def build_create_session_request(
     allow_domains: list[str] | None = None,
     allow_cidrs: list[str] | None = None,
     intercept_https: bool = False,
+    allowed_ports: list[int] | None = None,
     http_rules: list[EgressHttpRule] | None = None,
     egress_policies: list[str] | None = None,
     max_duration: float | int | object | None = None,
@@ -436,12 +439,13 @@ def build_create_session_request(
         req.workspace_id = workspace_id.strip()
     if tags:
         req.tags.extend(_normalize_tags(tags))
-    if allow_domains or allow_cidrs or intercept_https or http_rules:
+    if allow_domains or allow_cidrs or intercept_https or allowed_ports or http_rules:
         req.egress.CopyFrom(
             pb.SessionEgressPolicy(
                 allow_domains=list(allow_domains or []),
                 allow_cidrs=list(allow_cidrs or []),
                 intercept_https=intercept_https,
+                allowed_ports=allowed_ports,
                 http_rules=[egress_http_rule_proto(rule) for rule in http_rules or []],
             )
         )

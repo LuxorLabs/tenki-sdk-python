@@ -150,6 +150,7 @@ def session_egress_policy(proto, policy_names=()) -> SessionEgressPolicy:
         allow_domains=tuple(proto.allow_domains),
         allow_cidrs=tuple(proto.allow_cidrs),
         intercept_https=proto.intercept_https,
+        allowed_ports=tuple(proto.allowed_ports),
         http_rules=tuple(
             EgressHttpRule(
                 domains=tuple(rule.domains),

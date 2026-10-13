@@ -36,7 +36,7 @@ def _policy(name: str) -> pb.EgressPolicy:
         name=name,
         revision=3,
         active_session_count=2,
-        egress=pb.SessionEgressPolicy(allow_domains=["github.com"], intercept_https=True),
+        egress=pb.SessionEgressPolicy(allow_domains=["github.com"], intercept_https=True, allowed_ports=[22, 8443]),
         created_at=_timestamp(),
         updated_at=_timestamp(),
     )
@@ -107,6 +107,7 @@ WANT_BODY = pb.SessionEgressPolicy(
     allow_domains=["github.com"],
     allow_cidrs=["10.0.0.0/8"],
     intercept_https=True,
+    allowed_ports=[22, 8443],
     http_rules=[pb.SessionEgressHttpRule(domains=["github.com"], methods=["GET"], prefix="/repos/")],
 )
 WANT_REQUESTS = [
@@ -122,12 +123,18 @@ WANT_CREATED = EgressPolicy(
     workspace_id="ws-1",
     name="registries",
     revision=3,
-    egress=SessionEgressPolicy(allow_domains=("github.com",), intercept_https=True),
+    egress=SessionEgressPolicy(allow_domains=("github.com",), intercept_https=True, allowed_ports=(22, 8443)),
     active_session_count=2,
     created_at=CREATED_AT,
     updated_at=CREATED_AT,
 )
-BODY = dict(allow_domains=["github.com"], allow_cidrs=["10.0.0.0/8"], intercept_https=True, http_rules=RULES)
+BODY = dict(
+    allow_domains=["github.com"],
+    allow_cidrs=["10.0.0.0/8"],
+    intercept_https=True,
+    allowed_ports=[22, 8443],
+    http_rules=RULES,
+)
 
 
 def test_egress_policy_crud_wire_contract():

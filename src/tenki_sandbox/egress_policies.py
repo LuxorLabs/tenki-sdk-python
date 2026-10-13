@@ -18,11 +18,13 @@ def _body(
     allow_cidrs: list[str] | None,
     intercept_https: bool,
     http_rules: list[EgressHttpRule] | None,
+    allowed_ports: list[int] | None,
 ) -> "pb.SessionEgressPolicy":
     return pb.SessionEgressPolicy(
         allow_domains=list(allow_domains or []),
         allow_cidrs=list(allow_cidrs or []),
         intercept_https=intercept_https,
+        allowed_ports=list(allowed_ports or []),
         http_rules=[egress_http_rule_proto(rule) for rule in http_rules or []],
     )
 
@@ -41,17 +43,21 @@ def egress_policy(proto) -> EgressPolicy:
     )
 
 
-def build_create_request(name, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules):
+def build_create_request(name, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules, allowed_ports):
     return pb.CreateEgressPolicyRequest(
-        name=name, egress=_body(allow_domains, allow_cidrs, intercept_https, http_rules), **_workspace(workspace_id)
+        name=name,
+        egress=_body(allow_domains, allow_cidrs, intercept_https, http_rules, allowed_ports),
+        **_workspace(workspace_id),
     )
 
 
-def build_update_request(name_or_id, expected_revision, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules):
+def build_update_request(
+    name_or_id, expected_revision, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules, allowed_ports
+):
     return pb.UpdateEgressPolicyRequest(
         policy_id=name_or_id,
         expected_revision=expected_revision,
-        egress=_body(allow_domains, allow_cidrs, intercept_https, http_rules),
+        egress=_body(allow_domains, allow_cidrs, intercept_https, http_rules, allowed_ports),
         **_workspace(workspace_id),
     )
 
@@ -69,11 +75,12 @@ class EgressPolicies:
         allow_domains: list[str] | None = None,
         allow_cidrs: list[str] | None = None,
         intercept_https: bool = False,
+        allowed_ports: list[int] | None = None,
         http_rules: list[EgressHttpRule] | None = None,
         workspace_id: str | None = None,
     ) -> EgressPolicy:
         """Save a policy under ``name``; the server checks it like an inline sandbox egress policy."""
-        req = build_create_request(name, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules)
+        req = build_create_request(name, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules, allowed_ports)
         try:
             return egress_policy(self._rpc.create_egress_policy(req).policy)
         except Exception as err:
@@ -87,12 +94,13 @@ class EgressPolicies:
         allow_domains: list[str] | None = None,
         allow_cidrs: list[str] | None = None,
         intercept_https: bool = False,
+        allowed_ports: list[int] | None = None,
         http_rules: list[EgressHttpRule] | None = None,
         workspace_id: str | None = None,
     ) -> EgressPolicy:
         """Replace the policy body; existing sandboxes keep the policy they were created with."""
         req = build_update_request(
-            name_or_id, expected_revision, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules
+            name_or_id, expected_revision, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules, allowed_ports
         )
         try:
             return egress_policy(self._rpc.update_egress_policy(req).policy)
@@ -145,10 +153,11 @@ class AsyncEgressPolicies:
         allow_domains: list[str] | None = None,
         allow_cidrs: list[str] | None = None,
         intercept_https: bool = False,
+        allowed_ports: list[int] | None = None,
         http_rules: list[EgressHttpRule] | None = None,
         workspace_id: str | None = None,
     ) -> EgressPolicy:
-        req = build_create_request(name, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules)
+        req = build_create_request(name, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules, allowed_ports)
         try:
             return egress_policy((await self._rpc.create_egress_policy(req)).policy)
         except Exception as err:
@@ -162,11 +171,12 @@ class AsyncEgressPolicies:
         allow_domains: list[str] | None = None,
         allow_cidrs: list[str] | None = None,
         intercept_https: bool = False,
+        allowed_ports: list[int] | None = None,
         http_rules: list[EgressHttpRule] | None = None,
         workspace_id: str | None = None,
     ) -> EgressPolicy:
         req = build_update_request(
-            name_or_id, expected_revision, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules
+            name_or_id, expected_revision, workspace_id, allow_domains, allow_cidrs, intercept_https, http_rules, allowed_ports
         )
         try:
             return egress_policy((await self._rpc.update_egress_policy(req)).policy)

@@ -136,7 +136,7 @@ The allowlist is checked against the names the sandbox resolves, the TLS server 
 Connections can only reach addresses that an allowed name resolved to or that fall in an allowed CIDR; traffic to an allowed CIDR is not inspected unless the sandbox uses outbound secret injection.
 UDP port 443 (HTTP/3, QUIC) is blocked for sandboxes with a domain allowlist, so clients fall back to HTTPS over TCP.
 Unless the sandbox uses outbound secret injection, HTTPS is not decrypted, so another site on the same CDN as an allowed name can be reached by sending its name in the encrypted `Host` header.
-Ports other than 80 and 443 are open to any address an allowed name resolved to.
+Without HTTPS interception, other ports remain open to addresses an allowed name resolves to.
 Read the allowlist back from `sb.info.egress`.
 
 ### Inspecting HTTPS requests
@@ -167,11 +167,28 @@ sb = Sandbox.create(
 )
 ```
 
-HTTP rules apply only to ports 80 and 443; other ports follow the domain and CIDR allowlist alone.
+With interception enabled, public traffic is limited to TCP 80/443 through the proxy.
+Other public ports and protocols are blocked by default.
 Interception speaks HTTP/1.1 only, and WebSocket upgrades get 501.
 Git smart HTTP, pip, npm, cargo, Go modules and Maven all work over HTTP/1.1.
 The CA is installed at `/usr/local/share/ca-certificates/tenki-egress.crt` and added to the system bundle; unless you set them, `NODE_EXTRA_CA_CERTS` points at the CA and `SSL_CERT_FILE` and `REQUESTS_CA_BUNDLE` at the system bundle.
 The JVM reads none of those: for Maven or Gradle, import the CA into the JVM truststore (`keytool -importcert -cacerts -noprompt -alias tenki-egress -file /usr/local/share/ca-certificates/tenki-egress.crt`) or pass a truststore that has it through `JAVA_TOOL_OPTIONS`.
+
+### Additional public ports
+
+Use `allowed_ports` to allow extra TCP ports with HTTPS interception enabled.
+The policy accepts up to 64 ports from 1 to 65535.
+Destination and workspace restrictions still apply; ports 80/443 always use the proxy, and DNS stays on the controlled resolver.
+Additional ports bypass HTTP inspection, so allowing port 22 permits Git over SSH, including pushes.
+Tailnet traffic and internal services keep their existing access rules.
+
+```python
+session = client.create(
+    allow_domains=["github.com"],
+    intercept_https=True,
+    allowed_ports=[22],
+)
+```
 
 ### Named egress policies
 
@@ -199,7 +216,7 @@ sb = Sandbox.create(
 )
 ```
 
-The server merges the named policies with the inline options: domains and CIDRs are combined, HTTPS interception is on if any of them asks for it, and the HTTP rules are concatenated.
+The server merges the named policies with the inline options: domains, CIDRs and additional ports are combined, HTTPS interception is on if any of them asks for it, and the HTTP rules are concatenated.
 The merged policy must pass the same checks and limits as an inline one.
 An unknown name fails the create with `NotFound` naming every missing policy.
 The session keeps the merged copy, so editing or deleting a named policy later does not change it.

@@ -80,6 +80,7 @@ class SessionEgressPolicy:
     http_rules: tuple[EgressHttpRule, ...] = ()
     # Named workspace egress policies pinned at create; the fields above hold their merged expansion.
     policy_names: tuple[str, ...] = ()
+    allowed_ports: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
