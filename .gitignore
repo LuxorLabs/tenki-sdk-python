@@ -34,8 +34,14 @@ htmlcov/
 .env
 .env.*
 
+# Local planning / scratch notes — kept out of git per contributor preference
+.claude/
+
 # Editor / OS cruft
 .idea/
 .vscode/
+*.local.json
+*.local.toml
+*.local.sh
 *.swp
 .DS_Store
