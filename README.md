@@ -671,12 +671,18 @@ Set `base_url` or `TENKI_CLOUD_API_URL` to override the cloud API endpoint
 independently of sandbox configuration. Set `workspace_id` once on the client. An omitted or empty workspace ID uses the authenticated
 workspace key's scope; other callers must specify one.
 
-`create`, `update`, `get`, `list`, `list_versions`, `revoke`, and `delete` return
+`create`, `create_for_repository`, `update`, `get`, `list`, `list_versions`, `revoke`, and `delete` return
 metadata only. Values are `bytes`; omitted or `None` on update retains the value,
 while `b""` creates an empty value. Update, revoke, and delete require
 `expected_revision`. To select an existing version, update `active_version` with
 `value` omitted. Revoking without `version` revokes every version. Revoking the active version revokes
 the secret until a new value or an unrevoked version is made active.
+
+`create_for_repository("acme/api", "TOKEN", value_bytes)` creates a secret that only Tenki CI jobs
+in that repository receive, replacing a workspace secret with the same name. The repository must be
+connected to the workspace; `list_repositories` pages through the connected repositories and can
+filter them with `search`. `repository` is `None` on workspace secrets. Managed runtimes and
+secret policies use workspace secrets only.
 
 Mutations generate a request ID when none is supplied. For retries after an
 uncertain result, supply and reuse the same request ID and identical arguments.

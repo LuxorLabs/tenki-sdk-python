@@ -224,6 +224,7 @@ __all__ = [
 from .workspace import AsyncWorkspaceClient, WorkspaceClient
 from .workspace_secrets import (
     SecretPage,
+    SecretRepositoryPage,
     SecretVersionPage,
     WorkspaceSecret,
     WorkspaceSecretError,
@@ -237,6 +238,7 @@ __all__ += [
     "WorkspaceSecret",
     "WorkspaceSecretVersion",
     "SecretPage",
+    "SecretRepositoryPage",
     "SecretVersionPage",
 ]
 

@@ -47,11 +47,20 @@ def endpoint():
                 return pb.ListSecretPoliciesResponse(policies=[policy_metadata()], next_cursor="next")
             if name.endswith("SecretPolicy"):
                 return getattr(pb, name + "Response")(policy=policy_metadata())
+            if name == "CreateSecret":
+                secret = metadata()
+                secret.repository = request.repository
+                return pb.CreateSecretResponse(secret=secret)
             if name == "ListSecrets":
                 return pb.ListSecretsResponse(secrets=[metadata()], next_cursor="next")
             if name == "ListSecretVersions":
                 return pb.ListSecretVersionsResponse(
                     versions=[pb.SecretVersion(version=1)], next_cursor="versions-next"
+                )
+            if name == "ListSecretRepositories":
+                return pb.ListSecretRepositoriesResponse(
+                    repositories=[pb.SecretRepository(full_name="acme/api")],
+                    next_cursor="acme/api",
                 )
             return getattr(pb, name + "Response")(secret=metadata())
 
@@ -68,6 +77,7 @@ def endpoint():
         "GetSecret",
         "ListSecrets",
         "ListSecretVersions",
+        "ListSecretRepositories",
         "RevokeSecret",
         "DeleteSecret",
     ):
@@ -136,6 +146,14 @@ async def test_wire_contract(endpoint, client_type, workspace_id):
             expected_revision=2,
             request_id="00000000-0000-4000-8000-000000000005",
         )
+        scoped = await invoke(
+            client,
+            "create_for_repository",
+            "acme/api",
+            "SCOPED",
+            b"value",
+            request_id="00000000-0000-4000-8000-000000000007",
+        )
         assert all(header["authorization"] == "Bearer tk_test" for header in headers)
         assert requests[0].value == b"\x00\xff\n\x80"
         assert requests[0].request_id == "00000000-0000-4000-8000-000000000001"
@@ -157,6 +175,25 @@ async def test_wire_contract(endpoint, client_type, workspace_id):
         assert not requests[8].HasField("version")
         assert requests[9].version == 1 and requests[9].expected_revision == 2
         assert requests[10].request_id == "00000000-0000-4000-8000-000000000005"
+        assert requests[0].repository == "" and result.repository is None
+        assert requests[11].repository == "acme/api" and requests[11].name == "SCOPED"
+        assert requests[11].request_id == "00000000-0000-4000-8000-000000000007"
+        assert scoped.repository == "acme/api"
+        for repository in ("", "acme", "acme/api/extra", "/api"):
+            with pytest.raises(ValueError, match="owner/name"):
+                await invoke(client, "create_for_repository", repository, "TOKEN", b"v")
+        assert len(requests) == 12
+        repositories = await invoke(
+            client, "list_repositories", page_size=1, cursor="acme/a", search="acme"
+        )
+        assert repositories.repositories == ["acme/api"]
+        assert repositories.next_cursor == "acme/api"
+        assert (requests[12].page_size, requests[12].cursor, requests[12].search) == (
+            1,
+            "acme/a",
+            "acme",
+        )
+        assert requests[12].workspace_id == workspace_id
         assert "value" not in asdict(result) and "ciphertext" not in asdict(result)
         assert "policy" not in asdict(result)
     finally:
@@ -202,10 +239,12 @@ def test_sync_async_signature_parity():
 
     for name in (
         "create",
+        "create_for_repository",
         "update",
         "get",
         "list",
         "list_versions",
+        "list_repositories",
         "revoke",
         "delete",
     ):

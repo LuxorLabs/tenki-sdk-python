@@ -59,6 +59,11 @@ class WorkspaceSecretsServiceStub(object):
                 request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretsRequest.SerializeToString,
                 response_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretsResponse.FromString,
                 _registered_method=True)
+        self.ListSecretRepositories = channel.unary_unary(
+                '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/ListSecretRepositories',
+                request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesRequest.SerializeToString,
+                response_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesResponse.FromString,
+                _registered_method=True)
         self.ListSecretVersions = channel.unary_unary(
                 '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/ListSecretVersions',
                 request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretVersionsRequest.SerializeToString,
@@ -133,6 +138,12 @@ class WorkspaceSecretsServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ListSecretRepositories(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ListSecretVersions(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -198,6 +209,11 @@ def add_WorkspaceSecretsServiceServicer_to_server(servicer, server):
                     servicer.ListSecrets,
                     request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretsRequest.FromString,
                     response_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretsResponse.SerializeToString,
+            ),
+            'ListSecretRepositories': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListSecretRepositories,
+                    request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesRequest.FromString,
+                    response_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesResponse.SerializeToString,
             ),
             'ListSecretVersions': grpc.unary_unary_rpc_method_handler(
                     servicer.ListSecretVersions,
@@ -458,6 +474,33 @@ class WorkspaceSecretsService(object):
             '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/ListSecrets',
             tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretsRequest.SerializeToString,
             tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListSecretRepositories(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/ListSecretRepositories',
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesRequest.SerializeToString,
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesResponse.FromString,
             options,
             channel_credentials,
             insecure,

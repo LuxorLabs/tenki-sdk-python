@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -33,6 +34,8 @@ class WorkspaceSecret:
     updated_at: datetime | None = None
     revoked_at: datetime | None = None
     deleted_at: datetime | None = None
+    # Repository (owner/name) whose CI jobs get the secret; None for a workspace secret.
+    repository: str | None = None
 
 
 @dataclass(frozen=True)
@@ -54,6 +57,20 @@ class SecretVersionPage:
     next_cursor: str
 
 
+@dataclass(frozen=True)
+class SecretRepositoryPage:
+    # Full names (owner/name), ordered by name.
+    repositories: list[str]
+    next_cursor: str
+
+
+def _repository_page(response) -> SecretRepositoryPage:
+    return SecretRepositoryPage(
+        [repository.full_name for repository in response.repositories],
+        response.next_cursor,
+    )
+
+
 def _time(message, field):
     return (
         getattr(message, field).ToDatetime(tzinfo=timezone.utc)
@@ -73,6 +90,27 @@ def _metadata(secret) -> WorkspaceSecret:
         updated_at=_time(secret, "updated_at"),
         revoked_at=_time(secret, "revoked_at"),
         deleted_at=_time(secret, "deleted_at"),
+        repository=secret.repository or None,
+    )
+
+
+def _repository(repository: str) -> str:
+    if not isinstance(repository, str) or not re.fullmatch(r"[^/]+/[^/]+", repository):
+        raise ValueError(f"repository must be owner/name, got {repository!r}")
+    return repository
+
+
+def _create_request(
+    workspace_id: str, repository: str, name: str, value: bytes, request_id: str | None
+):
+    if not isinstance(value, bytes):
+        raise TypeError("Secret value must be bytes")
+    return pb.CreateSecretRequest(
+        workspace_id=workspace_id,
+        name=name,
+        value=value,
+        request_id=request_id if request_id is not None else str(uuid4()),
+        repository=repository,
     )
 
 
@@ -117,14 +155,26 @@ class _Secrets(_SecretsBase):
         *,
         request_id: str | None = None,
     ) -> WorkspaceSecret:
-        if not isinstance(value, bytes):
-            raise TypeError("Secret value must be bytes")
-        request = pb.CreateSecretRequest(
-            workspace_id=self._workspace_id,
-            name=name,
-            value=value,
-            request_id=request_id if request_id is not None else str(uuid4()),
+        """Create a workspace secret."""
+        request = _create_request(self._workspace_id, "", name, value, request_id)
+        return self._create(request)
+
+    def create_for_repository(
+        self,
+        repository: str,
+        name: str,
+        value: bytes,
+        *,
+        request_id: str | None = None,
+    ) -> WorkspaceSecret:
+        """Create a secret only CI jobs in ``repository`` (owner/name) get. It replaces
+        a workspace secret of the same name; the repository must be connected."""
+        request = _create_request(
+            self._workspace_id, _repository(repository), name, value, request_id
         )
+        return self._create(request)
+
+    def _create(self, request) -> WorkspaceSecret:
         try:
             response = self._stub.CreateSecret(
                 request, metadata=self._metadata, timeout=self._timeout
@@ -188,6 +238,24 @@ class _Secrets(_SecretsBase):
         return SecretPage(
             [_metadata(secret) for secret in response.secrets], response.next_cursor
         )
+
+    def list_repositories(
+        self, *, page_size: int = 0, cursor: str = "", search: str = ""
+    ) -> SecretRepositoryPage:
+        """Lists the connected repositories create_for_repository accepts."""
+        request = pb.ListSecretRepositoriesRequest(
+            workspace_id=self._workspace_id,
+            page_size=page_size,
+            cursor=cursor,
+            search=search,
+        )
+        try:
+            response = self._stub.ListSecretRepositories(
+                request, metadata=self._metadata, timeout=self._timeout
+            )
+        except grpc.RpcError as err:
+            raise _workspace_secret_error(err) from err
+        return _repository_page(response)
 
     def list_versions(
         self, secret_id: str, *, page_size: int = 0, cursor: str = ""
@@ -273,14 +341,26 @@ class _AsyncSecrets(_SecretsBase):
         *,
         request_id: str | None = None,
     ) -> WorkspaceSecret:
-        if not isinstance(value, bytes):
-            raise TypeError("Secret value must be bytes")
-        request = pb.CreateSecretRequest(
-            workspace_id=self._workspace_id,
-            name=name,
-            value=value,
-            request_id=request_id if request_id is not None else str(uuid4()),
+        """Create a workspace secret."""
+        request = _create_request(self._workspace_id, "", name, value, request_id)
+        return await self._create(request)
+
+    async def create_for_repository(
+        self,
+        repository: str,
+        name: str,
+        value: bytes,
+        *,
+        request_id: str | None = None,
+    ) -> WorkspaceSecret:
+        """Create a secret only CI jobs in ``repository`` (owner/name) get. It replaces
+        a workspace secret of the same name; the repository must be connected."""
+        request = _create_request(
+            self._workspace_id, _repository(repository), name, value, request_id
         )
+        return await self._create(request)
+
+    async def _create(self, request) -> WorkspaceSecret:
         try:
             response = await self._stub.CreateSecret(
                 request, metadata=self._metadata, timeout=self._timeout
@@ -344,6 +424,24 @@ class _AsyncSecrets(_SecretsBase):
         return SecretPage(
             [_metadata(secret) for secret in response.secrets], response.next_cursor
         )
+
+    async def list_repositories(
+        self, *, page_size: int = 0, cursor: str = "", search: str = ""
+    ) -> SecretRepositoryPage:
+        """Lists the connected repositories create_for_repository accepts."""
+        request = pb.ListSecretRepositoriesRequest(
+            workspace_id=self._workspace_id,
+            page_size=page_size,
+            cursor=cursor,
+            search=search,
+        )
+        try:
+            response = await self._stub.ListSecretRepositories(
+                request, metadata=self._metadata, timeout=self._timeout
+            )
+        except grpc.RpcError as err:
+            raise _workspace_secret_error(err) from err
+        return _repository_page(response)
 
     async def list_versions(
         self, secret_id: str, *, page_size: int = 0, cursor: str = ""
