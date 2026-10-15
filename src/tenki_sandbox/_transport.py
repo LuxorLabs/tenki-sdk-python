@@ -75,6 +75,16 @@ def resolve_gateway_url(gateway_url: str | None, base_url: str) -> str:
     return f"{scheme}://{host}"
 
 
+# Matches the Go SDK's HTTP/2 ReadIdleTimeout/PingTimeout so a dead connection fails within ~35s.
+KEEPALIVE_CHANNEL_OPTIONS = (
+    ("grpc.keepalive_time_ms", 30_000),
+    ("grpc.keepalive_timeout_ms", 5_000),
+    # grpc-core waits for the PING ack on its own timer, 60s by default.
+    ("grpc.http2.ping_timeout_ms", 5_000),
+    ("grpc.http2.max_pings_without_data", 0),
+)
+
+
 def grpc_target(base_url: str) -> tuple[str, bool]:
     parsed = _parse_url(base_url)
     secure = parsed.scheme != "http"
@@ -128,6 +138,7 @@ class GrpcConfig:
     base_url: str
     auth_token: str = field(repr=False)
     timeout: float | None = None
+    channel_options: tuple[tuple[str, int], ...] = ()
 
 
 # Server-/bidi-streaming RPCs (return an iterator sync / async iterator aio).
@@ -139,6 +150,7 @@ _STREAMING_OUT = frozenset({"wait_session", "run", "read_file_stream", "dial", "
 
 
 class GrpcSandboxRPC:
+    _accepts_call_timeout = True
     _methods = {
         "create_session": "CreateSession",
         "create_session_credential": "CreateSessionCredential",
@@ -238,9 +250,11 @@ class GrpcSandboxRPC:
         if not target:
             target = config.base_url
         if not secure:
-            self._channel = grpc.insecure_channel(target)
+            self._channel = grpc.insecure_channel(target, options=config.channel_options)
         else:
-            self._channel = grpc.secure_channel(target, grpc.ssl_channel_credentials())
+            self._channel = grpc.secure_channel(
+                target, grpc.ssl_channel_credentials(), options=config.channel_options
+            )
         self._stub = sandbox_pb2_grpc.SandboxServiceStub(self._channel)
         self._http_base = http_base_url(config.base_url)
         self._metadata = auth_metadata(config.auth_token)

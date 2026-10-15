@@ -36,7 +36,7 @@ from .models import (
     Template,
     VolumeMount,
 )
-from .process import Process
+from .process import Process, _rpc_error_message
 from .secret_files import RuntimeSecretFile
 from .template_spec import TemplateSpec
 from .warning import (
@@ -437,15 +437,16 @@ class Sandbox:
         return self._client.get_session_metrics(self.id, window=window)
 
     def wait_ready(self, timeout: float = 180) -> None:
+        deadline = time.monotonic() + timeout
         try:
             self._wait_ready_stream(timeout)
             return
         except Exception as err:
-            if not _is_unimplemented(err):
+            if not _is_retryable_wait_stream_error(err) or time.monotonic() >= deadline:
                 if hasattr(err, "code"):
                     raise map_rpc_error(err) from err
                 raise
-        self._wait_ready_poll(timeout)
+        self._wait_ready_poll(max(0, deadline - time.monotonic()))
 
     def _wait_ready_stream(self, timeout: float) -> None:
         for resp in self._client._rpc.wait_session(
@@ -465,20 +466,31 @@ class Sandbox:
             return
         if self.state in {"TERMINATING", "TERMINATED"}:
             raise RuntimeError(f"sandbox entered terminal state: {self.state}")
-        raise TimeoutError(f"timeout waiting for sandbox {self.id}")
+        raise _WaitStreamEndedError(f"readiness stream ended before sandbox {self.id} became ready")
 
     def _wait_ready_poll(self, timeout: float) -> None:
         deadline = time.monotonic() + timeout
+        last_err: Exception | None = None
         while True:
-            self.refresh()
-            if self.state == "RUNNING":
-                return
-            if self.state in {"TERMINATING", "TERMINATED"}:
-                raise RuntimeError(f"sandbox entered terminal state: {self.state}")
+            try:
+                resp = self._client._rpc.get_session(
+                    pb.GetSessionRequest(session_id=self.id),
+                    **_wait_poll_call_kwargs(self._client._rpc, deadline),
+                )
+                self._info = sandbox_info(resp.session)
+            except Exception as err:
+                if not _is_retryable_wait_poll_error(err):
+                    _raise_mapped(err)
+                last_err = err
+            else:
+                if self.state == "RUNNING":
+                    return
+                if self.state in {"TERMINATING", "TERMINATED"}:
+                    raise RuntimeError(f"sandbox entered terminal state: {self.state}")
             if time.monotonic() >= deadline:
                 break
-            time.sleep(0.5)
-        raise TimeoutError(f"timeout waiting for sandbox {self.id}")
+            time.sleep(min(0.5, max(0.0, deadline - time.monotonic())))
+        raise _wait_ready_timeout(self.id, last_err)
 
     def wait_paused(
         self,
@@ -882,9 +894,131 @@ class Sandbox:
         )
 
 
-def _is_unimplemented(err: Exception) -> bool:
+class _WaitStreamEndedError(TimeoutError):
+    pass
+
+
+# Connection-level HTTP/2 failures that clients report under any code.
+# Keep these markers in sync with the Go and TypeScript SDKs.
+_WAIT_CONNECTION_MARKERS = (
+    "refused_stream",
+    "refused stream",
+    "goaway",
+    "too_many_pings",
+    "enhance_your_calm",
+)
+
+# Markers for HTTP/2 and proxy failures across connect-go, connect-node and grpc-core.
+_WAIT_TRANSPORT_MARKERS = (
+    "http2:",
+    "rst_stream",
+    "stream reset",
+    "stream error",
+    "stream removed",
+    "stream closed",
+    "internal_error",
+    "econnreset",
+    "connection reset",
+    "connection lost",
+    "i/o timeout",
+    "socket closed",
+    "socket hang up",
+    "unexpected eof",
+    "missing status",
+    "no grpc-status trailer",
+    "incomplete envelope",
+    "server closed",
+    "transport closing",
+    "timeout awaiting response headers",
+    "upstream request timeout",
+)
+
+
+def _wait_error_chain(err: BaseException) -> list[BaseException]:
+    chain: list[BaseException] = []
+    current: BaseException | None = err
+    while current is not None and len(chain) < 4 and all(current is not seen for seen in chain):
+        chain.append(current)
+        current = current.__cause__
+    return chain
+
+
+def _rpc_code_name(err: BaseException) -> str | None:
     code_fn = getattr(err, "code", None)
     if not callable(code_fn):
+        return None
+    try:
+        code = code_fn()
+    except Exception:
+        return None
+    return getattr(code, "name", str(code))
+
+
+def _wait_error_code(chain: list[BaseException]) -> str | None:
+    # Unary errors arrive mapped to SandboxError with the gRPC error as their cause.
+    return next((name for name in map(_rpc_code_name, chain) if name), None)
+
+
+def _is_transient_wait_error(err: Exception) -> bool:
+    chain = _wait_error_chain(err)
+    code = _wait_error_code(chain)
+    if code in {"UNAVAILABLE", "DEADLINE_EXCEEDED"}:
+        return True
+    messages = [_rpc_error_message(item) for item in chain]
+    if code is not None and any(marker in message for message in messages for marker in _WAIT_CONNECTION_MARKERS):
+        return True
+    if code == "INVALID_ARGUMENT":
+        # A stream cut by GOAWAY can surface as an incomplete-envelope protocol error.
+        if not any("protocol error" in message for message in messages):
+            return False
+    elif code not in {"INTERNAL", "ABORTED", "UNKNOWN", "CANCELLED"}:
         return False
-    code = code_fn()
-    return getattr(code, "name", str(code)) == "UNIMPLEMENTED"
+    for depth, item in enumerate(chain):
+        if depth and (isinstance(item, TimeoutError) or _rpc_code_name(item) == "DEADLINE_EXCEEDED"):
+            return True
+        if any(marker in messages[depth] for marker in _WAIT_TRANSPORT_MARKERS):
+            return True
+    return False
+
+
+def _is_retryable_wait_poll_error(err: Exception) -> bool:
+    if isinstance(err, SessionNotFoundError):
+        return True
+    return _wait_error_code(_wait_error_chain(err)) == "NOT_FOUND" or _is_transient_wait_error(err)
+
+
+def _is_retryable_wait_stream_error(err: Exception) -> bool:
+    if isinstance(err, _WaitStreamEndedError):
+        return True
+    return _wait_error_code(_wait_error_chain(err)) == "UNIMPLEMENTED" or _is_transient_wait_error(err)
+
+
+# Caps one GetSession so a stalled connection cannot consume the whole readiness budget.
+_WAIT_POLL_ATTEMPT_TIMEOUT = 10.0
+
+
+def _wait_poll_call_kwargs(rpc, deadline: float) -> dict[str, float]:
+    # An injected Client(rpc=...) keeps the get_session(request) contract; only built-in transports take a deadline.
+    if not getattr(rpc, "_accepts_call_timeout", False):
+        return {}
+    limits = [_WAIT_POLL_ATTEMPT_TIMEOUT, deadline - time.monotonic()]
+    unary_timeout = getattr(rpc, "_timeout", None)
+    if unary_timeout:
+        limits.append(unary_timeout)
+    return {"timeout": max(0.001, min(limits))}
+
+
+def _raise_mapped(err: Exception) -> None:
+    mapped = map_rpc_error(err)
+    if mapped is err:
+        raise err
+    raise mapped from err
+
+
+def _wait_ready_timeout(sandbox_id: str, last_err: Exception | None) -> TimeoutError:
+    message = f"timeout waiting for sandbox {sandbox_id}"
+    if last_err is None:
+        return TimeoutError(message)
+    timeout_err = TimeoutError(f"{message} (last error: {last_err})")
+    timeout_err.__cause__ = last_err
+    return timeout_err

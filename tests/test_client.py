@@ -19,11 +19,13 @@ from tenki_sandbox import (
     MissingAuthTokenError,
     PauseFailedError,
     PauseWaitCancelledError,
+    PermissionDeniedError,
     Sandbox,
     SandboxInfo,
     SandboxError,
     SandboxWarningCode,
     SandboxWarningNotification,
+    SnapshotNotFoundError,
     TemplateRuntimeFailedError,
     UnauthorizedError,
     WaitReadyFailedError,
@@ -270,7 +272,13 @@ def test_sync_transport_closes_without_a_background_connectivity_monitor(monkeyp
     def unexpected_monitor(_channel):
         raise AssertionError("unused connectivity monitors race with channel.close()")
 
-    monkeypatch.setattr(grpc, "insecure_channel", lambda _target: channel)
+    channel_options = []
+
+    def new_channel(_target, options=None):
+        channel_options.append(dict(options or ()))
+        return channel
+
+    monkeypatch.setattr(grpc, "insecure_channel", new_channel)
     monkeypatch.setattr(grpc, "channel_ready_future", unexpected_monitor)
     monkeypatch.setattr(sandbox_pb2_grpc, "SandboxServiceStub", lambda candidate: object())
 
@@ -909,11 +917,100 @@ def test_wait_ready_falls_back_to_poll_when_stream_unimplemented():
     rpc.get_states = [pb.SESSION_STATE_RUNNING]
     sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
 
-    sandbox.wait_ready(timeout=0)
+    sandbox.wait_ready(timeout=1)
 
     assert sandbox.state == "RUNNING"
     assert len(rpc.requests["wait_session"]) == 1
     assert len(rpc.requests["get_session"]) == 1
+
+
+@pytest.mark.parametrize("code,message,recover", [
+    ('UNIMPLEMENTED', 'not implemented', True),
+    ('UNAVAILABLE', 'service unavailable', True),
+    ('DEADLINE_EXCEEDED', 'upstream deadline', True),
+    ('INTERNAL', 'REFUSED_STREAM', True),
+    ('INTERNAL', 'GOAWAY', True),
+    ('INTERNAL', 'stream reset', True),
+    ('INTERNAL', 'stream error', True),
+    ('INTERNAL', 'NGHTTP2_INTERNAL_ERROR', True),
+    ('INTERNAL', 'ECONNRESET', True),
+    ('INTERNAL', 'connection reset by peer', True),
+    ('INTERNAL', 'socket hang up', True),
+    ('INTERNAL', 'unexpected EOF', True),
+    ('INTERNAL', 'stream closed before headers', True),
+    ('INTERNAL', 'server closed', True),
+    ('INTERNAL', 'transport closing', True),
+    ('INTERNAL', 'upstream request timeout', True),
+    ('ABORTED', 'REFUSED_STREAM', True),
+    ('ABORTED', 'GOAWAY', True),
+    ('ABORTED', 'stream reset', True),
+    ('ABORTED', 'stream error', True),
+    ('ABORTED', 'NGHTTP2_INTERNAL_ERROR', True),
+    ('ABORTED', 'ECONNRESET', True),
+    ('ABORTED', 'connection reset by peer', True),
+    ('ABORTED', 'socket hang up', True),
+    ('ABORTED', 'unexpected EOF', True),
+    ('ABORTED', 'stream closed before headers', True),
+    ('ABORTED', 'server closed', True),
+    ('ABORTED', 'transport closing', True),
+    ('ABORTED', 'upstream request timeout', True),
+    ('UNKNOWN', 'REFUSED_STREAM', True),
+    ('UNKNOWN', 'GOAWAY', True),
+    ('UNKNOWN', 'stream reset', True),
+    ('UNKNOWN', 'stream error', True),
+    ('UNKNOWN', 'NGHTTP2_INTERNAL_ERROR', True),
+    ('UNKNOWN', 'ECONNRESET', True),
+    ('UNKNOWN', 'connection reset by peer', True),
+    ('UNKNOWN', 'socket hang up', True),
+    ('UNKNOWN', 'unexpected EOF', True),
+    ('UNKNOWN', 'stream closed before headers', True),
+    ('UNKNOWN', 'server closed', True),
+    ('UNKNOWN', 'transport closing', True),
+    ('UNKNOWN', 'upstream request timeout', True),
+    ('PERMISSION_DENIED', 'NGHTTP2_INTERNAL_ERROR', False),
+    ('UNAUTHENTICATED', 'NGHTTP2_INTERNAL_ERROR', False),
+    ('CANCELLED', 'NGHTTP2_INTERNAL_ERROR', True),
+    ('INTERNAL', 'Received RST_STREAM with error code 2', True),
+    ('UNKNOWN', 'Stream removed', True),
+    ('UNKNOWN', 'Socket closed', True),
+    ('INTERNAL', 'protocol error: missing status', True),
+    ('UNKNOWN', 'protocol error: no Grpc-Status trailer: unexpected EOF', True),
+    ('INTERNAL', 'http2: client connection lost', True),
+    ('INTERNAL', 'http2: timeout awaiting response headers', True),
+    ('CANCELLED', 'http/2 stream closed with error code CANCEL (0x8)', True),
+    ('INVALID_ARGUMENT', 'protocol error: incomplete envelope: http2: server sent GOAWAY and closed the connection', True),
+    ('INVALID_ARGUMENT', 'invalid session id', False),
+    ('CANCELLED', 'application failure', False),
+    ('RESOURCE_EXHAUSTED', 'http/2 connection closed with error code ENHANCE_YOUR_CALM (0xb), too_many_pings, doubled the interval', True),
+    ('RESOURCE_EXHAUSTED', 'REFUSED_STREAM', True),
+    ('PERMISSION_DENIED', 'GOAWAY', True),
+    ('RESOURCE_EXHAUSTED', 'rate limit exceeded', False),
+    ('INTERNAL', 'http2: client conn is closed', True),
+    ('INVALID_ARGUMENT', 'NGHTTP2_INTERNAL_ERROR', False),
+    ('RESOURCE_EXHAUSTED', 'NGHTTP2_INTERNAL_ERROR', False),
+    ('NOT_FOUND', 'NGHTTP2_INTERNAL_ERROR', False),
+    ('INTERNAL', 'application failure', False),
+    ('ABORTED', 'application failure', False),
+    ('UNKNOWN', 'application failure', False),
+])
+def test_wait_ready_transport_recovery(code, message, recover):
+    class BrokenWaitRPC(FakeRPC):
+        def wait_session(self, req, **kwargs):
+            error = FakeRPCError(code)
+            error.args = (message,)
+            raise error
+
+    rpc = BrokenWaitRPC()
+    rpc.get_states = [pb.SESSION_STATE_RUNNING]
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    if recover:
+        sandbox.wait_ready(timeout=1)
+        assert sandbox.state == "RUNNING"
+        assert len(rpc.requests["get_session"]) == 1
+    else:
+        with pytest.raises(Exception):
+            sandbox.wait_ready(timeout=1)
+        assert not rpc.requests.get("get_session")
 
 
 def test_wait_paused_reaches_paused():
@@ -1273,7 +1370,10 @@ def test_sandbox_create_keeps_owned_client_open_for_wait_failure(monkeypatch):
     # The sandbox exists server-side and rides out on the error, so the caller
     # still needs a live channel to terminate it through.
     rpc = _closable(FakeRPC())
-    rpc.wait_states = [pb.SESSION_STATE_CREATING]
+    def fail_wait(req, **kwargs):
+        raise FakeRPCError("PERMISSION_DENIED")
+
+    rpc.wait_session = fail_wait
     client = Client(rpc=rpc)
     monkeypatch.setattr("tenki_sandbox.client.Client", lambda **_kwargs: client)
 
@@ -1285,3 +1385,234 @@ def test_sandbox_create_keeps_owned_client_open_for_wait_failure(monkeypatch):
         assert sandbox._owns_client
     assert rpc.requests["terminate_session"][-1].session_id == "session-1"
     assert rpc.closed
+
+
+@pytest.mark.parametrize("elapsed", [0.75, 1.25])
+def test_wait_ready_preserves_remaining_budget(monkeypatch, elapsed):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    import tenki_sandbox.sandbox as module
+
+    rpc = FakeRPC()
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    clock = iter([0, elapsed, elapsed])
+    monkeypatch.setattr(module, "time", SimpleNamespace(monotonic=lambda: next(clock)))
+    stream = Mock(side_effect=FakeRPCError("UNAVAILABLE"))
+    poll = Mock()
+    monkeypatch.setattr(sandbox, "_wait_ready_stream", stream)
+    monkeypatch.setattr(sandbox, "_wait_ready_poll", poll)
+    if elapsed < 1:
+        sandbox.wait_ready(timeout=1)
+        poll.assert_called_once_with(0.25)
+    else:
+        with pytest.raises(Exception):
+            sandbox.wait_ready(timeout=1)
+        poll.assert_not_called()
+
+
+@pytest.mark.parametrize("code", ["NOT_FOUND", "UNAVAILABLE", "DEADLINE_EXCEEDED", "PERMISSION_DENIED", "UNAUTHENTICATED", "CANCELLED", "RESOURCE_EXHAUSTED"])
+def test_wait_ready_poll_tolerates_transient_errors(code):
+    rpc = FakeRPC()
+    rpc.wait_unimplemented = True
+    original_get = rpc.get_session
+    calls = 0
+
+    def get_session(req):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise FakeRPCError(code)
+        return original_get(req)
+
+    rpc.get_session = get_session
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    if code in {"NOT_FOUND", "UNAVAILABLE", "DEADLINE_EXCEEDED"}:
+        sandbox.wait_ready(timeout=2)
+        assert sandbox.state == "RUNNING"
+        assert calls == 2
+    else:
+        with pytest.raises(Exception):
+            sandbox.wait_ready(timeout=2)
+        assert calls == 1
+
+
+@pytest.mark.parametrize("states", [[], [pb.SESSION_STATE_CREATING]])
+def test_wait_ready_recovers_clean_stream_close(states):
+    rpc = FakeRPC()
+    rpc.wait_states = states
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    sandbox.wait_ready(timeout=1)
+    assert sandbox.state == "RUNNING"
+    assert len(rpc.requests["get_session"]) == 1
+
+
+@pytest.mark.parametrize("code", ["INTERNAL", "ABORTED", "UNKNOWN", "PERMISSION_DENIED", "CANCELLED"])
+@pytest.mark.parametrize("cause", [FakeRPCError("DEADLINE_EXCEEDED"), TimeoutError("upstream deadline"), RuntimeError("GOAWAY"), RuntimeError("application timeout")])
+def test_wait_ready_classifies_wrapped_transport_errors(code, cause):
+    rpc = FakeRPC()
+    def fail(req, **kwargs):
+        raise FakeRPCError(code) from cause
+    rpc.wait_session = fail
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    # GOAWAY is a connection failure under any code; the rest needs a transport-ambiguous code.
+    recover = str(cause) == "GOAWAY" or (
+        code in {"INTERNAL", "ABORTED", "UNKNOWN", "CANCELLED"} and str(cause) != "application timeout"
+    )
+    if recover:
+        sandbox.wait_ready(timeout=1)
+        assert sandbox.state == "RUNNING"
+        assert len(rpc.requests["get_session"]) == 1
+    else:
+        with pytest.raises(Exception):
+            sandbox.wait_ready(timeout=1)
+        assert not rpc.requests.get("get_session")
+
+
+@pytest.mark.parametrize("states", [[], [pb.SESSION_STATE_CREATING]])
+def test_wait_ready_clean_close_after_budget_raises_timeout(monkeypatch, states):
+    from types import SimpleNamespace
+    import tenki_sandbox.sandbox as module
+
+    rpc = FakeRPC()
+    rpc.wait_states = states
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    clock = iter([0, 1.25])
+    monkeypatch.setattr(module, "time", SimpleNamespace(monotonic=lambda: next(clock)))
+    with pytest.raises(TimeoutError):
+        sandbox.wait_ready(timeout=1)
+    assert not rpc.requests.get("get_session")
+
+
+def _chained(outer, cause):
+    outer.__cause__ = cause
+    return outer
+
+
+def _rpc_error(code, message):
+    error = FakeRPCError(code)
+    error.args = (message,)
+    return error
+
+
+@pytest.mark.parametrize("make_error,recover", [
+    (lambda: _chained(SandboxError("injected unavailable"), FakeRPCError("UNAVAILABLE")), True),
+    (lambda: _chained(SnapshotNotFoundError("snapshot not found"), FakeRPCError("NOT_FOUND")), True),
+    (lambda: _rpc_error("INTERNAL", "Received RST_STREAM with error code 2"), True),
+    (lambda: _chained(PermissionDeniedError("denied"), FakeRPCError("PERMISSION_DENIED")), False),
+])
+def test_wait_ready_poll_classifies_mapped_errors(make_error, recover):
+    rpc = FakeRPC()
+    rpc.wait_unimplemented = True
+    original_get = rpc.get_session
+    calls = 0
+
+    def get_session(req):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise make_error()
+        return original_get(req)
+
+    rpc.get_session = get_session
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    if recover:
+        sandbox.wait_ready(timeout=2)
+        assert sandbox.state == "RUNNING"
+        assert calls == 2
+    else:
+        with pytest.raises(PermissionDeniedError):
+            sandbox.wait_ready(timeout=2)
+        assert calls == 1
+
+
+def test_wait_ready_poll_bounds_rpc_by_remaining_budget():
+    rpc = FakeRPC()
+    rpc.wait_unimplemented = True
+    rpc._accepts_call_timeout = True
+    original_get = rpc.get_session
+    timeouts = []
+
+    def get_session(req, **kwargs):
+        timeouts.append(kwargs.get("timeout"))
+        return original_get(req)
+
+    rpc.get_session = get_session
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    sandbox.wait_ready(timeout=1)
+    assert timeouts and 0 < timeouts[0] <= 1
+
+
+def test_wait_ready_timeout_reports_last_poll_error():
+    rpc = FakeRPC()
+    rpc.wait_unimplemented = True
+
+    def get_session(req):
+        raise _rpc_error("UNAVAILABLE", "edge unreachable")
+
+    rpc.get_session = get_session
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    with pytest.raises(TimeoutError, match="edge unreachable"):
+        sandbox.wait_ready(timeout=0.3)
+
+
+@pytest.mark.parametrize("budget,unary_timeout,cap", [(60, None, 10), (60, 2, 2), (1, None, 1)])
+def test_wait_ready_poll_caps_each_attempt(budget, unary_timeout, cap):
+    rpc = FakeRPC()
+    rpc.wait_unimplemented = True
+    rpc._accepts_call_timeout = True
+    rpc._timeout = unary_timeout
+    original_get = rpc.get_session
+    timeouts = []
+
+    def get_session(req, **kwargs):
+        timeouts.append(kwargs.get("timeout"))
+        return original_get(req)
+
+    rpc.get_session = get_session
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    sandbox.wait_ready(timeout=budget)
+    assert timeouts and 0 < timeouts[0] <= cap
+
+
+def test_wait_classifier_retries_io_timeout_but_not_terminal_errors():
+    from tenki_sandbox.sandbox import _is_retryable_wait_poll_error, _is_retryable_wait_stream_error
+
+    io_timeout = _rpc_error("UNKNOWN", "read tcp 10.0.0.1:443: i/o timeout")
+    assert _is_retryable_wait_stream_error(io_timeout)
+    assert _is_retryable_wait_poll_error(io_timeout)
+    terminal = RuntimeError("sandbox entered terminal state: TERMINATED: connection reset by peer")
+    assert not _is_retryable_wait_stream_error(terminal)
+    assert not _is_retryable_wait_poll_error(terminal)
+
+
+def test_wait_ready_poll_keeps_injected_rpc_contract():
+    class StrictRPC(FakeRPC):
+        def get_session(self, req):
+            return super().get_session(req)
+
+    rpc = StrictRPC()
+    rpc.wait_unimplemented = True
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    sandbox.wait_ready(timeout=1)
+    assert sandbox.state == "RUNNING"
+
+
+def test_client_enables_http2_keepalive(monkeypatch):
+    import grpc
+
+    channel_options = []
+
+    def new_channel(_target, options=None):
+        from unittest.mock import MagicMock
+
+        channel_options.append(dict(options or ()))
+        return MagicMock()
+
+    monkeypatch.setattr(grpc, "insecure_channel", new_channel)
+    Client(base_url="http://localhost:8090", auth_token="tk_test")
+    assert channel_options[0] == {
+        "grpc.keepalive_time_ms": 30_000,
+        "grpc.keepalive_timeout_ms": 5_000,
+        "grpc.http2.ping_timeout_ms": 5_000,
+        "grpc.http2.max_pings_without_data": 0,
+    }

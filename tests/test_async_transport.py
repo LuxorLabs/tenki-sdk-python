@@ -50,7 +50,7 @@ async def test_async_transport_starts_channel_connection(monkeypatch):
             self.closed = True
 
     channel = Channel()
-    monkeypatch.setattr(grpc.aio, "insecure_channel", lambda _target: channel)
+    monkeypatch.setattr(grpc.aio, "insecure_channel", lambda _target, options=None: channel)
     monkeypatch.setattr(sandbox_pb2_grpc, "SandboxServiceStub", lambda candidate: object())
 
     rpc = AsyncGrpcSandboxRPC(
@@ -210,7 +210,8 @@ async def test_async_data_plane_channels_are_shared_by_origin(monkeypatch):
 
     created = []
 
-    def new_channel(target):
+    def new_channel(target, options=None):
+        assert dict(options or ())["grpc.keepalive_time_ms"] == 30_000
         channel = Channel()
         created.append((target, channel))
         return channel

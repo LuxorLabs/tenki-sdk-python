@@ -7,7 +7,7 @@ import threading
 from datetime import datetime, timezone
 
 from .._pb import pb
-from .._transport import grpc_target
+from .._transport import KEEPALIVE_CHANNEL_OPTIONS, grpc_target
 from ..data_plane import (
     DATA_PLANE_CREDENTIAL_HEADER,
     _authorize_data_plane_request,
@@ -84,9 +84,9 @@ def _acquire_shared_channel(target: str, secure: bool):
         shared = _shared_channels.get(key)
         if shared is None:
             channel = (
-                grpc.aio.secure_channel(target, grpc.ssl_channel_credentials())
+                grpc.aio.secure_channel(target, grpc.ssl_channel_credentials(), options=KEEPALIVE_CHANNEL_OPTIONS)
                 if secure
-                else grpc.aio.insecure_channel(target)
+                else grpc.aio.insecure_channel(target, options=KEEPALIVE_CHANNEL_OPTIONS)
             )
             shared = [channel, 0]
             _shared_channels[key] = shared

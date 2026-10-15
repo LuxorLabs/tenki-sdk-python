@@ -10,7 +10,7 @@ import grpc
 from google.protobuf.message import Message
 
 from ._pb import pb
-from ._transport import grpc_target
+from ._transport import KEEPALIVE_CHANNEL_OPTIONS, grpc_target
 
 DATA_PLANE_CREDENTIAL_HEADER = "x-tenki-session-cert"
 
@@ -64,9 +64,9 @@ def _acquire_shared_channel(endpoint: str):
         shared = _shared_channels.get(key)
         if shared is None:
             channel = (
-                grpc.secure_channel(target, grpc.ssl_channel_credentials())
+                grpc.secure_channel(target, grpc.ssl_channel_credentials(), options=KEEPALIVE_CHANNEL_OPTIONS)
                 if secure
-                else grpc.insecure_channel(target)
+                else grpc.insecure_channel(target, options=KEEPALIVE_CHANNEL_OPTIONS)
             )
             shared = [channel, 0]
             _shared_channels[key] = shared

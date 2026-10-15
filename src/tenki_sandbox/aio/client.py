@@ -7,6 +7,7 @@ from .._pagination import advance_page_token
 from .._pb import pb
 from .._time import duration
 from .._transport import (
+    KEEPALIVE_CHANNEL_OPTIONS,
     GrpcConfig,
     resolve_auth_token,
     resolve_base_url,
@@ -71,6 +72,8 @@ class AsyncClient:
                 base_url=self.base_url,
                 auth_token=self.auth_token,
                 timeout=timeout,
+                # Same HTTP/2 keepalive as the Go and TypeScript clients.
+                channel_options=KEEPALIVE_CHANNEL_OPTIONS,
             )
         )
         self._warning_handler = warning_handler

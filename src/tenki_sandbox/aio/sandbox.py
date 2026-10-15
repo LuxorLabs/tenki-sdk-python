@@ -31,7 +31,14 @@ from ..models import (
     Template,
     VolumeMount,
 )
-from ..sandbox import _is_unimplemented
+from ..sandbox import (
+    _WaitStreamEndedError,
+    _is_retryable_wait_poll_error,
+    _is_retryable_wait_stream_error,
+    _raise_mapped,
+    _wait_poll_call_kwargs,
+    _wait_ready_timeout,
+)
 from ..secret_files import RuntimeSecretFile
 from ..template_spec import TemplateSpec
 from ..warning import (
@@ -457,15 +464,16 @@ class AsyncSandbox:
         return await self._client.get_session_metrics(self.id, window=window)
 
     async def wait_ready(self, timeout: float = 180) -> None:
+        deadline = time.monotonic() + timeout
         try:
             await self._wait_ready_stream(timeout)
             return
         except Exception as err:
-            if not _is_unimplemented(err):
+            if not _is_retryable_wait_stream_error(err) or time.monotonic() >= deadline:
                 if hasattr(err, "code"):
                     raise map_rpc_error(err) from err
                 raise
-        await self._wait_ready_poll(timeout)
+        await self._wait_ready_poll(max(0, deadline - time.monotonic()))
 
     async def _wait_ready_stream(self, timeout: float) -> None:
         async for resp in self._client._rpc.wait_session(
@@ -485,20 +493,31 @@ class AsyncSandbox:
             return
         if self.state in {"TERMINATING", "TERMINATED"}:
             raise RuntimeError(f"sandbox entered terminal state: {self.state}")
-        raise TimeoutError(f"timeout waiting for sandbox {self.id}")
+        raise _WaitStreamEndedError(f"readiness stream ended before sandbox {self.id} became ready")
 
     async def _wait_ready_poll(self, timeout: float) -> None:
         deadline = time.monotonic() + timeout
+        last_err: Exception | None = None
         while True:
-            await self.refresh()
-            if self.state == "RUNNING":
-                return
-            if self.state in {"TERMINATING", "TERMINATED"}:
-                raise RuntimeError(f"sandbox entered terminal state: {self.state}")
+            try:
+                resp = await self._client._rpc.get_session(
+                    pb.GetSessionRequest(session_id=self.id),
+                    **_wait_poll_call_kwargs(self._client._rpc, deadline),
+                )
+                self._info = sandbox_info(resp.session)
+            except Exception as err:
+                if not _is_retryable_wait_poll_error(err):
+                    _raise_mapped(err)
+                last_err = err
+            else:
+                if self.state == "RUNNING":
+                    return
+                if self.state in {"TERMINATING", "TERMINATED"}:
+                    raise RuntimeError(f"sandbox entered terminal state: {self.state}")
             if time.monotonic() >= deadline:
                 break
-            await asyncio.sleep(0.5)
-        raise TimeoutError(f"timeout waiting for sandbox {self.id}")
+            await asyncio.sleep(min(0.5, max(0.0, deadline - time.monotonic())))
+        raise _wait_ready_timeout(self.id, last_err)
 
     async def wait_paused(
         self,

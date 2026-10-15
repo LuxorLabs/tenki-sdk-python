@@ -78,7 +78,8 @@ def test_sync_data_plane_channels_are_shared_by_origin(monkeypatch):
 
     created = []
 
-    def new_channel(target):
+    def new_channel(target, options=None):
+        assert dict(options or ())["grpc.keepalive_time_ms"] == 30_000
         channel = Channel()
         created.append((target, channel))
         return channel

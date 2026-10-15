@@ -33,6 +33,8 @@ class AsyncGrpcSandboxRPC:
     thread) with the same legacy-service fallback.
     """
 
+    _accepts_call_timeout = True
+
     _methods = dict(GrpcSandboxRPC._methods)
     _ssh_methods = dict(GrpcSandboxRPC._ssh_methods)
 
@@ -46,6 +48,7 @@ class AsyncGrpcSandboxRPC:
         self._http_base = http_base_url(config.base_url)
         self._metadata = auth_metadata(config.auth_token)
         self._timeout = config.timeout
+        self._channel_options = config.channel_options
         self._channel = None
         self._stub = None
         try:
@@ -64,9 +67,11 @@ class AsyncGrpcSandboxRPC:
             from tenki_sandbox._internal.proto.tenki.sandbox.v1 import sandbox_pb2_grpc
 
             if not self._secure:
-                self._channel = grpc.aio.insecure_channel(self._target)
+                self._channel = grpc.aio.insecure_channel(self._target, options=self._channel_options)
             else:
-                self._channel = grpc.aio.secure_channel(self._target, grpc.ssl_channel_credentials())
+                self._channel = grpc.aio.secure_channel(
+                    self._target, grpc.ssl_channel_credentials(), options=self._channel_options
+                )
             self._channel.get_state(try_to_connect=True)
             self._stub = sandbox_pb2_grpc.SandboxServiceStub(self._channel)
         return self._stub

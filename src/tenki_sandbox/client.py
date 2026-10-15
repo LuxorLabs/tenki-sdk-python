@@ -16,6 +16,7 @@ from ._pb import pb
 from ._resource_validation import validate_create_resources
 from ._time import duration
 from ._transport import (
+    KEEPALIVE_CHANNEL_OPTIONS,
     GrpcConfig,
     GrpcSandboxRPC,
     resolve_auth_token,
@@ -75,6 +76,8 @@ class Client:
                 base_url=self.base_url,
                 auth_token=self.auth_token,
                 timeout=timeout,
+                # Same HTTP/2 keepalive as the Go and TypeScript clients.
+                channel_options=KEEPALIVE_CHANNEL_OPTIONS,
             )
         )
         self._warning_handler = warning_handler
