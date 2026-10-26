@@ -194,6 +194,24 @@ class WaitReadyFailedError(SandboxError):
         self.sandbox = sandbox
 
 
+class ForkFailedError(SandboxError):
+    """A fork failed after its snapshot was created; ``sandboxes`` were created before
+    the failure and keep running until closed. ``cause`` is the mapped error."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        snapshot_id: str,
+        sandboxes=(),
+        cause: SandboxError | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.snapshot_id = snapshot_id
+        self.sandboxes = tuple(sandboxes)
+        self.cause = cause
+
+
 class StreamClosedError(SandboxError):
     pass
 
@@ -356,18 +374,46 @@ def _grpc_status_details(err: Exception):
     return ()
 
 
+def _status_detail(err: Exception, message):
+    suffix = "/" + message.DESCRIPTOR.full_name
+    for detail in _grpc_status_details(err):
+        if detail.type_url.endswith(suffix) and detail.Unpack(message):
+            return message
+    return None
+
+
 def _template_runtime_failure_detail(err: Exception):
     from ._pb import pb
 
-    for detail in _grpc_status_details(err):
-        if not detail.type_url.endswith(
-            "/tenki.sandbox.v1.TemplateRuntimeFailure"
-        ):
-            continue
-        failure = pb.TemplateRuntimeFailure()
-        if detail.Unpack(failure):
-            return failure
-    return None
+    return _status_detail(err, pb.TemplateRuntimeFailure())
+
+
+def _grpc_error(err: Exception) -> Exception:
+    """The transports re-raise mapped errors from the gRPC one, so walk the chain back to it."""
+    seen: set[int] = set()
+    current: BaseException | None = err
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if callable(getattr(current, "trailing_metadata", None)):
+            return current  # type: ignore[return-value]
+        current = current.__cause__ or current.__context__
+    return err
+
+
+def map_fork_error(err: Exception, to_sandbox) -> SandboxError:
+    """Map a ForkSession failure; a partial-result detail becomes ForkFailedError."""
+    from ._pb import pb
+
+    mapped = map_rpc_error(err)
+    partial = _status_detail(_grpc_error(err), pb.ForkSessionResponse())
+    if partial is None:
+        return mapped
+    return ForkFailedError(
+        str(mapped),
+        snapshot_id=partial.snapshot_id,
+        sandboxes=[to_sandbox(session) for session in partial.sessions],
+        cause=mapped,
+    )
 
 
 def _validation_field_path(path) -> str:

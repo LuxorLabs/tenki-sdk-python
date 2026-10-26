@@ -225,6 +225,11 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSnapshotRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSnapshotResponse.FromString,
                 _registered_method=True)
+        self.ForkSession = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/ForkSession',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ForkSessionRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ForkSessionResponse.FromString,
+                _registered_method=True)
         self.GetSnapshot = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/GetSnapshot',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSnapshotRequest.SerializeToString,
@@ -683,6 +688,13 @@ class SandboxServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ForkSession(self, request, context):
+        """Snapshots a RUNNING session and starts children from it while the source keeps running.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetSnapshot(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1136,6 +1148,11 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.CreateSnapshot,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSnapshotRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSnapshotResponse.SerializeToString,
+            ),
+            'ForkSession': grpc.unary_unary_rpc_method_handler(
+                    servicer.ForkSession,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ForkSessionRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ForkSessionResponse.SerializeToString,
             ),
             'GetSnapshot': grpc.unary_unary_rpc_method_handler(
                     servicer.GetSnapshot,
@@ -2449,6 +2466,33 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/CreateSnapshot',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSnapshotRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSnapshotResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ForkSession(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/ForkSession',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ForkSessionRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ForkSessionResponse.FromString,
             options,
             channel_credentials,
             insecure,

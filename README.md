@@ -99,10 +99,11 @@ The server may reject options from later milestones, including wake-on-connect a
 
 ## Durable pause
 
+`pause()` returns once the sandbox is `PAUSED`: the memory checkpoint is on the host and the RBD rootfs image is finalized.
+Ceph and R2 replication continue in the background after it returns.
+It raises an error carrying the rollback reason if a verified rollback restores `RUNNING`.
 `pause_async()` returns after the service durably accepts the request and moves the sandbox to `PAUSING` on a node that supports asynchronous pause.
-Snapshot capture and persistence continue in the background; acceptance does not mean the VM has stopped or the snapshot is durable.
-`pause()` retains its existing completion behavior for compatibility.
-Call `wait_paused()` before resuming or relying on a durable checkpoint.
+Acceptance does not mean the VM has stopped, so call `wait_paused()` before resuming or relying on the checkpoint.
 It returns at `PAUSED` and raises `PauseFailedError` if a verified rollback restores `RUNNING`.
 Pass `timeout=0` to wait without a deadline.
 For explicit local cancellation, pass a `threading.Event` as `cancel_event`; cancellation raises `PauseWaitCancelledError` and leaves the remote pause running.
@@ -114,9 +115,9 @@ sb.wait_paused(timeout=0)
 
 `AsyncSandbox` exposes the same operation through `await sb.pause_async()` and `await sb.wait_paused(timeout=0)`.
 Its wait accepts an `asyncio.Event` or `threading.Event`, and normal task cancellation also stops local observation without cancelling the remote pause.
+A `LOCAL_READY` pause snapshot resumes on the host that captured it.
 `DURABLE_CEPH` snapshots can resume on a capability-matched host in the same datacenter while R2 replication continues.
 `DURABLE` snapshots are portable to eligible hosts.
-`LOCAL_READY` is not resumable for pause operations.
 
 `allow_inbound` and `allow_outbound` both default to `True` on `create()`, so a new sandbox reaches the
 internet and can expose ports without passing either argument. Both are create-time settings and cannot be
@@ -516,6 +517,31 @@ client = Client(warning_handler=lambda warning: logger.warning(warning.message))
 sb = client.create(sticky=True, max_duration=8 * 3600)
 assert sb.warnings[0].code == SandboxWarningCode.STICKY_OVERRIDES_MAX_DURATION
 ```
+
+## Forking a sandbox
+
+`sb.fork()` snapshots a running sandbox and starts new sandboxes that continue from its memory and disk while the source keeps running.
+Each child inherits the source's size, network policy, lifetime settings and tags, and carries `fork_of_session_id` and `fork_snapshot_id` metadata.
+`count` accepts 1 to 10 and defaults to 1.
+Children are named `<name_prefix>-1` to `<name_prefix>-N`, and an unset prefix derives one from the source name.
+`wait=True` returns once every child is `RUNNING`.
+`AsyncSandbox.fork()` takes the same arguments.
+
+```python
+from tenki import ForkFailedError
+
+try:
+    children = sb.fork(count=3, name_prefix="trial", wait=True)
+except ForkFailedError as err:
+    # err.sandboxes were created before the failure and keep running.
+    print(err.snapshot_id, [child.id for child in err.sandboxes], err.cause)
+    raise
+```
+
+The fork snapshot is a regular snapshot that counts toward snapshot storage.
+A sandbox with attached volumes cannot be forked, because the children would need the source's volume images and only the source can use them.
+Detach the volumes first.
+Delete it once every sandbox started from it has terminated.
 
 ## SSH
 

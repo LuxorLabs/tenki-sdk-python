@@ -19,6 +19,7 @@ from .errors import (
     PauseWaitCancelledError,
     SessionNotFoundError,
     WaitReadyFailedError,
+    map_fork_error,
     map_rpc_error,
 )
 from .fs import SandboxFS
@@ -706,6 +707,23 @@ class Sandbox:
             raise map_rpc_error(err) from err
         # The session may resume on a different host; re-bootstrap on next use.
         self._reset_data_plane()
+
+    def fork(
+        self, *, count: int = 1, name_prefix: str | None = None, wait: bool = False
+    ) -> list["Sandbox"]:
+        """Snapshot this RUNNING sandbox and start ``count`` children that continue from
+        its memory and disk while it keeps running; partial failures raise ForkFailedError."""
+        req = pb.ForkSessionRequest(
+            session_id=self.id, count=count, name_prefix=name_prefix or "", wait=wait
+        )
+        try:
+            resp = self._client._rpc.fork_session(req)
+        except Exception as err:
+            raise map_fork_error(err, self._fork_child) from err
+        return [self._fork_child(session) for session in resp.sessions]
+
+    def _fork_child(self, session) -> "Sandbox":
+        return Sandbox(self._client, sandbox_info(session))
 
     def extend(self, additional: float | int | object) -> None:
         dur = duration(additional)

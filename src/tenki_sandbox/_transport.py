@@ -196,6 +196,7 @@ class GrpcSandboxRPC:
         "attach_volume": "AttachVolume",
         "detach_volume": "DetachVolume",
         "create_snapshot": "CreateSnapshot",
+        "fork_session": "ForkSession",
         "get_snapshot": "GetSnapshot",
         "get_snapshot_download_url": "GetSnapshotDownloadURL",
         "update_ssh_authorized_keys": "UpdateSSHAuthorizedKeys",
