@@ -800,8 +800,9 @@ class Sandbox:
     def detach_volume(
         self, volume_id: str, *, force: bool = False, wait: float = 120
     ) -> None:
-        """``force`` releases a ``SYNC_PENDING`` attachment at once, or unplugs an attached
-        volume the guest cannot unmount (writes the guest has not flushed are lost)."""
+        """``force`` unplugs an attached volume the guest cannot unmount (writes the guest has
+        not flushed are lost). It never releases a ``SYNC_PENDING`` attachment; wait for sync
+        back to finish or request operator recovery."""
         try:
             self._client._rpc.detach_volume(
                 pb.DetachVolumeRequest(
