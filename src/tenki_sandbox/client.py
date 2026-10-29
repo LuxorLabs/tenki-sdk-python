@@ -143,6 +143,7 @@ class Client:
         sticky: bool = False,
         wait_for_runtime: bool = False,
         tailnet: TailnetAttachment | None = None,
+        disable_tailnet: bool = False,
         _owns_client: bool = False,
     ) -> Sandbox:
         """Create a sandbox.
@@ -204,6 +205,7 @@ class Client:
             wait_ready=wait and wait_for_runtime,
             wait_for_runtime=wait_for_runtime,
             tailnet=tailnet,
+            disable_tailnet=disable_tailnet,
         )
 
         try:
@@ -410,6 +412,7 @@ def build_create_session_request(
     wait_ready: bool = False,
     wait_for_runtime: bool = False,
     tailnet: TailnetAttachment | None = None,
+    disable_tailnet: bool = False,
 ) -> "pb.CreateSessionRequest":
     """Build a CreateSessionRequest. Shared by the sync and async clients."""
     validate_create_resources(cpu_cores, memory_mb, disk_size_gb)
@@ -502,6 +505,9 @@ def build_create_session_request(
         req.runtime.CopyFrom(direct_runtime._to_direct_runtime_proto())
         if any(target in req.env for target in req.runtime.secret_env):
             raise ValueError("secret target conflicts with session environment")
+    if disable_tailnet and tailnet is not None:
+        raise ValueError("choose a Tailscale connection or disable Tailscale")
+    req.disable_tailnet = disable_tailnet
     if tailnet is not None:
         req.tailnet.CopyFrom(_tailnet_attachment_proto(tailnet))
     return req
@@ -510,8 +516,14 @@ def build_create_session_request(
 def _tailnet_attachment_proto(attachment: TailnetAttachment):
     if attachment.provider != "tailscale":
         raise ValueError("unsupported tailnet provider")
-    if not isinstance(attachment.auth_key, TailnetAuthKey):
-        raise TypeError("tailnet auth_key must be a TailnetAuthKey")
+    if attachment.profile_id:
+        if attachment.auth_key is not None:
+            raise ValueError("provide one tailnet credential: auth_key or profile_id")
+        credential = {"profile_id": attachment.profile_id}
+    else:
+        if not isinstance(attachment.auth_key, TailnetAuthKey):
+            raise TypeError("tailnet auth_key must be a TailnetAuthKey")
+        credential = {"auth_key": attachment.auth_key._wire_value()}
     exit_policies = {
         None: pb.TAILNET_EXIT_POLICY_UNSPECIFIED,
         "tenki_allowlist": pb.TAILNET_EXIT_POLICY_TENKI_ALLOWLIST,
@@ -543,7 +555,8 @@ def _tailnet_attachment_proto(attachment: TailnetAttachment):
         wake_on_connect=attachment.wake_on_connect,
         expose_ports=attachment.expose_ports,
         wait_for_online=attachment.wait_for_online,
-        auth_key=attachment.auth_key._wire_value(),
+        **credential,
+        profile_revision=attachment.profile_revision,
         exit_policy=exit_policy,
         ephemeral_pause_policy=pause_policy,
     )

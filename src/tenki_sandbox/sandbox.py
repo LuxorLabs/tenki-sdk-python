@@ -319,6 +319,7 @@ class Sandbox:
         sticky: bool = False,
         wait_for_runtime: bool = False,
         tailnet: TailnetAttachment | None = None,
+        disable_tailnet: bool = False,
     ) -> "Sandbox":
         """Create a sandbox on a client this sandbox owns and closes.
 
@@ -377,6 +378,7 @@ class Sandbox:
                 sticky=sticky,
                 wait_for_runtime=wait_for_runtime,
                 tailnet=tailnet,
+                disable_tailnet=disable_tailnet,
                 _owns_client=True,
             )
         except WaitReadyFailedError:

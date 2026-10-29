@@ -126,7 +126,7 @@ TailnetProvider = Literal["tailscale"]
 
 @dataclass(frozen=True)
 class TailnetAttachment:
-    auth_key: TailnetAuthKey
+    auth_key: TailnetAuthKey | None = None
     hostname: str = ""
     tags: tuple[str, ...] = ()
     ephemeral: bool = False
@@ -139,6 +139,8 @@ class TailnetAttachment:
     exit_policy: TailnetExitPolicy | None = None
     ephemeral_pause_policy: TailnetEphemeralPausePolicy | None = None
     provider: TailnetProvider = "tailscale"
+    profile_id: str | None = None
+    profile_revision: int = 0
 
 
 @dataclass(frozen=True)

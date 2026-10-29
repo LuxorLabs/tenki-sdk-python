@@ -142,6 +142,7 @@ class AsyncClient:
         sticky: bool = False,
         wait_for_runtime: bool = False,
         tailnet: TailnetAttachment | None = None,
+        disable_tailnet: bool = False,
         _owns_client: bool = False,
     ) -> AsyncSandbox:
         """Create a sandbox.
@@ -203,6 +204,7 @@ class AsyncClient:
             wait_ready=wait and wait_for_runtime,
             wait_for_runtime=wait_for_runtime,
             tailnet=tailnet,
+            disable_tailnet=disable_tailnet,
         )
 
         try:

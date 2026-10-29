@@ -4,6 +4,7 @@ import grpc
 
 from tenki_sandbox._internal.proto.tenki.sandbox.v1 import registry_pb2 as tenki_dot_sandbox_dot_v1_dot_registry__pb2
 from tenki_sandbox._internal.proto.tenki.sandbox.v1 import sandbox_pb2 as tenki_dot_sandbox_dot_v1_dot_sandbox__pb2
+from tenki_sandbox._internal.proto.tenki.sandbox.v1 import tailnet_connection_pb2 as tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2
 from tenki_sandbox._internal.proto.tenki.sandbox.v1 import template_pb2 as tenki_dot_sandbox_dot_v1_dot_template__pb2
 
 
@@ -20,6 +21,46 @@ class SandboxServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.GetTailnetDefaults = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/GetTailnetDefaults',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.GetTailnetDefaultsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.GetTailnetDefaultsResponse.FromString,
+                _registered_method=True)
+        self.SaveTailnetDefaults = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/SaveTailnetDefaults',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetDefaultsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetDefaultsResponse.FromString,
+                _registered_method=True)
+        self.ListTailnetRunnerStatuses = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/ListTailnetRunnerStatuses',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerStatusesRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerStatusesResponse.FromString,
+                _registered_method=True)
+        self.SaveTailnetRunnerConfiguration = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/SaveTailnetRunnerConfiguration',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetRunnerConfigurationRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetRunnerConfigurationResponse.FromString,
+                _registered_method=True)
+        self.ListTailnetRunnerConfigurations = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/ListTailnetRunnerConfigurations',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerConfigurationsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerConfigurationsResponse.FromString,
+                _registered_method=True)
+        self.SaveTailnetConnection = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/SaveTailnetConnection',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetConnectionRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetConnectionResponse.FromString,
+                _registered_method=True)
+        self.ListTailnetConnections = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/ListTailnetConnections',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetConnectionsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetConnectionsResponse.FromString,
+                _registered_method=True)
+        self.TestTailnetConnection = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/TestTailnetConnection',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.TestTailnetConnectionRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.TestTailnetConnectionResponse.FromString,
+                _registered_method=True)
         self.CreateSession = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/CreateSession',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionRequest.SerializeToString,
@@ -438,6 +479,54 @@ class SandboxServiceServicer(object):
     =============================================================================
 
     """
+
+    def GetTailnetDefaults(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SaveTailnetDefaults(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListTailnetRunnerStatuses(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SaveTailnetRunnerConfiguration(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListTailnetRunnerConfigurations(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SaveTailnetConnection(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListTailnetConnections(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def TestTailnetConnection(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
 
     def CreateSession(self, request, context):
         """Missing associated documentation comment in .proto file."""
@@ -944,6 +1033,46 @@ class SandboxServiceServicer(object):
 
 def add_SandboxServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'GetTailnetDefaults': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTailnetDefaults,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.GetTailnetDefaultsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.GetTailnetDefaultsResponse.SerializeToString,
+            ),
+            'SaveTailnetDefaults': grpc.unary_unary_rpc_method_handler(
+                    servicer.SaveTailnetDefaults,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetDefaultsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetDefaultsResponse.SerializeToString,
+            ),
+            'ListTailnetRunnerStatuses': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListTailnetRunnerStatuses,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerStatusesRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerStatusesResponse.SerializeToString,
+            ),
+            'SaveTailnetRunnerConfiguration': grpc.unary_unary_rpc_method_handler(
+                    servicer.SaveTailnetRunnerConfiguration,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetRunnerConfigurationRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetRunnerConfigurationResponse.SerializeToString,
+            ),
+            'ListTailnetRunnerConfigurations': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListTailnetRunnerConfigurations,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerConfigurationsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerConfigurationsResponse.SerializeToString,
+            ),
+            'SaveTailnetConnection': grpc.unary_unary_rpc_method_handler(
+                    servicer.SaveTailnetConnection,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetConnectionRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetConnectionResponse.SerializeToString,
+            ),
+            'ListTailnetConnections': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListTailnetConnections,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetConnectionsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetConnectionsResponse.SerializeToString,
+            ),
+            'TestTailnetConnection': grpc.unary_unary_rpc_method_handler(
+                    servicer.TestTailnetConnection,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.TestTailnetConnectionRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.TestTailnetConnectionResponse.SerializeToString,
+            ),
             'CreateSession': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateSession,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionRequest.FromString,
@@ -1368,6 +1497,222 @@ class SandboxService(object):
     =============================================================================
 
     """
+
+    @staticmethod
+    def GetTailnetDefaults(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/GetTailnetDefaults',
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.GetTailnetDefaultsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.GetTailnetDefaultsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SaveTailnetDefaults(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/SaveTailnetDefaults',
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetDefaultsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetDefaultsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListTailnetRunnerStatuses(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/ListTailnetRunnerStatuses',
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerStatusesRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerStatusesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SaveTailnetRunnerConfiguration(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/SaveTailnetRunnerConfiguration',
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetRunnerConfigurationRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetRunnerConfigurationResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListTailnetRunnerConfigurations(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/ListTailnetRunnerConfigurations',
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerConfigurationsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetRunnerConfigurationsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SaveTailnetConnection(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/SaveTailnetConnection',
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetConnectionRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.SaveTailnetConnectionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListTailnetConnections(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/ListTailnetConnections',
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetConnectionsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.ListTailnetConnectionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def TestTailnetConnection(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/TestTailnetConnection',
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.TestTailnetConnectionRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2.TestTailnetConnectionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
 
     @staticmethod
     def CreateSession(request,

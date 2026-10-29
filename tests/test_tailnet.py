@@ -92,6 +92,17 @@ def test_tailnet_request_and_status_conversion():
     assert status.device_retained is True
 
 
+def test_workspace_default_opt_out():
+    request = build_create_session_request(disable_tailnet=True)
+    assert request.disable_tailnet is True
+    assert not request.HasField("tailnet")
+    inherited = build_create_session_request()
+    assert inherited.disable_tailnet is False
+    assert not inherited.HasField("tailnet")
+    with pytest.raises(ValueError, match="choose a Tailscale connection"):
+        build_create_session_request(disable_tailnet=True, tailnet=attachment())
+
+
 def test_tailnet_auth_key_repr_is_redacted():
     key = TailnetAuthKey("tskey-auth-secret")
     rendered = f"{key!s} {key!r} {TailnetAttachment(auth_key=key)!r}"
@@ -169,3 +180,30 @@ async def test_async_client_uses_shared_tailnet_mapping():
 
     assert_tailnet_request(rpc.request)
     assert sandbox.tailnet_status == sandbox.info.tailnet_status
+
+
+def test_saved_profile_reference_and_credential_exclusivity():
+    from tenki_sandbox.client import _tailnet_attachment_proto
+
+    profile_id = "11111111-1111-4111-8111-111111111111"
+    request = _tailnet_attachment_proto(TailnetAttachment(profile_id=profile_id, profile_revision=3))
+    assert request.WhichOneof("credential") == "profile_id"
+    assert request.profile_id == profile_id
+    assert request.profile_revision == 3
+    assert request.auth_key == ""
+    with pytest.raises(ValueError, match="one tailnet credential"):
+        _tailnet_attachment_proto(TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), profile_id=profile_id))
+
+
+@pytest.mark.asyncio
+async def test_saved_profile_reference_reaches_async_client():
+    rpc = AsyncRPC()
+    profile_id = "11111111-1111-4111-8111-111111111111"
+    await AsyncClient(rpc=rpc).create(
+        wait=False,
+        tailnet=TailnetAttachment(profile_id=profile_id, profile_revision=3),
+    )
+    assert rpc.request.tailnet.WhichOneof("credential") == "profile_id"
+    assert rpc.request.tailnet.profile_id == profile_id
+    assert rpc.request.tailnet.profile_revision == 3
+    assert rpc.request.tailnet.auth_key == ""
