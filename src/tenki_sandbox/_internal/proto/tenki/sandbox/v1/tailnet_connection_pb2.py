@@ -22,9 +22,10 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
+from tenki_sandbox._internal.proto.buf.validate import validate_pb2 as buf_dot_validate_dot_validate__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n)tenki/sandbox/v1/tailnet_connection.proto\x12\x10tenki.sandbox.v1\"\xb5\x02\n\x11TailnetConnection\x12\x0e\n\x02id\x18\x01 \x01(\tR\x02id\x12!\n\x0cworkspace_id\x18\x02 \x01(\tR\x0bworkspaceId\x12\x12\n\x04name\x18\x03 \x01(\tR\x04name\x12\x1a\n\x08revision\x18\x04 \x01(\rR\x08revision\x12\x1b\n\tclient_id\x18\x05 \x01(\tR\x08\x63lientId\x12\x16\n\x06issuer\x18\x06 \x01(\tR\x06issuer\x12\x1a\n\x08\x61udience\x18\x07 \x01(\tR\x08\x61udience\x12\'\n\x0f\x61uthorized_tags\x18\x08 \x03(\tR\x0e\x61uthorizedTags\x12\x1a\n\x08\x64isabled\x18\t \x01(\x08R\x08\x64isabled\x12\'\n\x0fsubject_pattern\x18\n \x01(\tR\x0esubjectPattern\"\x90\x01\n\x1cSaveTailnetConnectionRequest\x12\x43\n\nconnection\x18\x01 \x01(\x0b\x32#.tenki.sandbox.v1.TailnetConnectionR\nconnection\x12+\n\x11\x65xpected_revision\x18\x02 \x01(\rR\x10\x65xpectedRevision\"d\n\x1dSaveTailnetConnectionResponse\x12\x43\n\nconnection\x18\x01 \x01(\x0b\x32#.tenki.sandbox.v1.TailnetConnectionR\nconnection\"B\n\x1dListTailnetConnectionsRequest\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\"\x88\x01\n\x1eListTailnetConnectionsResponse\x12\x45\n\x0b\x63onnections\x18\x01 \x03(\x0b\x32#.tenki.sandbox.v1.TailnetConnectionR\x0b\x63onnections\x12\x1f\n\x0boidc_issuer\x18\x02 \x01(\tR\noidcIssuer\"\x82\x01\n\x1cTestTailnetConnectionRequest\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\x12#\n\rconnection_id\x18\x02 \x01(\tR\x0c\x63onnectionId\x12\x1a\n\x08\x65ndpoint\x18\x03 \x01(\tR\x08\x65ndpoint\"\xa8\x01\n\x1dTestTailnetConnectionResponse\x12\x1d\n\nsession_id\x18\x01 \x01(\tR\tsessionId\x12\x1a\n\x08\x65nrolled\x18\x02 \x01(\x08R\x08\x65nrolled\x12-\n\x12\x65ndpoint_reachable\x18\x03 \x01(\x08R\x11\x65ndpointReachable\x12\x1d\n\nerror_code\x18\x04 \x01(\tR\terrorCode\"\xd6\x02\n\x1aTailnetRunnerConfiguration\x12\x0e\n\x02id\x18\x01 \x01(\tR\x02id\x12!\n\x0cworkspace_id\x18\x02 \x01(\tR\x0bworkspaceId\x12\x1f\n\x0boffering_id\x18\x03 \x01(\tR\nofferingId\x12#\n\rconnection_id\x18\x04 \x01(\tR\x0c\x63onnectionId\x12\x1a\n\x08revision\x18\x05 \x01(\rR\x08revision\x12%\n\x0erepository_ids\x18\x06 \x03(\x03R\rrepositoryIds\x12\x1d\n\njob_access\x18\x07 \x01(\tR\tjobAccess\x12\x1a\n\x08\x64isabled\x18\x08 \x01(\x08R\x08\x64isabled\x12\x14\n\x05label\x18\t \x01(\tR\x05label\x12+\n\x11workspace_default\x18\n \x01(\x08R\x10workspaceDefault\"\x84\x01\n\x0fTailnetDefaults\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\x12\x32\n\x15sandbox_connection_id\x18\x02 \x01(\tR\x13sandboxConnectionId\x12\x1a\n\x08revision\x18\x03 \x01(\rR\x08revision\">\n\x19GetTailnetDefaultsRequest\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\"[\n\x1aGetTailnetDefaultsResponse\x12=\n\x08\x64\x65\x66\x61ults\x18\x01 \x01(\x0b\x32!.tenki.sandbox.v1.TailnetDefaultsR\x08\x64\x65\x66\x61ults\"\x88\x01\n\x1aSaveTailnetDefaultsRequest\x12=\n\x08\x64\x65\x66\x61ults\x18\x01 \x01(\x0b\x32!.tenki.sandbox.v1.TailnetDefaultsR\x08\x64\x65\x66\x61ults\x12+\n\x11\x65xpected_revision\x18\x02 \x01(\rR\x10\x65xpectedRevision\"\\\n\x1bSaveTailnetDefaultsResponse\x12=\n\x08\x64\x65\x66\x61ults\x18\x01 \x01(\x0b\x32!.tenki.sandbox.v1.TailnetDefaultsR\x08\x64\x65\x66\x61ults\"\xd2\x01\n%SaveTailnetRunnerConfigurationRequest\x12R\n\rconfiguration\x18\x01 \x01(\x0b\x32,.tenki.sandbox.v1.TailnetRunnerConfigurationR\rconfiguration\x12(\n\x10\x62\x61se_offering_id\x18\x02 \x01(\tR\x0e\x62\x61seOfferingId\x12+\n\x11\x65xpected_revision\x18\x03 \x01(\rR\x10\x65xpectedRevision\"|\n&SaveTailnetRunnerConfigurationResponse\x12R\n\rconfiguration\x18\x01 \x01(\x0b\x32,.tenki.sandbox.v1.TailnetRunnerConfigurationR\rconfiguration\"K\n&ListTailnetRunnerConfigurationsRequest\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\"\x7f\n\'ListTailnetRunnerConfigurationsResponse\x12T\n\x0e\x63onfigurations\x18\x01 \x03(\x0b\x32,.tenki.sandbox.v1.TailnetRunnerConfigurationR\x0e\x63onfigurations\"\x87\x01\n ListTailnetRunnerStatusesRequest\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\x12)\n\x10\x63onfiguration_id\x18\x02 \x01(\tR\x0f\x63onfigurationId\x12\x15\n\x06job_id\x18\x03 \x01(\x03R\x05jobId\"\xb7\x02\n\x13TailnetRunnerStatus\x12\x1d\n\nsession_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n\x0brunner_name\x18\x02 \x01(\tR\nrunnerName\x12\'\n\x0f\x63onnection_name\x18\x03 \x01(\tR\x0e\x63onnectionName\x12/\n\x13\x63onnection_revision\x18\x04 \x01(\rR\x12\x63onnectionRevision\x12\x14\n\x05state\x18\x05 \x01(\tR\x05state\x12\x1a\n\x08hostname\x18\x06 \x01(\tR\x08hostname\x12\x10\n\x03ips\x18\x07 \x03(\tR\x03ips\x12\x1d\n\nerror_code\x18\x08 \x01(\tR\terrorCode\x12#\n\rjob_admission\x18\t \x01(\tR\x0cjobAdmission\"f\n!ListTailnetRunnerStatusesResponse\x12\x41\n\x08statuses\x18\x01 \x03(\x0b\x32%.tenki.sandbox.v1.TailnetRunnerStatusR\x08statusesB\xe5\x01\n\x14\x63om.tenki.sandbox.v1B\x16TailnetConnectionProtoP\x01ZSgithub.com/LuxorLabs/tenki-sdk-go/sandbox/internal/proto/tenki/sandbox/v1;sandboxv1\xa2\x02\x03TSX\xaa\x02\x10Tenki.Sandbox.V1\xca\x02\x10Tenki\\Sandbox\\V1\xe2\x02\x1cTenki\\Sandbox\\V1\\GPBMetadata\xea\x02\x12Tenki::Sandbox::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n)tenki/sandbox/v1/tailnet_connection.proto\x12\x10tenki.sandbox.v1\x1a\x1b\x62uf/validate/validate.proto\"\xb5\x02\n\x11TailnetConnection\x12\x0e\n\x02id\x18\x01 \x01(\tR\x02id\x12!\n\x0cworkspace_id\x18\x02 \x01(\tR\x0bworkspaceId\x12\x12\n\x04name\x18\x03 \x01(\tR\x04name\x12\x1a\n\x08revision\x18\x04 \x01(\rR\x08revision\x12\x1b\n\tclient_id\x18\x05 \x01(\tR\x08\x63lientId\x12\x16\n\x06issuer\x18\x06 \x01(\tR\x06issuer\x12\x1a\n\x08\x61udience\x18\x07 \x01(\tR\x08\x61udience\x12\'\n\x0f\x61uthorized_tags\x18\x08 \x03(\tR\x0e\x61uthorizedTags\x12\x1a\n\x08\x64isabled\x18\t \x01(\x08R\x08\x64isabled\x12\'\n\x0fsubject_pattern\x18\n \x01(\tR\x0esubjectPattern\"\x90\x01\n\x1cSaveTailnetConnectionRequest\x12\x43\n\nconnection\x18\x01 \x01(\x0b\x32#.tenki.sandbox.v1.TailnetConnectionR\nconnection\x12+\n\x11\x65xpected_revision\x18\x02 \x01(\rR\x10\x65xpectedRevision\"d\n\x1dSaveTailnetConnectionResponse\x12\x43\n\nconnection\x18\x01 \x01(\x0b\x32#.tenki.sandbox.v1.TailnetConnectionR\nconnection\"\xed\x01\n\x1dListTailnetConnectionsRequest\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\x12&\n\tpage_size\x18\x02 \x01(\x05\x42\t\xbaH\x06\x1a\x04\x18\x64(\x00R\x08pageSize\x12\x1d\n\npage_token\x18\x03 \x01(\tR\tpageToken\x12 \n\x06search\x18\x04 \x01(\tB\x08\xbaH\x05r\x03\x18\x80\x02R\x06search\x12#\n\rdisabled_only\x18\x05 \x01(\x08R\x0c\x64isabledOnly\x12\x1b\n\tsort_desc\x18\x06 \x01(\x08R\x08sortDesc\"\xed\x01\n\x1eListTailnetConnectionsResponse\x12\x45\n\x0b\x63onnections\x18\x01 \x03(\x0b\x32#.tenki.sandbox.v1.TailnetConnectionR\x0b\x63onnections\x12\x1f\n\x0boidc_issuer\x18\x02 \x01(\tR\noidcIssuer\x12&\n\x0fnext_page_token\x18\x03 \x01(\tR\rnextPageToken\x12\x14\n\x05total\x18\x04 \x01(\x05R\x05total\x12%\n\x0e\x64isabled_total\x18\x05 \x01(\x05R\rdisabledTotal\"\x82\x01\n\x1cTestTailnetConnectionRequest\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\x12#\n\rconnection_id\x18\x02 \x01(\tR\x0c\x63onnectionId\x12\x1a\n\x08\x65ndpoint\x18\x03 \x01(\tR\x08\x65ndpoint\"\xa8\x01\n\x1dTestTailnetConnectionResponse\x12\x1d\n\nsession_id\x18\x01 \x01(\tR\tsessionId\x12\x1a\n\x08\x65nrolled\x18\x02 \x01(\x08R\x08\x65nrolled\x12-\n\x12\x65ndpoint_reachable\x18\x03 \x01(\x08R\x11\x65ndpointReachable\x12\x1d\n\nerror_code\x18\x04 \x01(\tR\terrorCode\"\xd6\x02\n\x1aTailnetRunnerConfiguration\x12\x0e\n\x02id\x18\x01 \x01(\tR\x02id\x12!\n\x0cworkspace_id\x18\x02 \x01(\tR\x0bworkspaceId\x12\x1f\n\x0boffering_id\x18\x03 \x01(\tR\nofferingId\x12#\n\rconnection_id\x18\x04 \x01(\tR\x0c\x63onnectionId\x12\x1a\n\x08revision\x18\x05 \x01(\rR\x08revision\x12%\n\x0erepository_ids\x18\x06 \x03(\x03R\rrepositoryIds\x12\x1d\n\njob_access\x18\x07 \x01(\tR\tjobAccess\x12\x1a\n\x08\x64isabled\x18\x08 \x01(\x08R\x08\x64isabled\x12\x14\n\x05label\x18\t \x01(\tR\x05label\x12+\n\x11workspace_default\x18\n \x01(\x08R\x10workspaceDefault\"\x84\x01\n\x0fTailnetDefaults\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\x12\x32\n\x15sandbox_connection_id\x18\x02 \x01(\tR\x13sandboxConnectionId\x12\x1a\n\x08revision\x18\x03 \x01(\rR\x08revision\">\n\x19GetTailnetDefaultsRequest\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\"[\n\x1aGetTailnetDefaultsResponse\x12=\n\x08\x64\x65\x66\x61ults\x18\x01 \x01(\x0b\x32!.tenki.sandbox.v1.TailnetDefaultsR\x08\x64\x65\x66\x61ults\"\x88\x01\n\x1aSaveTailnetDefaultsRequest\x12=\n\x08\x64\x65\x66\x61ults\x18\x01 \x01(\x0b\x32!.tenki.sandbox.v1.TailnetDefaultsR\x08\x64\x65\x66\x61ults\x12+\n\x11\x65xpected_revision\x18\x02 \x01(\rR\x10\x65xpectedRevision\"\\\n\x1bSaveTailnetDefaultsResponse\x12=\n\x08\x64\x65\x66\x61ults\x18\x01 \x01(\x0b\x32!.tenki.sandbox.v1.TailnetDefaultsR\x08\x64\x65\x66\x61ults\"\xd2\x01\n%SaveTailnetRunnerConfigurationRequest\x12R\n\rconfiguration\x18\x01 \x01(\x0b\x32,.tenki.sandbox.v1.TailnetRunnerConfigurationR\rconfiguration\x12(\n\x10\x62\x61se_offering_id\x18\x02 \x01(\tR\x0e\x62\x61seOfferingId\x12+\n\x11\x65xpected_revision\x18\x03 \x01(\rR\x10\x65xpectedRevision\"|\n&SaveTailnetRunnerConfigurationResponse\x12R\n\rconfiguration\x18\x01 \x01(\x0b\x32,.tenki.sandbox.v1.TailnetRunnerConfigurationR\rconfiguration\"\xed\x02\n&ListTailnetRunnerConfigurationsRequest\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\x12&\n\tpage_size\x18\x02 \x01(\x05\x42\t\xbaH\x06\x1a\x04\x18\x64(\x00R\x08pageSize\x12\x1d\n\npage_token\x18\x03 \x01(\tR\tpageToken\x12 \n\x06search\x18\x04 \x01(\tB\x08\xbaH\x05r\x03\x18\x80\x02R\x06search\x12#\n\rdisabled_only\x18\x05 \x01(\x08R\x0c\x64isabledOnly\x12%\n\x0e\x64\x65\x64icated_only\x18\x06 \x01(\x08R\rdedicatedOnly\x12N\n\x07sort_by\x18\x07 \x01(\x0e\x32\x35.tenki.sandbox.v1.TailnetRunnerConfigurationSortFieldR\x06sortBy\x12\x1b\n\tsort_desc\x18\x08 \x01(\x08R\x08sortDesc\"\xe4\x01\n\'ListTailnetRunnerConfigurationsResponse\x12T\n\x0e\x63onfigurations\x18\x01 \x03(\x0b\x32,.tenki.sandbox.v1.TailnetRunnerConfigurationR\x0e\x63onfigurations\x12&\n\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\x12\x14\n\x05total\x18\x03 \x01(\x05R\x05total\x12%\n\x0e\x64isabled_total\x18\x04 \x01(\x05R\rdisabledTotal\"\x87\x01\n ListTailnetRunnerStatusesRequest\x12!\n\x0cworkspace_id\x18\x01 \x01(\tR\x0bworkspaceId\x12)\n\x10\x63onfiguration_id\x18\x02 \x01(\tR\x0f\x63onfigurationId\x12\x15\n\x06job_id\x18\x03 \x01(\x03R\x05jobId\"\xb7\x02\n\x13TailnetRunnerStatus\x12\x1d\n\nsession_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n\x0brunner_name\x18\x02 \x01(\tR\nrunnerName\x12\'\n\x0f\x63onnection_name\x18\x03 \x01(\tR\x0e\x63onnectionName\x12/\n\x13\x63onnection_revision\x18\x04 \x01(\rR\x12\x63onnectionRevision\x12\x14\n\x05state\x18\x05 \x01(\tR\x05state\x12\x1a\n\x08hostname\x18\x06 \x01(\tR\x08hostname\x12\x10\n\x03ips\x18\x07 \x03(\tR\x03ips\x12\x1d\n\nerror_code\x18\x08 \x01(\tR\terrorCode\x12#\n\rjob_admission\x18\t \x01(\tR\x0cjobAdmission\"f\n!ListTailnetRunnerStatusesResponse\x12\x41\n\x08statuses\x18\x01 \x03(\x0b\x32%.tenki.sandbox.v1.TailnetRunnerStatusR\x08statuses*\x91\x01\n#TailnetRunnerConfigurationSortField\x12\x37\n3TAILNET_RUNNER_CONFIGURATION_SORT_FIELD_UNSPECIFIED\x10\x00\x12\x31\n-TAILNET_RUNNER_CONFIGURATION_SORT_FIELD_LABEL\x10\x01\x42\xe5\x01\n\x14\x63om.tenki.sandbox.v1B\x16TailnetConnectionProtoP\x01ZSgithub.com/LuxorLabs/tenki-sdk-go/sandbox/internal/proto/tenki/sandbox/v1;sandboxv1\xa2\x02\x03TSX\xaa\x02\x10Tenki.Sandbox.V1\xca\x02\x10Tenki\\Sandbox\\V1\xe2\x02\x1cTenki\\Sandbox\\V1\\GPBMetadata\xea\x02\x12Tenki::Sandbox::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,44 +33,54 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'tenki.sandbox.v1.tailnet_co
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\024com.tenki.sandbox.v1B\026TailnetConnectionProtoP\001ZSgithub.com/LuxorLabs/tenki-sdk-go/sandbox/internal/proto/tenki/sandbox/v1;sandboxv1\242\002\003TSX\252\002\020Tenki.Sandbox.V1\312\002\020Tenki\\Sandbox\\V1\342\002\034Tenki\\Sandbox\\V1\\GPBMetadata\352\002\022Tenki::Sandbox::V1'
-  _globals['_TAILNETCONNECTION']._serialized_start=64
-  _globals['_TAILNETCONNECTION']._serialized_end=373
-  _globals['_SAVETAILNETCONNECTIONREQUEST']._serialized_start=376
-  _globals['_SAVETAILNETCONNECTIONREQUEST']._serialized_end=520
-  _globals['_SAVETAILNETCONNECTIONRESPONSE']._serialized_start=522
-  _globals['_SAVETAILNETCONNECTIONRESPONSE']._serialized_end=622
-  _globals['_LISTTAILNETCONNECTIONSREQUEST']._serialized_start=624
-  _globals['_LISTTAILNETCONNECTIONSREQUEST']._serialized_end=690
-  _globals['_LISTTAILNETCONNECTIONSRESPONSE']._serialized_start=693
-  _globals['_LISTTAILNETCONNECTIONSRESPONSE']._serialized_end=829
-  _globals['_TESTTAILNETCONNECTIONREQUEST']._serialized_start=832
-  _globals['_TESTTAILNETCONNECTIONREQUEST']._serialized_end=962
-  _globals['_TESTTAILNETCONNECTIONRESPONSE']._serialized_start=965
-  _globals['_TESTTAILNETCONNECTIONRESPONSE']._serialized_end=1133
-  _globals['_TAILNETRUNNERCONFIGURATION']._serialized_start=1136
-  _globals['_TAILNETRUNNERCONFIGURATION']._serialized_end=1478
-  _globals['_TAILNETDEFAULTS']._serialized_start=1481
-  _globals['_TAILNETDEFAULTS']._serialized_end=1613
-  _globals['_GETTAILNETDEFAULTSREQUEST']._serialized_start=1615
-  _globals['_GETTAILNETDEFAULTSREQUEST']._serialized_end=1677
-  _globals['_GETTAILNETDEFAULTSRESPONSE']._serialized_start=1679
-  _globals['_GETTAILNETDEFAULTSRESPONSE']._serialized_end=1770
-  _globals['_SAVETAILNETDEFAULTSREQUEST']._serialized_start=1773
-  _globals['_SAVETAILNETDEFAULTSREQUEST']._serialized_end=1909
-  _globals['_SAVETAILNETDEFAULTSRESPONSE']._serialized_start=1911
-  _globals['_SAVETAILNETDEFAULTSRESPONSE']._serialized_end=2003
-  _globals['_SAVETAILNETRUNNERCONFIGURATIONREQUEST']._serialized_start=2006
-  _globals['_SAVETAILNETRUNNERCONFIGURATIONREQUEST']._serialized_end=2216
-  _globals['_SAVETAILNETRUNNERCONFIGURATIONRESPONSE']._serialized_start=2218
-  _globals['_SAVETAILNETRUNNERCONFIGURATIONRESPONSE']._serialized_end=2342
-  _globals['_LISTTAILNETRUNNERCONFIGURATIONSREQUEST']._serialized_start=2344
-  _globals['_LISTTAILNETRUNNERCONFIGURATIONSREQUEST']._serialized_end=2419
-  _globals['_LISTTAILNETRUNNERCONFIGURATIONSRESPONSE']._serialized_start=2421
-  _globals['_LISTTAILNETRUNNERCONFIGURATIONSRESPONSE']._serialized_end=2548
-  _globals['_LISTTAILNETRUNNERSTATUSESREQUEST']._serialized_start=2551
-  _globals['_LISTTAILNETRUNNERSTATUSESREQUEST']._serialized_end=2686
-  _globals['_TAILNETRUNNERSTATUS']._serialized_start=2689
-  _globals['_TAILNETRUNNERSTATUS']._serialized_end=3000
-  _globals['_LISTTAILNETRUNNERSTATUSESRESPONSE']._serialized_start=3002
-  _globals['_LISTTAILNETRUNNERSTATUSESRESPONSE']._serialized_end=3104
+  _globals['_LISTTAILNETCONNECTIONSREQUEST'].fields_by_name['page_size']._loaded_options = None
+  _globals['_LISTTAILNETCONNECTIONSREQUEST'].fields_by_name['page_size']._serialized_options = b'\272H\006\032\004\030d(\000'
+  _globals['_LISTTAILNETCONNECTIONSREQUEST'].fields_by_name['search']._loaded_options = None
+  _globals['_LISTTAILNETCONNECTIONSREQUEST'].fields_by_name['search']._serialized_options = b'\272H\005r\003\030\200\002'
+  _globals['_LISTTAILNETRUNNERCONFIGURATIONSREQUEST'].fields_by_name['page_size']._loaded_options = None
+  _globals['_LISTTAILNETRUNNERCONFIGURATIONSREQUEST'].fields_by_name['page_size']._serialized_options = b'\272H\006\032\004\030d(\000'
+  _globals['_LISTTAILNETRUNNERCONFIGURATIONSREQUEST'].fields_by_name['search']._loaded_options = None
+  _globals['_LISTTAILNETRUNNERCONFIGURATIONSREQUEST'].fields_by_name['search']._serialized_options = b'\272H\005r\003\030\200\002'
+  _globals['_TAILNETRUNNERCONFIGURATIONSORTFIELD']._serialized_start=3802
+  _globals['_TAILNETRUNNERCONFIGURATIONSORTFIELD']._serialized_end=3947
+  _globals['_TAILNETCONNECTION']._serialized_start=93
+  _globals['_TAILNETCONNECTION']._serialized_end=402
+  _globals['_SAVETAILNETCONNECTIONREQUEST']._serialized_start=405
+  _globals['_SAVETAILNETCONNECTIONREQUEST']._serialized_end=549
+  _globals['_SAVETAILNETCONNECTIONRESPONSE']._serialized_start=551
+  _globals['_SAVETAILNETCONNECTIONRESPONSE']._serialized_end=651
+  _globals['_LISTTAILNETCONNECTIONSREQUEST']._serialized_start=654
+  _globals['_LISTTAILNETCONNECTIONSREQUEST']._serialized_end=891
+  _globals['_LISTTAILNETCONNECTIONSRESPONSE']._serialized_start=894
+  _globals['_LISTTAILNETCONNECTIONSRESPONSE']._serialized_end=1131
+  _globals['_TESTTAILNETCONNECTIONREQUEST']._serialized_start=1134
+  _globals['_TESTTAILNETCONNECTIONREQUEST']._serialized_end=1264
+  _globals['_TESTTAILNETCONNECTIONRESPONSE']._serialized_start=1267
+  _globals['_TESTTAILNETCONNECTIONRESPONSE']._serialized_end=1435
+  _globals['_TAILNETRUNNERCONFIGURATION']._serialized_start=1438
+  _globals['_TAILNETRUNNERCONFIGURATION']._serialized_end=1780
+  _globals['_TAILNETDEFAULTS']._serialized_start=1783
+  _globals['_TAILNETDEFAULTS']._serialized_end=1915
+  _globals['_GETTAILNETDEFAULTSREQUEST']._serialized_start=1917
+  _globals['_GETTAILNETDEFAULTSREQUEST']._serialized_end=1979
+  _globals['_GETTAILNETDEFAULTSRESPONSE']._serialized_start=1981
+  _globals['_GETTAILNETDEFAULTSRESPONSE']._serialized_end=2072
+  _globals['_SAVETAILNETDEFAULTSREQUEST']._serialized_start=2075
+  _globals['_SAVETAILNETDEFAULTSREQUEST']._serialized_end=2211
+  _globals['_SAVETAILNETDEFAULTSRESPONSE']._serialized_start=2213
+  _globals['_SAVETAILNETDEFAULTSRESPONSE']._serialized_end=2305
+  _globals['_SAVETAILNETRUNNERCONFIGURATIONREQUEST']._serialized_start=2308
+  _globals['_SAVETAILNETRUNNERCONFIGURATIONREQUEST']._serialized_end=2518
+  _globals['_SAVETAILNETRUNNERCONFIGURATIONRESPONSE']._serialized_start=2520
+  _globals['_SAVETAILNETRUNNERCONFIGURATIONRESPONSE']._serialized_end=2644
+  _globals['_LISTTAILNETRUNNERCONFIGURATIONSREQUEST']._serialized_start=2647
+  _globals['_LISTTAILNETRUNNERCONFIGURATIONSREQUEST']._serialized_end=3012
+  _globals['_LISTTAILNETRUNNERCONFIGURATIONSRESPONSE']._serialized_start=3015
+  _globals['_LISTTAILNETRUNNERCONFIGURATIONSRESPONSE']._serialized_end=3243
+  _globals['_LISTTAILNETRUNNERSTATUSESREQUEST']._serialized_start=3246
+  _globals['_LISTTAILNETRUNNERSTATUSESREQUEST']._serialized_end=3381
+  _globals['_TAILNETRUNNERSTATUS']._serialized_start=3384
+  _globals['_TAILNETRUNNERSTATUS']._serialized_end=3695
+  _globals['_LISTTAILNETRUNNERSTATUSESRESPONSE']._serialized_start=3697
+  _globals['_LISTTAILNETRUNNERSTATUSESRESPONSE']._serialized_end=3799
 # @@protoc_insertion_point(module_scope)
