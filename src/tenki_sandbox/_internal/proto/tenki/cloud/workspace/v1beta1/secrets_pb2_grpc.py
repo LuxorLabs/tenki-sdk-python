@@ -64,6 +64,16 @@ class WorkspaceSecretsServiceStub(object):
                 request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesRequest.SerializeToString,
                 response_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesResponse.FromString,
                 _registered_method=True)
+        self.StartSecretImport = channel.unary_unary(
+                '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/StartSecretImport',
+                request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.StartSecretImportRequest.SerializeToString,
+                response_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.StartSecretImportResponse.FromString,
+                _registered_method=True)
+        self.GetSecretImport = channel.unary_unary(
+                '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/GetSecretImport',
+                request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretImportRequest.SerializeToString,
+                response_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretImportResponse.FromString,
+                _registered_method=True)
         self.ListSecretVersions = channel.unary_unary(
                 '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/ListSecretVersions',
                 request_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretVersionsRequest.SerializeToString,
@@ -144,6 +154,19 @@ class WorkspaceSecretsServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StartSecretImport(self, request, context):
+        """Pushes a temporary branch whose workflow sends the repository's secrets back to Tenki.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSecretImport(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def ListSecretVersions(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -214,6 +237,16 @@ def add_WorkspaceSecretsServiceServicer_to_server(servicer, server):
                     servicer.ListSecretRepositories,
                     request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesRequest.FromString,
                     response_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesResponse.SerializeToString,
+            ),
+            'StartSecretImport': grpc.unary_unary_rpc_method_handler(
+                    servicer.StartSecretImport,
+                    request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.StartSecretImportRequest.FromString,
+                    response_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.StartSecretImportResponse.SerializeToString,
+            ),
+            'GetSecretImport': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSecretImport,
+                    request_deserializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretImportRequest.FromString,
+                    response_serializer=tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretImportResponse.SerializeToString,
             ),
             'ListSecretVersions': grpc.unary_unary_rpc_method_handler(
                     servicer.ListSecretVersions,
@@ -501,6 +534,60 @@ class WorkspaceSecretsService(object):
             '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/ListSecretRepositories',
             tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesRequest.SerializeToString,
             tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.ListSecretRepositoriesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StartSecretImport(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/StartSecretImport',
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.StartSecretImportRequest.SerializeToString,
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.StartSecretImportResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSecretImport(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.cloud.workspace.v1beta1.WorkspaceSecretsService/GetSecretImport',
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretImportRequest.SerializeToString,
+            tenki_dot_cloud_dot_workspace_dot_v1beta1_dot_secrets__pb2.GetSecretImportResponse.FromString,
             options,
             channel_credentials,
             insecure,
