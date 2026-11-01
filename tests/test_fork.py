@@ -227,3 +227,16 @@ async def test_fork_reaches_the_grpc_stub_through_the_async_transport():
     assert request.count == 2
     assert ("authorization", "Bearer tk_test") in metadata
     assert [child.name for child in children] == ["eval-1"]
+
+
+def test_fork_forwards_workspace_counts_above_ten():
+    rpc = _ForkRPC()
+    Client(rpc=rpc).get("source-1").fork(count=11)
+    assert rpc.request.count == 11
+
+
+async def test_async_fork_forwards_workspace_counts_above_ten():
+    rpc = _AsyncForkRPC()
+    source = await AsyncClient(rpc=rpc).get("source-1")
+    await source.fork(count=11)
+    assert rpc.request.count == 11

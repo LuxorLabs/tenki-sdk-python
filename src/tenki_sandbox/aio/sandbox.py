@@ -732,8 +732,8 @@ class AsyncSandbox:
     async def fork(
         self, *, count: int = 1, name_prefix: str | None = None, wait: bool = False
     ) -> list["AsyncSandbox"]:
-        """Snapshot this RUNNING sandbox and start ``count`` children that continue from
-        its memory and disk while it keeps running; partial failures raise ForkFailedError."""
+        """Fork ``count`` children from RUNNING memory/disk while the parent continues.
+        Workspace policy caps count (default 10); partial failures raise ForkFailedError."""
         req = pb.ForkSessionRequest(
             session_id=self.id, count=count, name_prefix=name_prefix or "", wait=wait
         )
