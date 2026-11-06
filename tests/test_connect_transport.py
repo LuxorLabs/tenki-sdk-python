@@ -8,6 +8,7 @@ import socketserver
 import threading
 
 import pytest
+from _client_metadata import EXPECTED_CLIENT_METADATA, client_metadata_of
 
 from tenki_sandbox._internal.proto.tenki.sandbox.v1 import ssh_gateway_client_pb2 as ssh_pb
 from tenki_sandbox._transport import GrpcConfig, GrpcSandboxRPC
@@ -29,6 +30,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             "content_type": self.headers.get("Content-Type"),
             "authorization": self.headers.get("Authorization"),
             "connect_version": self.headers.get("Connect-Protocol-Version"),
+            "client_metadata": client_metadata_of(self.headers.items()),
             "body": body,
         })
         if type(self).legacy_only and self.path.startswith(SSH_SERVICE + "/"):
@@ -85,6 +87,7 @@ def test_issue_ssh_cert_uses_connect_protocol(connect_server):
     assert seen["content_type"] == "application/proto"
     assert seen["connect_version"] == "1"
     assert seen["authorization"] == "Bearer tk_test"
+    assert seen["client_metadata"] == EXPECTED_CLIENT_METADATA
     parsed = ssh_pb.IssueSandboxSSHCertRequest()
     parsed.ParseFromString(seen["body"])
     assert parsed.session_id == "sid-1"

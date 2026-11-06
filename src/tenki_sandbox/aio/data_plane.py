@@ -6,6 +6,7 @@ import re
 import threading
 from datetime import datetime, timezone
 
+from .._client_metadata import CLIENT_METADATA
 from .._pb import pb
 from .._transport import KEEPALIVE_CHANNEL_OPTIONS, grpc_target
 from ..data_plane import (
@@ -334,7 +335,7 @@ class AsyncGrpcDataPlaneRPC:
         )
         if credential:
             metadata += ((DATA_PLANE_CREDENTIAL_HEADER, credential),)
-        return metadata
+        return metadata + CLIENT_METADATA
 
     async def _wrap_stream(self, name: str, request):
         async for frame in request:

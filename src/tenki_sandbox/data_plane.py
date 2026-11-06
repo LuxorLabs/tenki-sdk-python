@@ -9,6 +9,7 @@ from typing import Iterable
 import grpc
 from google.protobuf.message import Message
 
+from ._client_metadata import CLIENT_METADATA
 from ._pb import pb
 from ._transport import KEEPALIVE_CHANNEL_OPTIONS, grpc_target
 
@@ -322,6 +323,7 @@ class GrpcDataPlaneRPC:
             )
             if credential:
                 metadata += ((DATA_PLANE_CREDENTIAL_HEADER, credential),)
+            metadata += CLIENT_METADATA
             wrapped = _wrap_request(name, request, self._session_id)
             resp = method(wrapped, *args, metadata=metadata, **kwargs)
             return _unwrap_response(name, resp)

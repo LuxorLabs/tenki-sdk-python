@@ -7,6 +7,7 @@ import warnings
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from _client_metadata import EXPECTED_CLIENT_METADATA
 from google.protobuf.duration_pb2 import Duration
 from google.protobuf.timestamp_pb2 import Timestamp
 
@@ -250,7 +251,10 @@ def test_padded_credentials_are_trimmed_not_conflicting(rpc=None):
 
 
 def test_auth_metadata_and_grpc_target_are_provider_friendly():
-    assert auth_metadata(" tk_test ") == (("authorization", "Bearer tk_test"),)
+    assert auth_metadata(" tk_test ") == (
+        ("authorization", "Bearer tk_test"),
+        *EXPECTED_CLIENT_METADATA.items(),
+    )
     assert grpc_target("https://api.tenki.cloud") == ("api.tenki.cloud:443", True)
     assert grpc_target("http://localhost:8090") == ("localhost:8090", False)
     assert grpc_target("localhost:8090") == ("localhost:8090", True)

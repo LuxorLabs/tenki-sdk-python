@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import grpc
 import pytest
+from _client_metadata import EXPECTED_CLIENT_METADATA, client_metadata_of
 from tenki_sandbox._pb import pb
 from tenki_sandbox.aio.data_plane import AsyncGrpcDataPlaneRPC
 from tenki_sandbox.data_plane import DataPlaneCredentialManager, GrpcDataPlaneRPC
@@ -28,10 +29,9 @@ def test_stream_session_binding_over_grpc(
     seen = []
 
     def consume(requests, context):
-        assert (
-            dict(context.invocation_metadata())["x-tenki-session-cert"]
-            == "stream-credential"
-        )
+        metadata = context.invocation_metadata()
+        assert dict(metadata)["x-tenki-session-cert"] == "stream-credential"
+        assert client_metadata_of(metadata) == EXPECTED_CLIENT_METADATA
         for request in requests:
             seen.append(getattr(request.frame, opening).session_id)
         return response_type()

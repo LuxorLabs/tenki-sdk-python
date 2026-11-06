@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
 
+from ._client_metadata import CLIENT_METADATA
 from .constants import (
     DEFAULT_BASE_URL,
     ENV_API_ENDPOINT,
@@ -130,7 +131,7 @@ class _ConnectError(Exception):
 
 def auth_metadata(auth_token: str) -> tuple[tuple[str, str], ...]:
     token = _validate_auth_token(auth_token)
-    return (("authorization", f"Bearer {token}"),)
+    return (("authorization", f"Bearer {token}"),) + CLIENT_METADATA
 
 
 @dataclass
