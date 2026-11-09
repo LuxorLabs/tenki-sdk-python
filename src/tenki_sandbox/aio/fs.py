@@ -6,7 +6,7 @@ from typing import AsyncIterable, AsyncIterator, Iterable
 
 from .._convert import file_info
 from .._pb import pb
-from ..errors import FileNotFoundError, map_rpc_error
+from ..errors import FileNotFoundError, StreamClosedError, map_rpc_error
 from ..models import FileInfo
 
 
@@ -76,7 +76,10 @@ class AsyncSandboxFS:
         truncate: bool = True,
         sync: bool = False,
     ) -> None:
+        sent_all = False
+
         async def requests():
+            nonlocal sent_all
             yield pb.WriteFileStreamRequest(
                 start=pb.WriteFileStreamStart(
                     session_id=self._session_id,
@@ -90,12 +93,16 @@ class AsyncSandboxFS:
                 if isinstance(chunk, str):
                     chunk = chunk.encode()
                 yield pb.WriteFileStreamRequest(data=chunk)
+            sent_all = True
 
         try:
             rpc = await self._resolve_rpc()
             await rpc.write_file_stream(requests())
         except Exception as err:
             raise map_rpc_error(err) from err
+        # An early OK would otherwise truncate silently; this only catches frames not yet handed to the transport.
+        if not sent_all:
+            raise StreamClosedError("server ended the write stream before all data was sent")
 
     async def upload(self, local_path: str | Path, remote_path: str, *, chunk_bytes: int = 1024 * 1024) -> None:
         path = Path(local_path)

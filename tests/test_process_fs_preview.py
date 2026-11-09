@@ -197,6 +197,50 @@ def test_filesystem_helpers_map_to_rpc():
     assert sandbox.fs.list("/workspace")[0].path == "a.txt"
 
 
+@pytest.mark.parametrize("chunks,expected", [([b"foo", b"bar"], b"foobar"), ([], b"")])
+def test_write_stream_reassembles(chunks, expected):
+    rpc = FakeRPC()
+    sandbox = create_test_sandbox(rpc)
+
+    sandbox.fs.write_stream("/workspace/b.txt", chunks)
+
+    assert rpc.files["/workspace/b.txt"] == expected
+
+
+@pytest.mark.parametrize("consumed", [["start"], ["start", "data"], ["start", "data", "data"]])
+def test_write_stream_fails_when_server_ends_early_with_success(consumed):
+    rpc = FakeRPC()
+    sandbox = create_test_sandbox(rpc)
+    sent = []
+
+    def write_file_stream(requests):
+        sent.extend(next(requests) for _ in consumed)
+        requests.close()
+        return pb.WriteFileStreamResponse()
+
+    rpc.write_file_stream = write_file_stream
+
+    with pytest.raises(errors.StreamClosedError, match="before all data was sent"):
+        sandbox.fs.write_stream("/workspace/b.txt", [b"foo", b"bar", b"baz"])
+    assert [frame.WhichOneof("payload") for frame in sent] == consumed
+
+
+def test_write_stream_early_rpc_error_wins_over_stream_closed():
+    rpc = FakeRPC()
+    sandbox = create_test_sandbox(rpc)
+
+    def write_file_stream(requests):
+        next(requests)
+        raise RunRpcError(grpc.StatusCode.UNAVAILABLE, "HTTP status 502")
+
+    rpc.write_file_stream = write_file_stream
+
+    with pytest.raises(errors.SandboxError) as excinfo:
+        sandbox.fs.write_stream("/workspace/b.txt", [b"foo", b"bar"])
+    assert not isinstance(excinfo.value, errors.StreamClosedError)
+    assert "502" in str(excinfo.value)
+
+
 def test_stat_missing_path_raises_file_not_found():
     rpc = FakeRPC()
     client = Client(rpc=rpc)
@@ -301,6 +345,19 @@ class FakeRPC:
 
     def read_file(self, req):
         return pb.ReadFileResponse(path=req.path, content=self.files[req.path])
+
+    def write_file_stream(self, requests):
+        path = None
+        buf = b""
+        for frame in requests:
+            kind = frame.WhichOneof("payload")
+            if kind == "start":
+                path = frame.start.path
+            elif kind == "data":
+                buf += bytes(frame.data)
+        if path is not None:
+            self.files[path] = buf
+        return pb.WriteFileStreamResponse()
 
     def read_file_stream(self, req):
         data = self.files[req.path]
