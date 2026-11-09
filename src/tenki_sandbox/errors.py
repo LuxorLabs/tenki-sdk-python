@@ -134,6 +134,18 @@ class PauseWaitCancelledError(SandboxError):
     """Local pause observation was cancelled; the remote pause continues."""
 
 
+class ResumeFailedError(SandboxError):
+    pass
+
+
+class ResumeWaitCancelledError(SandboxError):
+    """Local resume observation was cancelled; the remote resume continues."""
+
+
+class ResumeWaitTimeoutError(SandboxError, TimeoutError):
+    """A resume did not reach RUNNING in time; it may still land. Also a TimeoutError."""
+
+
 class TemplateNotFoundError(SandboxError):
     pass
 
@@ -540,6 +552,8 @@ def map_rpc_error(err: Exception) -> SandboxError:
         if "template build already in progress" in msg or "build in progress" in msg:
             return TemplateBuildInProgressError(details)
         return InvalidStateError(details)
+    if code_name == "ABORTED" and msg.startswith("resume failed"):
+        return ResumeFailedError(details)
     if code_name == "UNAVAILABLE":
         mapped = SandboxError(details)
         mapped.retryable = True

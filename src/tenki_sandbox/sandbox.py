@@ -15,8 +15,12 @@ from .data_plane import (
     _DataPlaneEndpointHints,
 )
 from .errors import (
+    CommandTimeoutError,
     PauseFailedError,
     PauseWaitCancelledError,
+    ResumeFailedError,
+    ResumeWaitCancelledError,
+    ResumeWaitTimeoutError,
     SessionNotFoundError,
     WaitReadyFailedError,
     map_fork_error,
@@ -536,6 +540,64 @@ class Sandbox:
                 time.sleep(0.5)
         raise TimeoutError(f"timeout waiting for sandbox {self.id} to pause")
 
+    def wait_resumed(
+        self,
+        timeout: float = 180,
+        *,
+        cancel_event: threading.Event | None = None,
+    ) -> None:
+        """Wait locally for an in-flight resume without cancelling the remote resume."""
+        deadline = time.monotonic() + timeout
+        started = time.monotonic()
+        saw_resuming = False
+        paused_at = self._info.paused_at
+        while time.monotonic() < deadline:
+            if cancel_event is not None and cancel_event.is_set():
+                raise ResumeWaitCancelledError(
+                    f"wait for sandbox {self.id} to resume cancelled locally"
+                )
+            try:
+                self.refresh()
+            except SessionNotFoundError:
+                pass
+            else:
+                if self.state == "RUNNING":
+                    return
+                if self.state in {"TERMINATING", "TERMINATED"}:
+                    raise RuntimeError(f"sandbox entered terminal state: {self.state}")
+                if self.state == "RESUMING":
+                    saw_resuming = True
+                    paused_at = self._info.paused_at or paused_at
+                elif self.state == "PAUSING" and (
+                    saw_resuming or time.monotonic() - started > 3
+                ):
+                    # PAUSING only follows RUNNING, so a fresh read means the resume
+                    # landed before a concurrent pause.
+                    return
+                elif self.state in {"PAUSED", "USER_SHUTDOWN"} and (
+                    saw_resuming or time.monotonic() - started > 3
+                ):
+                    # A landed resume clears paused_at, and a later pause or shutdown
+                    # sets a newer one; a revert or snapshot migration keeps it.
+                    if (
+                        paused_at is not None
+                        and not self._info.last_resume_error
+                        and self._info.paused_at != paused_at
+                    ):
+                        return
+                    raise _resume_failed_error(self.id, self._info)
+            if cancel_event is not None:
+                if cancel_event.wait(0.5):
+                    raise ResumeWaitCancelledError(
+                        f"wait for sandbox {self.id} to resume cancelled locally"
+                    )
+            else:
+                time.sleep(0.5)
+        raise ResumeWaitTimeoutError(
+            f"timeout waiting for sandbox {self.id} to resume; it may still be resuming, "
+            "call wait_resumed to keep waiting"
+        )
+
     def start(
         self,
         *argv: str | Sequence[str],
@@ -700,13 +762,31 @@ class Sandbox:
         self._reset_data_plane()
 
     def resume(self) -> None:
+        """Resume and return once the sandbox is RUNNING; joins a resume already in flight.
+
+        Raises ResumeWaitTimeoutError if the client timeout passes first; the resume may still land.
+        """
+        self._resume(async_=False)
+
+    def resume_async(self) -> None:
+        """Return once the resume is accepted; use wait_resumed to observe RUNNING."""
+        self._resume(async_=True)
+
+    def _resume(self, *, async_: bool) -> None:
+        req = pb.ResumeSessionRequest(session_id=self.id)
+        setattr(req, "async", async_)
         try:
-            resp = self._client._rpc.resume_session(
-                pb.ResumeSessionRequest(session_id=self.id)
-            )
+            resp = self._client._rpc.resume_session(req)
             self._info = sandbox_info(resp.session)
         except Exception as err:
-            raise map_rpc_error(err) from err
+            mapped = map_rpc_error(err)
+            # The deadline ends the wait for RUNNING, not necessarily the resume.
+            if not async_ and isinstance(mapped, CommandTimeoutError):
+                raise ResumeWaitTimeoutError(
+                    f"sandbox {self.id} did not resume before the deadline; it may still be "
+                    "resuming, call wait_resumed to keep waiting"
+                ) from err
+            raise mapped from err
         # The session may resume on a different host; re-bootstrap on next use.
         self._reset_data_plane()
 
@@ -1034,6 +1114,13 @@ def _raise_mapped(err: Exception) -> None:
     if mapped is err:
         raise err
     raise mapped from err
+
+
+def _resume_failed_error(sandbox_id: str, info: SandboxInfo) -> ResumeFailedError:
+    suffix = f": {info.last_resume_error}" if info.last_resume_error else ""
+    return ResumeFailedError(
+        f"resume failed: sandbox {sandbox_id} reverted to {info.state}{suffix}"
+    )
 
 
 def _wait_ready_timeout(sandbox_id: str, last_err: Exception | None) -> TimeoutError:

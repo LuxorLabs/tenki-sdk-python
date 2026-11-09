@@ -119,7 +119,8 @@ class FakeControlRPC:
 
     async def resume_session(self, req):
         self._record("resume_session", req)
-        return pb.ResumeSessionResponse(session=session(pb.SESSION_STATE_RUNNING))
+        state = pb.SESSION_STATE_RESUMING if getattr(req, "async") else pb.SESSION_STATE_RUNNING
+        return pb.ResumeSessionResponse(session=session(state))
 
     async def who_am_i(self, req):
         self._record("who_am_i", req)

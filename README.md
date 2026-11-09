@@ -224,6 +224,25 @@ The session keeps the merged copy, so editing or deleting a named policy later d
 `sb.info.egress.policy_names` reads the pinned names back, and the other fields of `sb.info.egress` hold the merged policy.
 `AsyncSandbox.create` takes the same `egress_policies` argument.
 
+## Resume
+
+`resume()` returns once the sandbox is `RUNNING`, so the next call can use it right away.
+It raises `ResumeFailedError` with the restore error if the sandbox falls back to `PAUSED`.
+If the client `timeout` passes first, it raises `ResumeWaitTimeoutError`; the resume may still land, so call `wait_resumed()` to keep waiting.
+Calling `resume()` on a sandbox that is already `RESUMING` joins that resume instead of failing.
+`resume_async()` returns once the service accepts the resume, usually with the sandbox in `RESUMING`.
+Call `wait_resumed()` before running commands.
+It returns at `RUNNING`, raises `ResumeFailedError` if the resume fails, and raises `ResumeWaitTimeoutError`, a `TimeoutError`, after `timeout` seconds (default 180).
+For explicit local cancellation, pass a `threading.Event` as `cancel_event`; cancellation raises `ResumeWaitCancelledError` and leaves the remote resume running.
+
+```python
+sb.resume_async()
+sb.wait_resumed()
+```
+
+`AsyncSandbox` exposes the same operation through `await sb.resume_async()` and `await sb.wait_resumed()`.
+Its wait accepts an `asyncio.Event` or `threading.Event`.
+
 ## What survives a pause
 
 Pause captures the VM's full memory, not only its disk: a resumed sandbox is the

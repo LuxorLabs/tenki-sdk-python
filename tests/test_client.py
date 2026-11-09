@@ -14,6 +14,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import tenki_sandbox
 from tenki_sandbox import (
     Client,
+    CommandTimeoutError,
     EgressHttpRule,
     InvalidAuthTokenError,
     InvalidResourceConfigError,
@@ -21,6 +22,9 @@ from tenki_sandbox import (
     PauseFailedError,
     PauseWaitCancelledError,
     PermissionDeniedError,
+    ResumeFailedError,
+    ResumeWaitCancelledError,
+    ResumeWaitTimeoutError,
     Sandbox,
     SandboxInfo,
     SandboxError,
@@ -849,11 +853,45 @@ def test_pause_and_resume_reset_data_plane():
     resumed_credential, resumed_rpc = _prime_data_plane(sandbox)
     sandbox.resume()
     assert sandbox.state == "RUNNING"
+    assert getattr(rpc.requests["resume_session"][-1], "async") is False
     assert resumed_credential.stopped is True
     assert resumed_rpc.closed is True
     assert sandbox._data_plane_credentials is None
     assert sandbox._data_plane_rpc is None
     assert sandbox._data_plane_verified is False
+
+    sandbox.resume_async()
+    assert sandbox.state == "RESUMING"
+    assert getattr(rpc.requests["resume_session"][-1], "async") is True
+
+
+def test_resume_raises_resume_failed_error_when_resume_does_not_land():
+    class FailedResumeRPC(FakeRPC):
+        def resume_session(self, req):
+            self.requests["resume_session"].append(req)
+            raise FakeDetailedRPCError(
+                "ABORTED", "resume failed, session is PAUSED: restore timed out"
+            )
+
+    sandbox = Client(rpc=FailedResumeRPC()).create(workspace_id="ws-1", wait=False)
+
+    with pytest.raises(ResumeFailedError, match="restore timed out"):
+        sandbox.resume()
+
+
+def test_resume_raises_resume_wait_timeout_error_at_deadline():
+    class SlowResumeRPC(FakeRPC):
+        def resume_session(self, req):
+            self.requests["resume_session"].append(req)
+            raise FakeDetailedRPCError("DEADLINE_EXCEEDED", "Deadline Exceeded")
+
+    sandbox = Client(rpc=SlowResumeRPC()).create(workspace_id="ws-1", wait=False)
+
+    with pytest.raises(ResumeWaitTimeoutError, match="may still be resuming") as exc_info:
+        sandbox.resume()
+    assert isinstance(exc_info.value, TimeoutError)
+    with pytest.raises(CommandTimeoutError):
+        sandbox.resume_async()
 
 
 def test_create_wait_failure_preserves_closable_sandbox():
@@ -1083,6 +1121,152 @@ def test_wait_paused_raises_when_pause_rolls_back():
         sandbox.wait_paused(timeout=5)
 
 
+def _session_sequence(rpc, *sessions):
+    queue = list(sessions)
+
+    def get_session(req):
+        rpc.requests["get_session"].append(req)
+        return pb.GetSessionResponse(session=queue.pop(0) if queue else sessions[-1])
+
+    rpc.get_session = get_session
+
+
+def test_wait_resumed_reaches_running(monkeypatch):
+    rpc = FakeRPC()
+    rpc.get_states = [pb.SESSION_STATE_RESUMING, pb.SESSION_STATE_RUNNING]
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    monkeypatch.setattr("tenki_sandbox.sandbox.time.sleep", lambda _duration: None)
+
+    sandbox.wait_resumed(timeout=5)
+
+    assert sandbox.state == "RUNNING"
+
+
+def test_wait_resumed_treats_concurrent_pause_as_landed(monkeypatch):
+    rpc = FakeRPC()
+    rpc.get_states = [
+        pb.SESSION_STATE_RESUMING,
+        pb.SESSION_STATE_PAUSING,
+        pb.SESSION_STATE_PAUSED,
+    ]
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    monkeypatch.setattr("tenki_sandbox.sandbox.time.sleep", lambda _duration: None)
+
+    sandbox.wait_resumed(timeout=5)
+
+    assert sandbox.state == "PAUSING"
+
+
+def test_wait_resumed_raises_resume_failed_error_with_last_resume_error(monkeypatch):
+    rpc = FakeRPC()
+    resuming = _session(pb.SESSION_STATE_RESUMING)
+    resuming.paused_at.seconds = 1_700_000_000
+    reverted = _session(pb.SESSION_STATE_PAUSED)
+    reverted.paused_at.seconds = 1_700_000_000
+    reverted.last_resume_error = "restore timed out"
+    _session_sequence(rpc, resuming, reverted)
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    monkeypatch.setattr("tenki_sandbox.sandbox.time.sleep", lambda _duration: None)
+
+    with pytest.raises(ResumeFailedError, match="reverted to PAUSED: restore timed out"):
+        sandbox.wait_resumed(timeout=5)
+
+
+def test_wait_resumed_ignores_stale_pausing_read_before_resuming(monkeypatch):
+    rpc = FakeRPC()
+    stale = _session(pb.SESSION_STATE_PAUSING)
+    resuming = _session(pb.SESSION_STATE_RESUMING)
+    resuming.paused_at.seconds = 1_700_000_000
+    reverted = _session(pb.SESSION_STATE_PAUSED)
+    reverted.paused_at.seconds = 1_700_000_000
+    reverted.last_resume_error = "restore timed out"
+    _session_sequence(rpc, stale, resuming, reverted)
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    monkeypatch.setattr("tenki_sandbox.sandbox.time.sleep", lambda _duration: None)
+
+    with pytest.raises(ResumeFailedError, match="restore timed out"):
+        sandbox.wait_resumed(timeout=5)
+
+
+def test_wait_resumed_treats_pause_between_polls_as_landed(monkeypatch):
+    rpc = FakeRPC()
+    resuming = _session(pb.SESSION_STATE_RESUMING)
+    resuming.paused_at.seconds = 1_700_000_000
+    repaused = _session(pb.SESSION_STATE_PAUSED)
+    repaused.paused_at.seconds = 1_700_003_600
+    _session_sequence(rpc, resuming, repaused)
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    monkeypatch.setattr("tenki_sandbox.sandbox.time.sleep", lambda _duration: None)
+
+    sandbox.wait_resumed(timeout=5)
+
+    assert sandbox.state == "PAUSED"
+
+
+def test_wait_resumed_reports_revert_after_snapshot_migration_as_failure(monkeypatch):
+    rpc = FakeRPC()
+    resuming = _session(pb.SESSION_STATE_RESUMING)
+    resuming.paused_at.seconds = 1_700_000_000
+    resuming.pause_snapshot_id = "restored-snapshot"
+    migrated = _session(pb.SESSION_STATE_PAUSED)
+    migrated.paused_at.seconds = 1_700_000_000
+    migrated.pause_snapshot_id = "migrated-snapshot"
+    _session_sequence(rpc, resuming, migrated)
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    monkeypatch.setattr("tenki_sandbox.sandbox.time.sleep", lambda _duration: None)
+
+    with pytest.raises(ResumeFailedError):
+        sandbox.wait_resumed(timeout=5)
+
+
+def test_wait_resumed_tolerates_stale_paused_read_before_resuming(monkeypatch):
+    rpc = FakeRPC()
+    rpc.get_states = [
+        pb.SESSION_STATE_PAUSED,
+        pb.SESSION_STATE_RESUMING,
+        pb.SESSION_STATE_RUNNING,
+    ]
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    monkeypatch.setattr("tenki_sandbox.sandbox.time.sleep", lambda _duration: None)
+
+    sandbox.wait_resumed(timeout=5)
+
+    assert sandbox.state == "RUNNING"
+
+
+def test_wait_resumed_raises_on_terminal_state(monkeypatch):
+    rpc = FakeRPC()
+    rpc.get_states = [pb.SESSION_STATE_TERMINATED]
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    monkeypatch.setattr("tenki_sandbox.sandbox.time.sleep", lambda _duration: None)
+
+    with pytest.raises(RuntimeError, match="terminal state"):
+        sandbox.wait_resumed(timeout=5)
+
+
+@pytest.mark.parametrize("timeout", [0, -1])
+def test_wait_resumed_nonpositive_timeout_fails_fast(timeout):
+    rpc = FakeRPC()
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    with pytest.raises(ResumeWaitTimeoutError, match="to resume"):
+        sandbox.wait_resumed(timeout=timeout)
+
+    assert rpc.requests["get_session"] == []
+
+
+def test_wait_resumed_can_be_cancelled():
+    rpc = FakeRPC()
+    sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    cancel = threading.Event()
+    cancel.set()
+
+    with pytest.raises(ResumeWaitCancelledError, match="cancelled locally"):
+        sandbox.wait_resumed(timeout=5, cancel_event=cancel)
+
+    assert rpc.requests["get_session"] == []
+
+
 def test_wait_ready_stream_preserves_terminal_state_error_type():
     rpc = FakeRPC()
     rpc.wait_states = [pb.SESSION_STATE_TERMINATING]
@@ -1189,6 +1373,15 @@ class FakeRPCError(Exception):
 
     def code(self):
         return type("Code", (), {"name": self._code_name})()
+
+
+class FakeDetailedRPCError(FakeRPCError):
+    def __init__(self, code_name: str, details: str):
+        super().__init__(code_name)
+        self._details = details
+
+    def details(self):
+        return self._details
 
 
 class FakeRuntimeError(Exception):
@@ -1305,7 +1498,8 @@ class FakeRPC:
 
     def resume_session(self, req):
         self.requests["resume_session"].append(req)
-        return pb.ResumeSessionResponse(session=_session(pb.SESSION_STATE_RUNNING))
+        state = pb.SESSION_STATE_RESUMING if getattr(req, "async") else pb.SESSION_STATE_RUNNING
+        return pb.ResumeSessionResponse(session=_session(state))
 
     def attach_volume(self, req):
         self.requests["attach_volume"].append(req)
