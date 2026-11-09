@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import warnings
 
 from ._convert import (
@@ -16,14 +15,15 @@ from ._pb import pb
 from ._resource_validation import validate_create_resources
 from ._time import duration
 from ._transport import (
-    KEEPALIVE_CHANNEL_OPTIONS,
+    CHANNEL_OPTIONS,
     GrpcConfig,
     GrpcSandboxRPC,
     resolve_auth_token,
     resolve_base_url,
+    read_env,
     resolve_gateway_url,
 )
-from .constants import ENV_GATEWAY_URL
+from .constants import GATEWAY_URL_ENVS
 from .errors import WaitReadyFailedError, map_rpc_error
 from .models import (
     CIRunnerSizes,
@@ -65,7 +65,7 @@ class Client:
     ) -> None:
         self.base_url = resolve_base_url(base_url)
         self.gateway_url = resolve_gateway_url(gateway_url, self.base_url)
-        self._gateway_explicit = bool((gateway_url or os.getenv(ENV_GATEWAY_URL) or "").strip())
+        self._gateway_explicit = bool((gateway_url or read_env(GATEWAY_URL_ENVS)).strip())
         self.auth_token = (
             resolve_auth_token(auth_token, api_key)
             if rpc is None or auth_token is not None or api_key is not None
@@ -77,7 +77,7 @@ class Client:
                 auth_token=self.auth_token,
                 timeout=timeout,
                 # Same HTTP/2 keepalive as the Go and TypeScript clients.
-                channel_options=KEEPALIVE_CHANNEL_OPTIONS,
+                channel_options=CHANNEL_OPTIONS,
             )
         )
         self._warning_handler = warning_handler

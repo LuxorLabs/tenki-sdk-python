@@ -38,6 +38,7 @@ from tenki_sandbox import (
 from tenki_sandbox._convert import sandbox_info
 from tenki_sandbox._pb import pb, template_pb
 from tenki_sandbox._transport import (
+    SDK_METADATA,
     GrpcConfig,
     GrpcSandboxRPC,
     auth_metadata,
@@ -45,6 +46,7 @@ from tenki_sandbox._transport import (
     resolve_gateway_url,
 )
 from tenki_sandbox.client import _create_wait_timeout
+from tenki_sandbox.constants import SDK_VERSION
 from tenki_sandbox.data_plane import _DataPlaneEndpointHints
 from tenki_sandbox.models import VolumeMount
 
@@ -52,6 +54,8 @@ from tenki_sandbox.models import VolumeMount
 def test_client_requires_auth_without_injected_rpc(monkeypatch):
     monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
+    monkeypatch.delenv("LUXORAI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("LUXORAI_API_KEY", raising=False)
 
     with pytest.raises(MissingAuthTokenError):
         Client()
@@ -215,6 +219,8 @@ def test_invalid_auth_token_is_unauthorized_error():
 def test_client_accepts_api_key_as_an_alias_for_auth_token(rpc, monkeypatch):
     monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
+    monkeypatch.delenv("LUXORAI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("LUXORAI_API_KEY", raising=False)
 
     assert Client(api_key="tk_alias", rpc=rpc).auth_token == "tk_alias"
     assert Client(auth_token="tk_same", api_key="tk_same", rpc=rpc).auth_token == "tk_same"
@@ -227,6 +233,8 @@ def test_auth_token_wins_over_the_api_key_alias():
 def test_api_key_alias_is_validated_like_auth_token(monkeypatch):
     monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
+    monkeypatch.delenv("LUXORAI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("LUXORAI_API_KEY", raising=False)
 
     with pytest.raises(InvalidAuthTokenError):
         Client(api_key="ory_st_test", rpc=object())
@@ -242,6 +250,8 @@ def test_api_key_alias_takes_precedence_over_the_environment(monkeypatch):
 def test_blank_credentials_count_as_absent(blank, monkeypatch):
     """Whitespace-only values must behave like "" - no spurious conflict, env still wins."""
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
+    monkeypatch.delenv("LUXORAI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("LUXORAI_API_KEY", raising=False)
     monkeypatch.setenv("TENKI_AUTH_TOKEN", "tk_env")
 
     assert Client(auth_token="tk_real", api_key=blank, rpc=object()).auth_token == "tk_real"
@@ -257,6 +267,7 @@ def test_padded_credentials_are_trimmed_not_conflicting(rpc=None):
 def test_auth_metadata_and_grpc_target_are_provider_friendly():
     assert auth_metadata(" tk_test ") == (
         ("authorization", "Bearer tk_test"),
+        *SDK_METADATA,
         *EXPECTED_CLIENT_METADATA.items(),
     )
     assert grpc_target("https://api.tenki.cloud") == ("api.tenki.cloud:443", True)
@@ -1813,4 +1824,5 @@ def test_client_enables_http2_keepalive(monkeypatch):
         "grpc.keepalive_timeout_ms": 5_000,
         "grpc.http2.ping_timeout_ms": 5_000,
         "grpc.http2.max_pings_without_data": 0,
+        "grpc.primary_user_agent": f"luxor-sandbox-python/{SDK_VERSION}",
     }

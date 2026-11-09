@@ -17,7 +17,10 @@ class PaginationStalledError(SandboxError):
 
 class MissingAuthTokenError(SandboxError):
     def __init__(self) -> None:
-        super().__init__("missing auth token: set TENKI_AUTH_TOKEN or TENKI_API_KEY")
+        super().__init__(
+            "missing auth token: set LUXORAI_AUTH_TOKEN or LUXORAI_API_KEY"
+            " (or TENKI_AUTH_TOKEN or TENKI_API_KEY)"
+        )
 
 
 class UnauthorizedError(SandboxError):
@@ -27,7 +30,7 @@ class UnauthorizedError(SandboxError):
 class InvalidAuthTokenError(UnauthorizedError):
     def __init__(self) -> None:
         super().__init__(
-            "invalid auth token: expected an API key or service token starting with tk_"
+            "invalid auth token: expected an API key or service token starting with lx_ or tk_"
         )
 
 

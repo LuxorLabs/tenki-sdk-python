@@ -34,6 +34,8 @@ from tenki_sandbox.errors import PermissionDeniedError, SandboxError, SnapshotNo
 def test_async_client_requires_auth_without_injected_rpc(monkeypatch):
     monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
+    monkeypatch.delenv("LUXORAI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("LUXORAI_API_KEY", raising=False)
     with pytest.raises(MissingAuthTokenError):
         AsyncClient()
 
@@ -199,6 +201,8 @@ def test_async_client_rejects_invalid_auth_tokens(auth_token, rpc):
 def test_async_client_accepts_api_key_as_an_alias_for_auth_token(rpc, monkeypatch):
     monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
+    monkeypatch.delenv("LUXORAI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("LUXORAI_API_KEY", raising=False)
 
     assert AsyncClient(api_key="tk_alias", rpc=rpc).auth_token == "tk_alias"
 
@@ -1313,8 +1317,9 @@ async def test_wait_ready_poll_keeps_injected_rpc_contract():
 
 
 def test_async_client_enables_http2_keepalive():
-    from tenki_sandbox._transport import KEEPALIVE_CHANNEL_OPTIONS
+    from tenki_sandbox._transport import CHANNEL_OPTIONS, KEEPALIVE_CHANNEL_OPTIONS
 
     client = AsyncClient(base_url="http://localhost:8090", auth_token="tk_test")
-    assert client._rpc._channel_options == KEEPALIVE_CHANNEL_OPTIONS
+    assert client._rpc._channel_options == CHANNEL_OPTIONS
+    assert set(KEEPALIVE_CHANNEL_OPTIONS) <= set(CHANNEL_OPTIONS)
     assert dict(KEEPALIVE_CHANNEL_OPTIONS)["grpc.keepalive_time_ms"] == 30_000

@@ -323,10 +323,12 @@ Auth resolution:
 
 1. `auth_token=` passed to `Client` or `Sandbox.create`
 2. `api_key=`, an alias for `auth_token`
-3. `TENKI_AUTH_TOKEN`
-4. `TENKI_API_KEY`
+3. `LUXORAI_AUTH_TOKEN`
+4. `LUXORAI_API_KEY`
+5. `TENKI_AUTH_TOKEN`
+6. `TENKI_API_KEY`
 
-Credentials must be a Tenki API key or service token starting with `tk_`. Missing
+Credentials must be an API key or service token starting with `lx_` or `tk_`. Missing
 credentials raise `MissingAuthTokenError`; nonempty credentials with any other
 prefix raise `InvalidAuthTokenError`. Blank or whitespace-only values count as
 absent. Requests authenticate with an `Authorization: Bearer` header.
@@ -344,7 +346,9 @@ for Ory session tokens and browser cookie values. Pass a `tk_` API key or
 service token through `auth_token`; the SDK sends it as an
 `Authorization: Bearer` credential.
 
-`TENKI_API_ENDPOINT` overrides the API URL; legacy `TENKI_API_URL` is also accepted.
+`LUXORAI_API_ENDPOINT` or `LUXORAI_API_URL` overrides the API URL; `TENKI_API_ENDPOINT`
+and legacy `TENKI_API_URL` are also accepted when no `LUXORAI_*` URL is set. Every
+`LUXORAI_*` variable takes precedence over its `TENKI_*` equivalent.
 
 ## Process API
 
