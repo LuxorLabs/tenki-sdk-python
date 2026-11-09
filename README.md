@@ -252,6 +252,10 @@ state, and the guest clock stops for the duration of the pause.
 `/tmp` is cleared across a pause. Keep durable state under `/home/tenki`, which
 is preserved.
 
+The kernel boot ID (`/proc/sys/kernel/random/boot_id`) changes on every resume,
+so it can't tell a resume from a restart. Memory-backed paths such as `/dev/shm`
+survive a pause but not a restart, so a token written there can.
+
 While a sandbox is paused it serves no traffic: preview requests return `404`
 until it resumes. The client connection itself is not dropped — a held
 keep-alive connection returns `200` again after resume — so treat a paused
