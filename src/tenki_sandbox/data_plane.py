@@ -11,7 +11,7 @@ from google.protobuf.message import Message
 
 from ._client_metadata import CLIENT_METADATA
 from ._pb import pb
-from ._transport import CHANNEL_OPTIONS, SDK_METADATA, grpc_target
+from ._transport import CHANNEL_OPTIONS, grpc_target
 
 DATA_PLANE_CREDENTIAL_HEADER = "x-tenki-session-cert"
 
@@ -317,7 +317,7 @@ class GrpcDataPlaneRPC:
         method = getattr(self._stub, rpc_name)
 
         def call(request, *args, **kwargs):
-            metadata = tuple(kwargs.pop("metadata", ())) + SDK_METADATA
+            metadata = tuple(kwargs.pop("metadata", ()))
             credential = _authorize_data_plane_request(
                 self._credentials, self.endpoint, self._session_id, request
             )

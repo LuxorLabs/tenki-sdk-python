@@ -119,7 +119,6 @@ def test_luxor_ai_reexports_tenki_sandbox():
 def test_control_plane_metadata_and_user_agent():
     assert auth_metadata("lx_test") == (
         ("authorization", "Bearer lx_test"),
-        ("x-luxor-sdk", f"python/{SDK_VERSION}"),
         *EXPECTED_CLIENT_METADATA.items(),
     )
     assert dict(CHANNEL_OPTIONS)["grpc.primary_user_agent"] == f"luxor-sandbox-python/{SDK_VERSION}"
@@ -136,7 +135,7 @@ class _FakeSandbox:
     _client = None
 
 
-def test_sync_data_plane_sends_sdk_header():
+def test_sync_data_plane_sends_client_metadata():
     seen = []
 
     class Stub:
@@ -154,16 +153,16 @@ def test_sync_data_plane_sends_sdk_header():
         rpc.stat(sandbox_pb.StatRequest(session_id="sess-1", path="/"))
     finally:
         rpc.close()
-    assert seen[0]["x-luxor-sdk"] == f"python/{SDK_VERSION}"
+    assert seen[0]["x-luxor-client-family"] == "python"
     assert seen[0]["x-tenki-session-cert"] == "cred"
 
 
-def test_async_data_plane_sends_sdk_header():
+def test_async_data_plane_sends_client_metadata():
     endpoint = "http://127.0.0.1:1"
     credentials = AsyncDataPlaneCredentialManager(_FakeSandbox(), _credential("cred"), endpoint)
     rpc = AsyncGrpcDataPlaneRPC(endpoint, credentials, "sess-1")
     metadata = dict(rpc._auth_metadata({}, sandbox_pb.StatRequest(session_id="sess-1", path="/")))
-    assert metadata["x-luxor-sdk"] == f"python/{SDK_VERSION}"
+    assert metadata["x-luxor-client-family"] == "python"
     assert metadata["x-tenki-session-cert"] == "cred"
 
 
@@ -193,7 +192,7 @@ def test_workspace_client_reads_luxorai_env_and_sends_sdk_identity(monkeypatch, 
     with WorkspaceClient() as client:
         client.secrets.get("secret")
     assert seen[0]["authorization"] == "Bearer lx_luxorai"
-    assert seen[0]["x-luxor-sdk"] == f"python/{SDK_VERSION}"
+    assert seen[0]["x-luxor-client-family"] == "python"
     assert seen[0]["user-agent"].startswith(f"luxor-sandbox-python/{SDK_VERSION} ")
 
 

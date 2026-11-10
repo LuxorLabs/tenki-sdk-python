@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from .._client_metadata import CLIENT_METADATA
 from .._pb import pb
-from .._transport import CHANNEL_OPTIONS, SDK_METADATA, grpc_target
+from .._transport import CHANNEL_OPTIONS, grpc_target
 from ..data_plane import (
     DATA_PLANE_CREDENTIAL_HEADER,
     _authorize_data_plane_request,
@@ -329,7 +329,7 @@ class AsyncGrpcDataPlaneRPC:
             raise last
 
     def _auth_metadata(self, kwargs: dict, request=None) -> tuple:
-        metadata = tuple(kwargs.pop("metadata", ())) + SDK_METADATA
+        metadata = tuple(kwargs.pop("metadata", ()))
         credential = _authorize_data_plane_request(
             self._credentials, self.endpoint, self._session_id, request
         )

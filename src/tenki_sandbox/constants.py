@@ -40,8 +40,6 @@ def _sdk_version() -> str:
 
 
 SDK_VERSION = _sdk_version()
-SDK_HEADER = "x-luxor-sdk"
-SDK_HEADER_VALUE = f"python/{SDK_VERSION}"
 SDK_USER_AGENT = f"luxor-sandbox-python/{SDK_VERSION}"
 
 KB = 1_000

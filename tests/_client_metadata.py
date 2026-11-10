@@ -2,10 +2,10 @@ import platform
 from importlib.metadata import version
 
 EXPECTED_CLIENT_METADATA = {
-    "x-tenki-client-family": "python",
-    "x-tenki-client-version": version("tenki"),
-    "x-tenki-client-generation": "1",
-    "x-tenki-client-runtime": f"{platform.python_implementation().lower()}/{platform.python_version()}",
+    "x-luxor-client-family": "python",
+    "x-luxor-client-version": version("tenki"),
+    "x-luxor-client-generation": "1",
+    "x-luxor-client-runtime": f"{platform.python_implementation().lower()}/{platform.python_version()}",
 }
 
 

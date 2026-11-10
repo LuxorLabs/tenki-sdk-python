@@ -38,7 +38,6 @@ from tenki_sandbox import (
 from tenki_sandbox._convert import sandbox_info
 from tenki_sandbox._pb import pb, template_pb
 from tenki_sandbox._transport import (
-    SDK_METADATA,
     GrpcConfig,
     GrpcSandboxRPC,
     auth_metadata,
@@ -267,7 +266,6 @@ def test_padded_credentials_are_trimmed_not_conflicting(rpc=None):
 def test_auth_metadata_and_grpc_target_are_provider_friendly():
     assert auth_metadata(" tk_test ") == (
         ("authorization", "Bearer tk_test"),
-        *SDK_METADATA,
         *EXPECTED_CLIENT_METADATA.items(),
     )
     assert grpc_target("https://api.tenki.cloud") == ("api.tenki.cloud:443", True)

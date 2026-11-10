@@ -12,8 +12,6 @@ from .constants import (
     BASE_URL_ENVS,
     DEFAULT_BASE_URL,
     GATEWAY_URL_ENVS,
-    SDK_HEADER,
-    SDK_HEADER_VALUE,
     SDK_USER_AGENT,
 )
 from .errors import InvalidAuthTokenError, MissingAuthTokenError, map_rpc_error
@@ -100,7 +98,6 @@ SDK_CHANNEL_OPTIONS = (("grpc.primary_user_agent", SDK_USER_AGENT),)
 # A unary ReadFile returns up to 32 MiB plus its envelope; grpc-core otherwise refuses replies above 4 MiB.
 MAX_RECEIVE_CHANNEL_OPTIONS = (("grpc.max_receive_message_length", 33 << 20),)
 CHANNEL_OPTIONS = KEEPALIVE_CHANNEL_OPTIONS + SDK_CHANNEL_OPTIONS + MAX_RECEIVE_CHANNEL_OPTIONS
-SDK_METADATA = ((SDK_HEADER, SDK_HEADER_VALUE),)
 
 
 def grpc_target(base_url: str) -> tuple[str, bool]:
@@ -148,7 +145,7 @@ class _ConnectError(Exception):
 
 def auth_metadata(auth_token: str) -> tuple[tuple[str, str], ...]:
     token = _validate_auth_token(auth_token)
-    return (("authorization", f"Bearer {token}"),) + SDK_METADATA + CLIENT_METADATA
+    return (("authorization", f"Bearer {token}"),) + CLIENT_METADATA
 
 
 @dataclass
