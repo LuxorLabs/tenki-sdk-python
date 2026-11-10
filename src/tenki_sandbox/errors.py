@@ -51,6 +51,20 @@ class FileNotFoundError(SandboxError, builtins.FileNotFoundError):  # noqa: A001
     """
 
 
+class FileTooLargeError(SandboxError):
+    """Raised when a unary ``read_bytes`` or ``write_bytes`` refuses a file above
+    ``max_bytes``; use ``read_stream`` or ``write_stream`` instead. ``operation``
+    is ``"ReadFile"`` or ``"WriteFile"``. ``size_bytes`` is a lower bound when the
+    guest could not stat the file's size.
+    """
+
+    def __init__(self, message: str, *, operation: str, size_bytes: int, max_bytes: int) -> None:
+        super().__init__(message)
+        self.operation = operation
+        self.size_bytes = size_bytes
+        self.max_bytes = max_bytes
+
+
 class SessionTerminatedError(SandboxError):
     """Raised when the session is gone: already terminated when the call was
     made, or torn down by the platform mid-stream.
@@ -309,7 +323,9 @@ class CommandFailedError(SandboxError):
 
 
 class CapabilityUnavailableError(SandboxError):
-    pass
+    def __init__(self, *args: object, primitive: str = "") -> None:
+        super().__init__(*args)
+        self.primitive = primitive
 
 
 class PrimitiveTimeoutError(CapabilityUnavailableError):
@@ -332,6 +348,16 @@ def session_termination_cause(reason: str) -> str:
         return ""
     return reason[len(prefix) :].split(":", 1)[0].strip()
 
+
+# Same pattern as fileTooLargeRe in errors.go and FILE_TOO_LARGE in errors.ts.
+_FILE_TOO_LARGE = re.compile(
+    r"file too large for (ReadFile|WriteFile): size_bytes=(\d{1,18}) max_bytes=(\d{1,18})"
+)
+
+# A guest agent without a primitive answers with this text; older node agents relay it as
+# INTERNAL, newer as UNIMPLEMENTED. Same pattern as legacyGuestUnknownRequestRe in errors.go
+# and LEGACY_GUEST_UNKNOWN_REQUEST in errors.ts.
+_LEGACY_GUEST_UNKNOWN_REQUEST = re.compile(r"unknown request type: \*sandboxv1\.GuestRequest_(\w+)")
 
 # Git failure classification — see the matching block in errors.ts / errors.go.
 _GIT_FAILURE = re.compile(r"git .*failed \(exit_code=", re.IGNORECASE)
@@ -506,6 +532,9 @@ def map_rpc_error(err: Exception) -> SandboxError:
         details = details_fn() or details
 
     msg = details.lower()
+    legacy_guest = _LEGACY_GUEST_UNKNOWN_REQUEST.search(details)
+    if legacy_guest:
+        return CapabilityUnavailableError(details, primitive=legacy_guest.group(1))
     if code_name == "FAILED_PRECONDITION":
         runtime_failure = _template_runtime_failure_detail(err)
         if runtime_failure is not None:
@@ -547,6 +576,14 @@ def map_rpc_error(err: Exception) -> SandboxError:
     if code_name == "DEADLINE_EXCEEDED":
         return CommandTimeoutError(details)
     if code_name == "RESOURCE_EXHAUSTED":
+        too_large = _FILE_TOO_LARGE.search(details)
+        if too_large:
+            return FileTooLargeError(
+                details,
+                operation=too_large.group(1),
+                size_bytes=int(too_large.group(2)),
+                max_bytes=int(too_large.group(3)),
+            )
         if "maximum exposed ports" in msg:
             return PortLimitExceededError(details)
         if "rate limit" in msg:

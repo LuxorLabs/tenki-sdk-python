@@ -142,8 +142,8 @@ async def open_dial_conn(rpc, session_id: str, unix_socket_path: str, connect_ti
         detail = first.closed.detail or ""
         if reason == pb.DialClosed.REASON_CAPABILITY_UNAVAILABLE:
             if detail.startswith("first_frame_timeout"):
-                raise PrimitiveTimeoutError("dial", detail)
-            raise CapabilityUnavailableError("dial", detail)
+                raise PrimitiveTimeoutError(detail, primitive="dial")
+            raise CapabilityUnavailableError(detail or "sandbox capability unavailable: dial", primitive="dial")
         if reason == pb.DialClosed.REASON_TIMEOUT:
             raise TimeoutError(f"dial connect timed out: {detail}")
         raise RuntimeError(f"dial failed: {detail}")

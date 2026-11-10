@@ -97,7 +97,9 @@ KEEPALIVE_CHANNEL_OPTIONS = (
 
 # grpc-core prepends the primary user agent to its own, like the Go and TypeScript SDKs.
 SDK_CHANNEL_OPTIONS = (("grpc.primary_user_agent", SDK_USER_AGENT),)
-CHANNEL_OPTIONS = KEEPALIVE_CHANNEL_OPTIONS + SDK_CHANNEL_OPTIONS
+# A unary ReadFile returns up to 32 MiB plus its envelope; grpc-core otherwise refuses replies above 4 MiB.
+MAX_RECEIVE_CHANNEL_OPTIONS = (("grpc.max_receive_message_length", 33 << 20),)
+CHANNEL_OPTIONS = KEEPALIVE_CHANNEL_OPTIONS + SDK_CHANNEL_OPTIONS + MAX_RECEIVE_CHANNEL_OPTIONS
 SDK_METADATA = ((SDK_HEADER, SDK_HEADER_VALUE),)
 
 

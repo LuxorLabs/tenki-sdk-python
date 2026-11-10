@@ -15,6 +15,7 @@ class SandboxFS:
         self._session_id = session_id
 
     def write_bytes(self, path: str, data: bytes) -> None:
+        """Write up to 32 MiB; larger content raises ``FileTooLargeError``, so write it with ``write_stream``."""
         try:
             self._rpc.write_file(pb.WriteFileRequest(session_id=self._session_id, path=path, content=data))
         except Exception as err:
@@ -24,6 +25,7 @@ class SandboxFS:
         self.write_bytes(path, text.encode(encoding))
 
     def read_bytes(self, path: str) -> bytes:
+        """Read up to 32 MiB; larger files raise ``FileTooLargeError``, so read them with ``read_stream``."""
         try:
             resp = self._rpc.read_file(pb.ReadFileRequest(session_id=self._session_id, path=path))
             return bytes(resp.content)

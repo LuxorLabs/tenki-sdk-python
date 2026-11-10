@@ -80,9 +80,9 @@ def _command_result_from_exit(
     exit: pb.RunExit, argv: list[str], stdout: bytes, stderr: bytes
 ) -> CommandResult:
     if exit.reason.startswith("first_frame_timeout"):
-        raise PrimitiveTimeoutError(exit.reason)
+        raise PrimitiveTimeoutError(exit.reason, primitive="run")
     if exit.reason.startswith("capability_unavailable"):
-        raise CapabilityUnavailableError(exit.reason)
+        raise CapabilityUnavailableError(exit.reason, primitive="run")
     if is_session_terminated_reason(exit.reason):
         raise SessionTerminatedError(
             exit.reason,

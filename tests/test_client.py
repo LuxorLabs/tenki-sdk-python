@@ -1825,4 +1825,5 @@ def test_client_enables_http2_keepalive(monkeypatch):
         "grpc.http2.ping_timeout_ms": 5_000,
         "grpc.http2.max_pings_without_data": 0,
         "grpc.primary_user_agent": f"luxor-sandbox-python/{SDK_VERSION}",
+        "grpc.max_receive_message_length": 33 << 20,
     }
