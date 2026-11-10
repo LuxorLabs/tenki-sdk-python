@@ -101,6 +101,22 @@ class EgressPolicyNotFoundError(SandboxError):
     pass
 
 
+class StorageConnectionNotFoundError(SandboxError):
+    pass
+
+
+class StorageMountNotFoundError(SandboxError):
+    pass
+
+
+class StorageMountAttachCancelledError(SandboxError):
+    """A detach of the same mount landed before the attach finished."""
+
+
+class StorageConnectionDisabledError(SandboxError):
+    """Tenki disabled the storage connection; contact support to restore it."""
+
+
 class VolumeInUseError(SandboxError):
     pass
 
@@ -509,6 +525,10 @@ def map_rpc_error(err: Exception) -> SandboxError:
         # Matched as a prefix first: the message ends with caller-chosen policy names.
         if msg.startswith("egress polic"):
             return EgressPolicyNotFoundError(details)
+        if "storage connection" in msg:
+            return StorageConnectionNotFoundError(details)
+        if "storage mount" in msg:
+            return StorageMountNotFoundError(details)
         if "template" in msg:
             return TemplateNotFoundError(details)
         if "snapshot" in msg:
@@ -533,6 +553,8 @@ def map_rpc_error(err: Exception) -> SandboxError:
             return RateLimitedError(details)
         return QuotaExceededError(details)
     if code_name == "FAILED_PRECONDITION":
+        if "disabled by tenki" in msg:
+            return StorageConnectionDisabledError(details)
         if "terminated" in msg:
             return SessionTerminatedError(details)
         if _GIT_FAILURE.search(details):
@@ -555,6 +577,8 @@ def map_rpc_error(err: Exception) -> SandboxError:
         if "template build already in progress" in msg or "build in progress" in msg:
             return TemplateBuildInProgressError(details)
         return InvalidStateError(details)
+    if code_name == "ABORTED" and "cancelled by a detach" in msg:
+        return StorageMountAttachCancelledError(details)
     if code_name == "ABORTED" and msg.startswith("resume failed"):
         return ResumeFailedError(details)
     if code_name == "UNAVAILABLE":

@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Sequence
 
+from . import _storage
 from ._convert import exposed_port, sandbox_info
 from ._pb import pb
 from ._time import duration, seconds
@@ -40,6 +41,8 @@ from .models import (
     TailnetStatus,
     Template,
     VolumeMount,
+    StorageMount,
+    StorageMountSpec,
 )
 from .process import Process, _rpc_error_message
 from .secret_files import RuntimeSecretFile
@@ -319,6 +322,9 @@ class Sandbox:
         enable_opencode: bool = False,
         clone_repo_url: str | None = None,
         volumes: list[dict | tuple] | None = None,
+        storage_mounts: list[StorageMountSpec | dict] | None = None,
+        disable_storage_defaults: bool = False,
+        excluded_default_mount_ids: list[str] | None = None,
         github_token: str | None = None,
         sticky: bool = False,
         wait_for_runtime: bool = False,
@@ -378,6 +384,9 @@ class Sandbox:
                 enable_opencode=enable_opencode,
                 clone_repo_url=clone_repo_url,
                 volumes=volumes,
+                storage_mounts=storage_mounts,
+                disable_storage_defaults=disable_storage_defaults,
+                excluded_default_mount_ids=excluded_default_mount_ids,
                 github_token=github_token,
                 sticky=sticky,
                 wait_for_runtime=wait_for_runtime,
@@ -904,6 +913,33 @@ class Sandbox:
             mount for mount in self._info.volume_mounts if mount.volume_id != volume_id
         )
         self._info = dataclasses.replace(self._info, volume_mounts=mounts)
+
+    def list_storage_mounts(self) -> list[StorageMount]:
+        try:
+            response = self._client._rpc.list_storage_mounts(
+                pb.ListStorageMountsRequest(session_id=self.id)
+            )
+            return [_storage.mount_from_proto(mount) for mount in response.mounts]
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    def attach_storage_mount(self, mount: StorageMountSpec | dict) -> StorageMount:
+        """Mount a storage connection into this running sandbox; returns once it is mounted or failed."""
+        try:
+            response = self._client._rpc.attach_storage_mount(
+                pb.AttachStorageMountRequest(session_id=self.id, mount=_storage.mount_spec(mount))
+            )
+            return _storage.mount_from_proto(response.mount)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    def detach_storage_mount(self, mount_id: str) -> None:
+        try:
+            self._client._rpc.detach_storage_mount(
+                pb.DetachStorageMountRequest(session_id=self.id, mount_id=mount_id)
+            )
+        except Exception as err:
+            raise map_rpc_error(err) from err
 
     def _is_volume_detached(self, volume_id: str) -> bool:
         matches = [

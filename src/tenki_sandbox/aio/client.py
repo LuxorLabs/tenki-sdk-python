@@ -30,6 +30,7 @@ from ..models import (
     TailnetAttachment,
     Template,
 	WorkspaceUsageLimit,
+    StorageMountSpec,
 )
 from ..secret_files import RuntimeSecretFile
 from ..template_spec import TemplateSpec
@@ -43,7 +44,7 @@ from ._transport import AsyncGrpcSandboxRPC
 from .preview_url import AsyncPreviewUrls
 from .registry import AsyncRegistry
 from ..egress_policies import AsyncEgressPolicies
-from .resources import AsyncSnapshots, AsyncTemplates, AsyncVolumes
+from .resources import AsyncSnapshots, AsyncStorageConnections, AsyncTemplates, AsyncVolumes
 from .sandbox import AsyncSandbox
 
 
@@ -80,6 +81,7 @@ class AsyncClient:
         self.preview_urls = AsyncPreviewUrls(self._rpc)
         self.volumes = AsyncVolumes(self._rpc)
         self.egress_policies = AsyncEgressPolicies(self._rpc)
+        self.storage_connections = AsyncStorageConnections(self._rpc)
         self.snapshots = AsyncSnapshots(self._rpc)
         self.templates = AsyncTemplates(self._rpc)
         self.registry = AsyncRegistry(self._rpc)
@@ -138,6 +140,9 @@ class AsyncClient:
         enable_opencode: bool = False,
         clone_repo_url: str | None = None,
         volumes: list[dict | tuple] | None = None,
+        storage_mounts: list[StorageMountSpec | dict] | None = None,
+        disable_storage_defaults: bool = False,
+        excluded_default_mount_ids: list[str] | None = None,
         github_token: str | None = None,
         sticky: bool = False,
         wait_for_runtime: bool = False,
@@ -197,6 +202,9 @@ class AsyncClient:
             enable_opencode=enable_opencode,
             clone_repo_url=clone_repo_url,
             volumes=volumes,
+            storage_mounts=storage_mounts,
+            disable_storage_defaults=disable_storage_defaults,
+            excluded_default_mount_ids=excluded_default_mount_ids,
             github_token=github_token,
             sticky=sticky,
             # Normal readiness waits client-side so WaitSession can expose and
