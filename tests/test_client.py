@@ -526,13 +526,14 @@ def test_create_sets_egress_only_when_allow_domains_or_allow_cidrs_given():
     client.create(
         workspace_id="ws-1",
         wait=False,
-        allow_domains=["*.pypi.org", "files.pythonhosted.org"],
+        allow_domains=["*.pypi.org", "**.sb.tenki.sh", "files.pythonhosted.org"],
         allow_cidrs=["10.0.0.0/8"],
     )
     with_egress = rpc.requests["create_session"][-1]
     assert with_egress.HasField("egress")
     assert list(with_egress.egress.allow_domains) == [
         "*.pypi.org",
+        "**.sb.tenki.sh",
         "files.pythonhosted.org",
     ]
     assert list(with_egress.egress.allow_cidrs) == ["10.0.0.0/8"]

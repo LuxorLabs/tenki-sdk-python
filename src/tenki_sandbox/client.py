@@ -161,7 +161,10 @@ class Client:
         that source's disk unless this is set.
 
         ``allow_domains``/``allow_cidrs`` restrict outbound access; both are
-        ignored when ``allow_outbound`` is false. ``intercept_https`` (requires
+        ignored when ``allow_outbound`` is false. An ``allow_domains`` entry is
+        an exact host, ``*.example.com`` (one subdomain label) or
+        ``**.example.com`` (any depth); neither wildcard matches the bare
+        parent. ``intercept_https`` (requires
         ``allow_domains``) terminates HTTPS at the egress proxy so each request's
         Host must match the TLS server name; ``http_rules`` (requires
         ``intercept_https``) refuses with 403 any HTTP request on ports 80 and
