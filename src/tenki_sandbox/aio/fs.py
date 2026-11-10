@@ -6,7 +6,7 @@ from typing import AsyncIterable, AsyncIterator, Iterable
 
 from .._convert import file_info
 from .._pb import pb
-from ..errors import FileNotFoundError, map_rpc_error
+from ..errors import FileNotFoundError, StreamClosedError, map_rpc_error
 from ..models import FileInfo
 
 
@@ -27,6 +27,7 @@ class AsyncSandboxFS:
         self._session_id = session_id
 
     async def write_bytes(self, path: str, data: bytes) -> None:
+        """Write up to 32 MiB; larger content raises ``FileTooLargeError``, so write it with ``write_stream``."""
         try:
             rpc = await self._resolve_rpc()
             await rpc.write_file(pb.WriteFileRequest(session_id=self._session_id, path=path, content=data))
@@ -37,6 +38,7 @@ class AsyncSandboxFS:
         await self.write_bytes(path, text.encode(encoding))
 
     async def read_bytes(self, path: str) -> bytes:
+        """Read up to 32 MiB; larger files raise ``FileTooLargeError``, so read them with ``read_stream``."""
         try:
             rpc = await self._resolve_rpc()
             resp = await rpc.read_file(pb.ReadFileRequest(session_id=self._session_id, path=path))
@@ -76,7 +78,10 @@ class AsyncSandboxFS:
         truncate: bool = True,
         sync: bool = False,
     ) -> None:
+        sent_all = False
+
         async def requests():
+            nonlocal sent_all
             yield pb.WriteFileStreamRequest(
                 start=pb.WriteFileStreamStart(
                     session_id=self._session_id,
@@ -90,12 +95,16 @@ class AsyncSandboxFS:
                 if isinstance(chunk, str):
                     chunk = chunk.encode()
                 yield pb.WriteFileStreamRequest(data=chunk)
+            sent_all = True
 
         try:
             rpc = await self._resolve_rpc()
             await rpc.write_file_stream(requests())
         except Exception as err:
             raise map_rpc_error(err) from err
+        # An early OK would otherwise truncate silently; this only catches frames not yet handed to the transport.
+        if not sent_all:
+            raise StreamClosedError("server ended the write stream before all data was sent")
 
     async def upload(self, local_path: str | Path, remote_path: str, *, chunk_bytes: int = 1024 * 1024) -> None:
         path = Path(local_path)

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-import os
 
 from .._convert import ci_runner_sizes, identity, sandbox_info, session_metrics, workspace_usage_limit
 from .._pagination import advance_page_token
 from .._pb import pb
 from .._time import duration
 from .._transport import (
-    KEEPALIVE_CHANNEL_OPTIONS,
+    CHANNEL_OPTIONS,
     GrpcConfig,
     resolve_auth_token,
     resolve_base_url,
+    read_env,
     resolve_gateway_url,
 )
 from ..client import (
@@ -19,7 +19,7 @@ from ..client import (
     build_create_session_request,
     build_issue_ssh_cert_request,
 )
-from ..constants import ENV_GATEWAY_URL
+from ..constants import GATEWAY_URL_ENVS
 from ..errors import WaitReadyFailedError, map_rpc_error
 from ..models import (
     CIRunnerSizes,
@@ -30,6 +30,7 @@ from ..models import (
     TailnetAttachment,
     Template,
 	WorkspaceUsageLimit,
+    StorageMountSpec,
 )
 from ..secret_files import RuntimeSecretFile
 from ..template_spec import TemplateSpec
@@ -43,7 +44,7 @@ from ._transport import AsyncGrpcSandboxRPC
 from .preview_url import AsyncPreviewUrls
 from .registry import AsyncRegistry
 from ..egress_policies import AsyncEgressPolicies
-from .resources import AsyncSnapshots, AsyncTemplates, AsyncVolumes
+from .resources import AsyncSnapshots, AsyncStorageConnections, AsyncTemplates, AsyncVolumes
 from .sandbox import AsyncSandbox
 
 
@@ -61,7 +62,7 @@ class AsyncClient:
     ) -> None:
         self.base_url = resolve_base_url(base_url)
         self.gateway_url = resolve_gateway_url(gateway_url, self.base_url)
-        self._gateway_explicit = bool((gateway_url or os.getenv(ENV_GATEWAY_URL) or "").strip())
+        self._gateway_explicit = bool((gateway_url or read_env(GATEWAY_URL_ENVS)).strip())
         self.auth_token = (
             resolve_auth_token(auth_token, api_key)
             if rpc is None or auth_token is not None or api_key is not None
@@ -73,13 +74,14 @@ class AsyncClient:
                 auth_token=self.auth_token,
                 timeout=timeout,
                 # Same HTTP/2 keepalive as the Go and TypeScript clients.
-                channel_options=KEEPALIVE_CHANNEL_OPTIONS,
+                channel_options=CHANNEL_OPTIONS,
             )
         )
         self._warning_handler = warning_handler
         self.preview_urls = AsyncPreviewUrls(self._rpc)
         self.volumes = AsyncVolumes(self._rpc)
         self.egress_policies = AsyncEgressPolicies(self._rpc)
+        self.storage_connections = AsyncStorageConnections(self._rpc)
         self.snapshots = AsyncSnapshots(self._rpc)
         self.templates = AsyncTemplates(self._rpc)
         self.registry = AsyncRegistry(self._rpc)
@@ -138,6 +140,9 @@ class AsyncClient:
         enable_opencode: bool = False,
         clone_repo_url: str | None = None,
         volumes: list[dict | tuple] | None = None,
+        storage_mounts: list[StorageMountSpec | dict] | None = None,
+        disable_storage_defaults: bool = False,
+        excluded_default_mount_ids: list[str] | None = None,
         github_token: str | None = None,
         sticky: bool = False,
         wait_for_runtime: bool = False,
@@ -154,7 +159,10 @@ class AsyncClient:
         that source's disk unless this is set.
 
         ``allow_domains``/``allow_cidrs`` restrict outbound access; both are
-        ignored when ``allow_outbound`` is false. ``intercept_https`` (requires
+        ignored when ``allow_outbound`` is false. An ``allow_domains`` entry is
+        an exact host, ``*.example.com`` (one subdomain label) or
+        ``**.example.com`` (any depth); neither wildcard matches the bare
+        parent. ``intercept_https`` (requires
         ``allow_domains``) terminates HTTPS at the egress proxy so each request's
         Host must match the TLS server name; ``http_rules`` (requires
         ``intercept_https``) refuses with 403 any HTTP request on ports 80 and
@@ -197,6 +205,9 @@ class AsyncClient:
             enable_opencode=enable_opencode,
             clone_repo_url=clone_repo_url,
             volumes=volumes,
+            storage_mounts=storage_mounts,
+            disable_storage_defaults=disable_storage_defaults,
+            excluded_default_mount_ids=excluded_default_mount_ids,
             github_token=github_token,
             sticky=sticky,
             # Normal readiness waits client-side so WaitSession can expose and

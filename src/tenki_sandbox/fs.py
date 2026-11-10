@@ -5,7 +5,7 @@ from typing import Iterable
 
 from ._convert import file_info
 from ._pb import pb
-from .errors import FileNotFoundError, map_rpc_error
+from .errors import FileNotFoundError, StreamClosedError, map_rpc_error
 from .models import FileInfo
 
 
@@ -15,6 +15,7 @@ class SandboxFS:
         self._session_id = session_id
 
     def write_bytes(self, path: str, data: bytes) -> None:
+        """Write up to 32 MiB; larger content raises ``FileTooLargeError``, so write it with ``write_stream``."""
         try:
             self._rpc.write_file(pb.WriteFileRequest(session_id=self._session_id, path=path, content=data))
         except Exception as err:
@@ -24,6 +25,7 @@ class SandboxFS:
         self.write_bytes(path, text.encode(encoding))
 
     def read_bytes(self, path: str) -> bytes:
+        """Read up to 32 MiB; larger files raise ``FileTooLargeError``, so read them with ``read_stream``."""
         try:
             resp = self._rpc.read_file(pb.ReadFileRequest(session_id=self._session_id, path=path))
             return bytes(resp.content)
@@ -59,7 +61,10 @@ class SandboxFS:
         truncate: bool = True,
         sync: bool = False,
     ) -> None:
+        sent_all = False
+
         def requests():
+            nonlocal sent_all
             yield pb.WriteFileStreamRequest(
                 start=pb.WriteFileStreamStart(
                     session_id=self._session_id,
@@ -73,11 +78,15 @@ class SandboxFS:
                 if isinstance(chunk, str):
                     chunk = chunk.encode()
                 yield pb.WriteFileStreamRequest(data=chunk)
+            sent_all = True
 
         try:
             self._rpc.write_file_stream(requests())
         except Exception as err:
             raise map_rpc_error(err) from err
+        # An early OK would otherwise truncate silently; this only catches frames not yet handed to the transport.
+        if not sent_all:
+            raise StreamClosedError("server ended the write stream before all data was sent")
 
     def upload(self, local_path: str | Path, remote_path: str, *, chunk_bytes: int = 1024 * 1024) -> None:
         path = Path(local_path)

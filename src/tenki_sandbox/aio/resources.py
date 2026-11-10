@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime
 
 from .._convert import snapshot, snapshot_download_url, template, template_build, volume
+from .. import _storage
 from .._pb import pb, template_pb
 from .._pagination import advance_page_token
 from .._time import timestamp
@@ -30,6 +31,11 @@ from ..models import (
     TemplateBuild,
     TemplateBuildEvent,
     Volume,
+    StorageConnection,
+    StorageConnectionCredentials,
+    StorageConnectionList,
+    StorageConnectionTest,
+    StorageDefaults,
 )
 from ..resources import (  # shared request builders/id helpers; one canonical copy
     build_create_template_request,
@@ -141,6 +147,93 @@ class AsyncVolumes:
                 raise RuntimeError(f"volume entered terminal state: {vol.state}")
             await asyncio.sleep(0.5)
         raise TimeoutError(f"timeout waiting for volume {volume_id}")
+
+
+class AsyncStorageConnections:
+    """Workspace storage connections; credentials live in Tenki Secrets under the s3_storage scope."""
+
+    def __init__(self, rpc) -> None:
+        self._rpc = rpc
+
+    async def create(
+        self,
+        *,
+        name: str,
+        provider: str,
+        bucket: str,
+        auth_method: str,
+        default_access: str,
+        credentials: StorageConnectionCredentials,
+        endpoint: str = "",
+        region: str = "",
+        workspace_id: str = "",
+    ) -> StorageConnection:
+        """``endpoint`` may be empty for AWS_S3 (derived from ``region``) and GCS; ``workspace_id`` defaults to the API key's."""
+        req = _storage.create_connection_request(
+            workspace_id=workspace_id, name=name, provider=provider, bucket=bucket, auth_method=auth_method,
+            default_access=default_access, credentials=credentials, endpoint=endpoint, region=region,
+        )
+        try:
+            return _storage.connection_from_proto((await self._rpc.create_storage_connection(req)).connection)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def list(self, *, workspace_id: str = "") -> StorageConnectionList:
+        try:
+            response = await self._rpc.list_storage_connections(pb.ListStorageConnectionsRequest(workspace_id=workspace_id))
+            return _storage.connection_list_from_proto(response)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def update(
+        self,
+        connection_id: str,
+        *,
+        expected_revision: int,
+        name: str | None = None,
+        endpoint: str | None = None,
+        region: str | None = None,
+        default_access: str | None = None,
+        credentials: StorageConnectionCredentials | None = None,
+    ) -> StorageConnection:
+        req = _storage.update_connection_request(
+            connection_id, expected_revision=expected_revision, name=name, endpoint=endpoint, region=region,
+            default_access=default_access, credentials=credentials,
+        )
+        try:
+            return _storage.connection_from_proto((await self._rpc.update_storage_connection(req)).connection)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def delete(self, connection_id: str, *, expected_revision: int) -> None:
+        try:
+            await self._rpc.delete_storage_connection(
+                pb.DeleteStorageConnectionRequest(connection_id=connection_id, expected_revision=expected_revision)
+            )
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def test(self, connection_id: str) -> StorageConnectionTest:
+        try:
+            response = await self._rpc.test_storage_connection(pb.TestStorageConnectionRequest(connection_id=connection_id))
+            return _storage.connection_test_from_proto(response)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def get_defaults(self, *, workspace_id: str = "") -> StorageDefaults:
+        try:
+            response = await self._rpc.get_storage_defaults(pb.GetStorageDefaultsRequest(workspace_id=workspace_id))
+            return _storage.defaults_from_proto(response.defaults)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def save_defaults(self, defaults: StorageDefaults, *, expected_revision: int) -> StorageDefaults:
+        """Replace the workspace's default mounts; pass the revision you read (0 before the first save)."""
+        try:
+            response = await self._rpc.save_storage_defaults(_storage.save_defaults_request(defaults, expected_revision))
+            return _storage.defaults_from_proto(response.defaults)
+        except Exception as err:
+            raise map_rpc_error(err) from err
 
 
 class AsyncSnapshots:

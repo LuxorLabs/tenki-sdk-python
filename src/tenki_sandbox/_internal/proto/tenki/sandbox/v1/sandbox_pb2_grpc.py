@@ -141,6 +141,56 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachVolumeRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachVolumeResponse.FromString,
                 _registered_method=True)
+        self.CreateStorageConnection = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/CreateStorageConnection',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateStorageConnectionRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateStorageConnectionResponse.FromString,
+                _registered_method=True)
+        self.TestStorageConnection = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/TestStorageConnection',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.TestStorageConnectionRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.TestStorageConnectionResponse.FromString,
+                _registered_method=True)
+        self.ListStorageConnections = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/ListStorageConnections',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageConnectionsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageConnectionsResponse.FromString,
+                _registered_method=True)
+        self.UpdateStorageConnection = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/UpdateStorageConnection',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateStorageConnectionRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateStorageConnectionResponse.FromString,
+                _registered_method=True)
+        self.DeleteStorageConnection = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/DeleteStorageConnection',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteStorageConnectionRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteStorageConnectionResponse.FromString,
+                _registered_method=True)
+        self.ListStorageMounts = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/ListStorageMounts',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageMountsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageMountsResponse.FromString,
+                _registered_method=True)
+        self.AttachStorageMount = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/AttachStorageMount',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.AttachStorageMountRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.AttachStorageMountResponse.FromString,
+                _registered_method=True)
+        self.DetachStorageMount = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/DetachStorageMount',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachStorageMountRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachStorageMountResponse.FromString,
+                _registered_method=True)
+        self.GetStorageDefaults = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/GetStorageDefaults',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetStorageDefaultsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetStorageDefaultsResponse.FromString,
+                _registered_method=True)
+        self.SaveStorageDefaults = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/SaveStorageDefaults',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.SaveStorageDefaultsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.SaveStorageDefaultsResponse.FromString,
+                _registered_method=True)
         self.ExecuteCommand = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/ExecuteCommand',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ExecuteCommandRequest.SerializeToString,
@@ -619,6 +669,66 @@ class SandboxServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def DetachVolume(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateStorageConnection(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def TestStorageConnection(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListStorageConnections(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateStorageConnection(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteStorageConnection(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ListStorageMounts(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def AttachStorageMount(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DetachStorageMount(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetStorageDefaults(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SaveStorageDefaults(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1152,6 +1262,56 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.DetachVolume,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachVolumeRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachVolumeResponse.SerializeToString,
+            ),
+            'CreateStorageConnection': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateStorageConnection,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateStorageConnectionRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateStorageConnectionResponse.SerializeToString,
+            ),
+            'TestStorageConnection': grpc.unary_unary_rpc_method_handler(
+                    servicer.TestStorageConnection,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.TestStorageConnectionRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.TestStorageConnectionResponse.SerializeToString,
+            ),
+            'ListStorageConnections': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListStorageConnections,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageConnectionsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageConnectionsResponse.SerializeToString,
+            ),
+            'UpdateStorageConnection': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateStorageConnection,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateStorageConnectionRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateStorageConnectionResponse.SerializeToString,
+            ),
+            'DeleteStorageConnection': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteStorageConnection,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteStorageConnectionRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteStorageConnectionResponse.SerializeToString,
+            ),
+            'ListStorageMounts': grpc.unary_unary_rpc_method_handler(
+                    servicer.ListStorageMounts,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageMountsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageMountsResponse.SerializeToString,
+            ),
+            'AttachStorageMount': grpc.unary_unary_rpc_method_handler(
+                    servicer.AttachStorageMount,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.AttachStorageMountRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.AttachStorageMountResponse.SerializeToString,
+            ),
+            'DetachStorageMount': grpc.unary_unary_rpc_method_handler(
+                    servicer.DetachStorageMount,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachStorageMountRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachStorageMountResponse.SerializeToString,
+            ),
+            'GetStorageDefaults': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetStorageDefaults,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetStorageDefaultsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetStorageDefaultsResponse.SerializeToString,
+            ),
+            'SaveStorageDefaults': grpc.unary_unary_rpc_method_handler(
+                    servicer.SaveStorageDefaults,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.SaveStorageDefaultsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.SaveStorageDefaultsResponse.SerializeToString,
             ),
             'ExecuteCommand': grpc.unary_unary_rpc_method_handler(
                     servicer.ExecuteCommand,
@@ -2136,6 +2296,276 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/DetachVolume',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachVolumeRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachVolumeResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateStorageConnection(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/CreateStorageConnection',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateStorageConnectionRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateStorageConnectionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def TestStorageConnection(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/TestStorageConnection',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.TestStorageConnectionRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.TestStorageConnectionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListStorageConnections(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/ListStorageConnections',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageConnectionsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageConnectionsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateStorageConnection(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/UpdateStorageConnection',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateStorageConnectionRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateStorageConnectionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteStorageConnection(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/DeleteStorageConnection',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteStorageConnectionRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DeleteStorageConnectionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ListStorageMounts(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/ListStorageMounts',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageMountsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.ListStorageMountsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def AttachStorageMount(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/AttachStorageMount',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.AttachStorageMountRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.AttachStorageMountResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DetachStorageMount(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/DetachStorageMount',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachStorageMountRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.DetachStorageMountResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetStorageDefaults(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/GetStorageDefaults',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetStorageDefaultsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetStorageDefaultsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SaveStorageDefaults(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/SaveStorageDefaults',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.SaveStorageDefaultsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.SaveStorageDefaultsResponse.FromString,
             options,
             channel_credentials,
             insecure,

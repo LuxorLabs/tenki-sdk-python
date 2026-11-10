@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tenki"
-version = "1.4.1"
+version = "1.4.3"
 description = "Tenki Cloud Python SDK — cloud sandboxes (microVMs) for AI agents and code execution"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -44,11 +44,11 @@ dev = [
   "websockets>=12",
 ]
 
-# `tenki` ships both the canonical `tenki` namespace and the legacy
-# `tenki_sandbox` implementation package, so `import tenki` and
-# `import tenki_sandbox` both resolve from this one distribution.
+# `tenki` ships the `luxor_ai` and `tenki` namespaces and the
+# `tenki_sandbox` implementation package, so `import luxor_ai`, `import tenki`
+# and `import tenki_sandbox` all resolve from this one distribution.
 [tool.hatch.build.targets.wheel]
-packages = ["src/tenki", "src/tenki_sandbox"]
+packages = ["src/luxor_ai", "src/tenki", "src/tenki_sandbox"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

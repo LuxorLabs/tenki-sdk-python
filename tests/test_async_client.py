@@ -9,11 +9,15 @@ import pytest
 from tenki_sandbox import (
     AsyncClient,
     AsyncSandbox,
+    CommandTimeoutError,
     EgressHttpRule,
     InvalidAuthTokenError,
     MissingAuthTokenError,
     PauseFailedError,
     PauseWaitCancelledError,
+    ResumeFailedError,
+    ResumeWaitCancelledError,
+    ResumeWaitTimeoutError,
     SandboxError,
     SandboxWarningCode,
     SandboxWarningNotification,
@@ -23,13 +27,15 @@ from tenki_sandbox._pb import pb
 from tenki_sandbox.aio.data_plane import _AsyncDataPlaneEndpointHints
 from tenki_sandbox.models import VolumeMount
 
-from _async_fakes import FakeControlRPC, FakeRPCError
+from _async_fakes import FakeControlRPC, FakeRPCError, session
 from tenki_sandbox.errors import PermissionDeniedError, SandboxError, SnapshotNotFoundError
 
 
 def test_async_client_requires_auth_without_injected_rpc(monkeypatch):
     monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
+    monkeypatch.delenv("LUXORAI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("LUXORAI_API_KEY", raising=False)
     with pytest.raises(MissingAuthTokenError):
         AsyncClient()
 
@@ -195,6 +201,8 @@ def test_async_client_rejects_invalid_auth_tokens(auth_token, rpc):
 def test_async_client_accepts_api_key_as_an_alias_for_auth_token(rpc, monkeypatch):
     monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
+    monkeypatch.delenv("LUXORAI_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("LUXORAI_API_KEY", raising=False)
 
     assert AsyncClient(api_key="tk_alias", rpc=rpc).auth_token == "tk_alias"
 
@@ -623,6 +631,154 @@ async def test_async_wait_paused_raises_when_pause_rolls_back():
         await sandbox.wait_paused(timeout=5)
 
 
+async def test_async_wait_resumed_reaches_running(monkeypatch):
+    rpc = FakeControlRPC()
+    rpc.get_states = [pb.SESSION_STATE_RESUMING, pb.SESSION_STATE_RUNNING]
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    async def no_sleep(_duration):
+        return None
+
+    monkeypatch.setattr("tenki_sandbox.aio.sandbox.asyncio.sleep", no_sleep)
+
+    await sandbox.wait_resumed(timeout=5)
+
+    assert sandbox.state == "RUNNING"
+
+
+async def test_async_wait_resumed_treats_concurrent_pause_as_landed(monkeypatch):
+    rpc = FakeControlRPC()
+    rpc.get_states = [
+        pb.SESSION_STATE_RESUMING,
+        pb.SESSION_STATE_PAUSING,
+        pb.SESSION_STATE_PAUSED,
+    ]
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    async def no_sleep(_duration):
+        return None
+
+    monkeypatch.setattr("tenki_sandbox.aio.sandbox.asyncio.sleep", no_sleep)
+
+    await sandbox.wait_resumed(timeout=5)
+
+    assert sandbox.state == "PAUSING"
+
+
+async def test_async_wait_resumed_raises_resume_failed_error_with_last_resume_error(monkeypatch):
+    rpc = FakeControlRPC()
+    resuming = session(pb.SESSION_STATE_RESUMING)
+    resuming.paused_at.seconds = 1_700_000_000
+    reverted = session(pb.SESSION_STATE_PAUSED)
+    reverted.paused_at.seconds = 1_700_000_000
+    reverted.last_resume_error = "restore timed out"
+    responses = [resuming, reverted]
+
+    async def get_session(req):
+        rpc._record("get_session", req)
+        return pb.GetSessionResponse(session=responses.pop(0) if responses else reverted)
+
+    rpc.get_session = get_session
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    async def no_sleep(_duration):
+        return None
+
+    monkeypatch.setattr("tenki_sandbox.aio.sandbox.asyncio.sleep", no_sleep)
+
+    with pytest.raises(ResumeFailedError, match="reverted to PAUSED: restore timed out"):
+        await sandbox.wait_resumed(timeout=5)
+
+
+async def test_async_wait_resumed_ignores_stale_pausing_read_before_resuming(monkeypatch):
+    rpc = FakeControlRPC()
+    stale = session(pb.SESSION_STATE_PAUSING)
+    resuming = session(pb.SESSION_STATE_RESUMING)
+    resuming.paused_at.seconds = 1_700_000_000
+    reverted = session(pb.SESSION_STATE_PAUSED)
+    reverted.paused_at.seconds = 1_700_000_000
+    reverted.last_resume_error = "restore timed out"
+    responses = [stale, resuming, reverted]
+
+    async def get_session(req):
+        rpc._record("get_session", req)
+        return pb.GetSessionResponse(session=responses.pop(0) if responses else reverted)
+
+    rpc.get_session = get_session
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    async def no_sleep(_duration):
+        return None
+
+    monkeypatch.setattr("tenki_sandbox.aio.sandbox.asyncio.sleep", no_sleep)
+
+    with pytest.raises(ResumeFailedError, match="restore timed out"):
+        await sandbox.wait_resumed(timeout=5)
+
+
+async def test_async_wait_resumed_treats_pause_between_polls_as_landed(monkeypatch):
+    rpc = FakeControlRPC()
+    resuming = session(pb.SESSION_STATE_RESUMING)
+    resuming.paused_at.seconds = 1_700_000_000
+    repaused = session(pb.SESSION_STATE_PAUSED)
+    repaused.paused_at.seconds = 1_700_003_600
+    responses = [resuming, repaused]
+
+    async def get_session(req):
+        rpc._record("get_session", req)
+        return pb.GetSessionResponse(session=responses.pop(0) if responses else repaused)
+
+    rpc.get_session = get_session
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    async def no_sleep(_duration):
+        return None
+
+    monkeypatch.setattr("tenki_sandbox.aio.sandbox.asyncio.sleep", no_sleep)
+
+    await sandbox.wait_resumed(timeout=5)
+
+    assert sandbox.state == "PAUSED"
+
+
+async def test_async_wait_resumed_reports_revert_after_snapshot_migration_as_failure(monkeypatch):
+    rpc = FakeControlRPC()
+    resuming = session(pb.SESSION_STATE_RESUMING)
+    resuming.paused_at.seconds = 1_700_000_000
+    resuming.pause_snapshot_id = "restored-snapshot"
+    migrated = session(pb.SESSION_STATE_PAUSED)
+    migrated.paused_at.seconds = 1_700_000_000
+    migrated.pause_snapshot_id = "migrated-snapshot"
+    responses = [resuming, migrated]
+
+    async def get_session(req):
+        rpc._record("get_session", req)
+        return pb.GetSessionResponse(session=responses.pop(0) if responses else migrated)
+
+    rpc.get_session = get_session
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+
+    async def no_sleep(_duration):
+        return None
+
+    monkeypatch.setattr("tenki_sandbox.aio.sandbox.asyncio.sleep", no_sleep)
+
+    with pytest.raises(ResumeFailedError):
+        await sandbox.wait_resumed(timeout=5)
+
+
+async def test_async_wait_resumed_can_be_cancelled():
+    rpc = FakeControlRPC()
+    sandbox = await AsyncClient(rpc=rpc).create(workspace_id="ws-1", wait=False)
+    cancel = asyncio.Event()
+    cancel.set()
+
+    with pytest.raises(ResumeWaitCancelledError, match="cancelled locally"):
+        await sandbox.wait_resumed(timeout=5, cancel_event=cancel)
+
+    assert "get_session" not in rpc.requests
+
+
 async def test_async_create_skips_failed_data_plane_route():
     # A FAILED route carries a dead endpoint; must NOT be cached, so first use
     # re-bootstraps via CreateSessionCredential instead of routing to the corpse.
@@ -832,10 +988,42 @@ async def test_async_pause_and_resume_reset_data_plane_fields():
     await sandbox.resume()
 
     assert sandbox.state == "RUNNING"
+    assert getattr(rpc.requests["resume_session"][-1], "async") is False
     assert resumed_dp.closed is True
     assert sandbox._data_plane_rpc is None
     assert sandbox._data_plane_credentials is None
     assert sandbox._data_plane_verified is False
+
+    await sandbox.resume_async()
+    assert sandbox.state == "RESUMING"
+    assert getattr(rpc.requests["resume_session"][-1], "async") is True
+
+
+async def test_async_resume_raises_resume_failed_error_when_resume_does_not_land():
+    class FailedResumeRPC(FakeControlRPC):
+        async def resume_session(self, req):
+            self._record("resume_session", req)
+            raise FakeRPCError("ABORTED", "resume failed, session is PAUSED: restore timed out")
+
+    sandbox = await AsyncClient(rpc=FailedResumeRPC()).create(workspace_id="ws-1", wait=False)
+
+    with pytest.raises(ResumeFailedError, match="restore timed out"):
+        await sandbox.resume()
+
+
+async def test_async_resume_raises_resume_wait_timeout_error_at_deadline():
+    class SlowResumeRPC(FakeControlRPC):
+        async def resume_session(self, req):
+            self._record("resume_session", req)
+            raise FakeRPCError("DEADLINE_EXCEEDED", "Deadline Exceeded")
+
+    sandbox = await AsyncClient(rpc=SlowResumeRPC()).create(workspace_id="ws-1", wait=False)
+
+    with pytest.raises(ResumeWaitTimeoutError, match="may still be resuming") as exc_info:
+        await sandbox.resume()
+    assert isinstance(exc_info.value, TimeoutError)
+    with pytest.raises(CommandTimeoutError):
+        await sandbox.resume_async()
 
 
 async def test_async_who_am_i():
@@ -1129,8 +1317,9 @@ async def test_wait_ready_poll_keeps_injected_rpc_contract():
 
 
 def test_async_client_enables_http2_keepalive():
-    from tenki_sandbox._transport import KEEPALIVE_CHANNEL_OPTIONS
+    from tenki_sandbox._transport import CHANNEL_OPTIONS, KEEPALIVE_CHANNEL_OPTIONS
 
     client = AsyncClient(base_url="http://localhost:8090", auth_token="tk_test")
-    assert client._rpc._channel_options == KEEPALIVE_CHANNEL_OPTIONS
+    assert client._rpc._channel_options == CHANNEL_OPTIONS
+    assert set(KEEPALIVE_CHANNEL_OPTIONS) <= set(CHANNEL_OPTIONS)
     assert dict(KEEPALIVE_CHANNEL_OPTIONS)["grpc.keepalive_time_ms"] == 30_000

@@ -322,8 +322,8 @@ def open_host_port_tunnel(
         detail = term.detail or ""
         if term.reason == pb.HostPortTunnelTerminated.REASON_CAPABILITY_UNAVAILABLE:
             if detail.startswith("first_frame_timeout"):
-                raise PrimitiveTimeoutError("host_port_tunnel", detail)
-            raise CapabilityUnavailableError("host_port_tunnel", detail)
+                raise PrimitiveTimeoutError(detail, primitive="host_port_tunnel")
+            raise CapabilityUnavailableError(detail or "sandbox capability unavailable: host_port_tunnel", primitive="host_port_tunnel")
         raise RuntimeError(f"host_port_tunnel failed: {detail}")
     if kind != "opened":
         raise RuntimeError(f"host_port_tunnel: unexpected first frame: {kind}")

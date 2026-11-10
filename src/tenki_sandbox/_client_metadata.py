@@ -14,11 +14,11 @@ def _sdk_version() -> str:
 
 
 CLIENT_METADATA: tuple[tuple[str, str], ...] = (
-    ("x-tenki-client-family", "python"),
-    ("x-tenki-client-version", _sdk_version()),
-    ("x-tenki-client-generation", CLIENT_GENERATION),
+    ("x-luxor-client-family", "python"),
+    ("x-luxor-client-version", _sdk_version()),
+    ("x-luxor-client-generation", CLIENT_GENERATION),
     (
-        "x-tenki-client-runtime",
+        "x-luxor-client-runtime",
         f"{platform.python_implementation().lower()}/{platform.python_version()}",
     ),
 )

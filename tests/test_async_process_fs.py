@@ -416,11 +416,31 @@ async def test_async_filesystem_helpers():
     assert entries[0].path == "a.txt"
 
 
-async def test_async_write_stream_reassembles():
+@pytest.mark.parametrize("chunks,expected", [([b"foo", b"bar"], b"foobar"), ([], b"")])
+async def test_async_write_stream_reassembles(chunks, expected):
     rpc = FakeDataPlaneRPC()
     sandbox = await _sandbox(rpc)
-    await sandbox.fs.write_stream("/workspace/b.txt", [b"foo", b"bar"])
-    assert rpc.files["/workspace/b.txt"] == b"foobar"
+    await sandbox.fs.write_stream("/workspace/b.txt", chunks)
+    assert rpc.files["/workspace/b.txt"] == expected
+
+
+@pytest.mark.parametrize("consumed", [["start"], ["start", "data"], ["start", "data", "data"]])
+async def test_async_write_stream_fails_when_server_ends_early_with_success(consumed):
+    rpc = FakeDataPlaneRPC()
+    sandbox = await _sandbox(rpc)
+    sent = []
+
+    async def write_file_stream(requests):
+        for _ in consumed:
+            sent.append(await requests.__anext__())
+        await requests.aclose()
+        return pb.WriteFileStreamResponse()
+
+    rpc.write_file_stream = write_file_stream
+
+    with pytest.raises(errors.StreamClosedError, match="before all data was sent"):
+        await sandbox.fs.write_stream("/workspace/b.txt", [b"foo", b"bar", b"baz"])
+    assert [frame.WhichOneof("payload") for frame in sent] == consumed
 
 
 async def test_async_stat_missing_raises_file_not_found():

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import warnings
 
 from ._convert import (
@@ -16,14 +15,15 @@ from ._pb import pb
 from ._resource_validation import validate_create_resources
 from ._time import duration
 from ._transport import (
-    KEEPALIVE_CHANNEL_OPTIONS,
+    CHANNEL_OPTIONS,
     GrpcConfig,
     GrpcSandboxRPC,
     resolve_auth_token,
     resolve_base_url,
+    read_env,
     resolve_gateway_url,
 )
-from .constants import ENV_GATEWAY_URL
+from .constants import GATEWAY_URL_ENVS
 from .errors import WaitReadyFailedError, map_rpc_error
 from .models import (
     CIRunnerSizes,
@@ -35,11 +35,13 @@ from .models import (
     TailnetAuthKey,
     Template,
     WorkspaceUsageLimit,
+    StorageMountSpec,
 )
 from .preview_url import PreviewUrls
 from .registry import Registry
 from .egress_policies import EgressPolicies
-from .resources import Snapshots, Templates, Volumes
+from . import _storage
+from .resources import Snapshots, StorageConnections, Templates, Volumes
 from .sandbox import Sandbox
 from .secret_files import RuntimeSecretFile, valid_secret_files
 from .template_spec import TemplateSpec
@@ -65,7 +67,7 @@ class Client:
     ) -> None:
         self.base_url = resolve_base_url(base_url)
         self.gateway_url = resolve_gateway_url(gateway_url, self.base_url)
-        self._gateway_explicit = bool((gateway_url or os.getenv(ENV_GATEWAY_URL) or "").strip())
+        self._gateway_explicit = bool((gateway_url or read_env(GATEWAY_URL_ENVS)).strip())
         self.auth_token = (
             resolve_auth_token(auth_token, api_key)
             if rpc is None or auth_token is not None or api_key is not None
@@ -77,13 +79,14 @@ class Client:
                 auth_token=self.auth_token,
                 timeout=timeout,
                 # Same HTTP/2 keepalive as the Go and TypeScript clients.
-                channel_options=KEEPALIVE_CHANNEL_OPTIONS,
+                channel_options=CHANNEL_OPTIONS,
             )
         )
         self._warning_handler = warning_handler
         self.preview_urls = PreviewUrls(self._rpc)
         self.volumes = Volumes(self._rpc)
         self.egress_policies = EgressPolicies(self._rpc)
+        self.storage_connections = StorageConnections(self._rpc)
         self.snapshots = Snapshots(self._rpc)
         self.templates = Templates(self._rpc)
         self.registry = Registry(self._rpc)
@@ -139,6 +142,9 @@ class Client:
         enable_opencode: bool = False,
         clone_repo_url: str | None = None,
         volumes: list[dict | tuple] | None = None,
+        storage_mounts: list[StorageMountSpec | dict] | None = None,
+        disable_storage_defaults: bool = False,
+        excluded_default_mount_ids: list[str] | None = None,
         github_token: str | None = None,
         sticky: bool = False,
         wait_for_runtime: bool = False,
@@ -155,7 +161,10 @@ class Client:
         that source's disk unless this is set.
 
         ``allow_domains``/``allow_cidrs`` restrict outbound access; both are
-        ignored when ``allow_outbound`` is false. ``intercept_https`` (requires
+        ignored when ``allow_outbound`` is false. An ``allow_domains`` entry is
+        an exact host, ``*.example.com`` (one subdomain label) or
+        ``**.example.com`` (any depth); neither wildcard matches the bare
+        parent. ``intercept_https`` (requires
         ``allow_domains``) terminates HTTPS at the egress proxy so each request's
         Host must match the TLS server name; ``http_rules`` (requires
         ``intercept_https``) refuses with 403 any HTTP request on ports 80 and
@@ -198,6 +207,9 @@ class Client:
             enable_opencode=enable_opencode,
             clone_repo_url=clone_repo_url,
             volumes=volumes,
+            storage_mounts=storage_mounts,
+            disable_storage_defaults=disable_storage_defaults,
+            excluded_default_mount_ids=excluded_default_mount_ids,
             github_token=github_token,
             sticky=sticky,
             # Normal readiness waits client-side so WaitSession can expose and
@@ -407,6 +419,9 @@ def build_create_session_request(
     enable_opencode: bool = False,
     clone_repo_url: str | None = None,
     volumes: list[dict | tuple] | None = None,
+    storage_mounts: list[StorageMountSpec | dict] | None = None,
+    disable_storage_defaults: bool = False,
+    excluded_default_mount_ids: list[str] | None = None,
     github_token: str | None = None,
     sticky: bool = False,
     wait_ready: bool = False,
@@ -499,6 +514,10 @@ def build_create_session_request(
             req.volumes.append(
                 pb.VolumeMount(volume_id=volume_id, mount_path=mount_path, readonly=bool(rest and rest[0]))
             )
+    for mount in storage_mounts or []:
+        req.storage_mounts.append(_storage.mount_spec(mount))
+    req.disable_storage_defaults = disable_storage_defaults
+    req.excluded_default_mount_ids.extend(mount_id.strip() for mount_id in excluded_default_mount_ids or [])
     if direct_runtime is not None:
         if from_template_spec:
             raise ValueError("direct_runtime conflicts with from_template_spec")

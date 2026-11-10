@@ -7,21 +7,30 @@ from urllib.parse import urlparse
 
 from ._client_metadata import CLIENT_METADATA
 from .constants import (
+    API_KEY_PREFIXES,
+    AUTH_TOKEN_ENVS,
+    BASE_URL_ENVS,
     DEFAULT_BASE_URL,
-    ENV_API_ENDPOINT,
-    ENV_API_KEY,
-    ENV_API_URL,
-    ENV_AUTH_TOKEN,
-    ENV_GATEWAY_URL,
+    GATEWAY_URL_ENVS,
+    SDK_USER_AGENT,
 )
 from .errors import InvalidAuthTokenError, MissingAuthTokenError, map_rpc_error
+
+
+def read_env(names: tuple[str, ...]) -> str:
+    """Returns the first non-blank environment value among names, trimmed, in order."""
+    for name in names:
+        value = (os.getenv(name) or "").strip()
+        if value:
+            return value
+    return ""
 
 
 def _validate_auth_token(auth_token: str) -> str:
     token = auth_token.strip()
     if not token:
         raise MissingAuthTokenError()
-    if not token.startswith("tk_"):
+    if not token.startswith(API_KEY_PREFIXES):
         raise InvalidAuthTokenError()
     return token
 
@@ -30,15 +39,14 @@ def resolve_auth_token(auth_token: str | None, api_key: str | None = None) -> st
     # Strip first so a whitespace-only value counts as absent; auth_token wins over its alias.
     explicit = (auth_token or "").strip()
     alias = (api_key or "").strip()
-    token = explicit or alias or os.getenv(ENV_AUTH_TOKEN) or os.getenv(ENV_API_KEY)
+    token = explicit or alias or read_env(AUTH_TOKEN_ENVS)
     return _validate_auth_token(token or "")
 
 
 def resolve_base_url(base_url: str | None) -> str:
     return (
         base_url
-        or os.getenv(ENV_API_ENDPOINT)
-        or os.getenv(ENV_API_URL)
+        or read_env(BASE_URL_ENVS)
         or DEFAULT_BASE_URL
     ).strip()
 
@@ -51,7 +59,7 @@ def _parse_url(url: str):
 
 
 def resolve_gateway_url(gateway_url: str | None, base_url: str) -> str:
-    explicit = (gateway_url or os.getenv(ENV_GATEWAY_URL) or "").strip()
+    explicit = (gateway_url or read_env(GATEWAY_URL_ENVS)).strip()
     if explicit:
         return explicit
     parsed = _parse_url(base_url)
@@ -84,6 +92,12 @@ KEEPALIVE_CHANNEL_OPTIONS = (
     ("grpc.http2.ping_timeout_ms", 5_000),
     ("grpc.http2.max_pings_without_data", 0),
 )
+
+# grpc-core prepends the primary user agent to its own, like the Go and TypeScript SDKs.
+SDK_CHANNEL_OPTIONS = (("grpc.primary_user_agent", SDK_USER_AGENT),)
+# A unary ReadFile returns up to 32 MiB plus its envelope; grpc-core otherwise refuses replies above 4 MiB.
+MAX_RECEIVE_CHANNEL_OPTIONS = (("grpc.max_receive_message_length", 33 << 20),)
+CHANNEL_OPTIONS = KEEPALIVE_CHANNEL_OPTIONS + SDK_CHANNEL_OPTIONS + MAX_RECEIVE_CHANNEL_OPTIONS
 
 
 def grpc_target(base_url: str) -> tuple[str, bool]:
@@ -139,7 +153,7 @@ class GrpcConfig:
     base_url: str
     auth_token: str = field(repr=False)
     timeout: float | None = None
-    channel_options: tuple[tuple[str, int], ...] = ()
+    channel_options: tuple[tuple[str, int | str], ...] = ()
 
 
 # Server-/bidi-streaming RPCs (return an iterator sync / async iterator aio).
@@ -196,6 +210,16 @@ class GrpcSandboxRPC:
         "resize_volume": "ResizeVolume",
         "attach_volume": "AttachVolume",
         "detach_volume": "DetachVolume",
+        "create_storage_connection": "CreateStorageConnection",
+        "list_storage_connections": "ListStorageConnections",
+        "update_storage_connection": "UpdateStorageConnection",
+        "delete_storage_connection": "DeleteStorageConnection",
+        "list_storage_mounts": "ListStorageMounts",
+        "attach_storage_mount": "AttachStorageMount",
+        "detach_storage_mount": "DetachStorageMount",
+        "test_storage_connection": "TestStorageConnection",
+        "get_storage_defaults": "GetStorageDefaults",
+        "save_storage_defaults": "SaveStorageDefaults",
         "create_snapshot": "CreateSnapshot",
         "fork_session": "ForkSession",
         "get_snapshot": "GetSnapshot",
@@ -358,6 +382,7 @@ def connect_unary_blocking(
     )
     req.add_header("Content-Type", "application/proto")
     req.add_header("Connect-Protocol-Version", "1")
+    req.add_header("User-Agent", SDK_USER_AGENT)
     for key, value in metadata:
         req.add_header(key, value)
     try:

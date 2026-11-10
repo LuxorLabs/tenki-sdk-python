@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+import tenki_sandbox
 from tenki_sandbox import (
     Client,
     GiB,
@@ -15,7 +16,12 @@ from tenki_sandbox._convert import template_build
 from tenki_sandbox.errors import (
     GitOperationFailedError,
     InvalidStateError,
+    SessionNotFoundError,
     SessionTerminatedError,
+    StorageConnectionNotFoundError,
+    StorageMountAttachCancelledError,
+    StorageConnectionDisabledError,
+    StorageMountNotFoundError,
     VolumeSyncPendingError,
     is_session_terminated_reason,
     map_rpc_error,
@@ -119,6 +125,31 @@ def test_template_create_rejects_invalid_resources():
 def test_rpc_error_mapping_uses_grpc_code_names():
     assert isinstance(map_rpc_error(FakeRpcError("PERMISSION_DENIED", "nope")), PermissionDeniedError)
     assert isinstance(map_rpc_error(FakeRpcError("RESOURCE_EXHAUSTED", "quota exceeded")), QuotaExceededError)
+
+
+def test_missing_storage_connection_or_mount_is_not_a_missing_session():
+    connection = map_rpc_error(FakeRpcError("NOT_FOUND", "storage connection not found"))
+    assert isinstance(connection, StorageConnectionNotFoundError)
+    assert not isinstance(connection, SessionNotFoundError)
+    assert isinstance(map_rpc_error(FakeRpcError("NOT_FOUND", "storage mount not found")), StorageMountNotFoundError)
+    assert isinstance(map_rpc_error(FakeRpcError("NOT_FOUND", "session not found")), SessionNotFoundError)
+
+
+def test_attach_cancelled_by_the_callers_own_detach_has_its_own_error():
+    cancelled = map_rpc_error(FakeRpcError("ABORTED", "storage mount attach was cancelled by a detach"))
+    assert isinstance(cancelled, StorageMountAttachCancelledError)
+    assert not isinstance(cancelled, InvalidStateError)
+    assert not isinstance(map_rpc_error(FakeRpcError("ABORTED", "read ECONNRESET")), StorageMountAttachCancelledError)
+    assert tenki_sandbox.StorageMountAttachCancelledError is StorageMountAttachCancelledError
+
+
+def test_connection_disabled_by_tenki_has_its_own_error():
+    disabled = map_rpc_error(
+        FakeRpcError("FAILED_PRECONDITION", 'storage connection "Build cache" was disabled by Tenki; contact support')
+    )
+    assert isinstance(disabled, StorageConnectionDisabledError)
+    assert not isinstance(disabled, InvalidStateError)
+    assert tenki_sandbox.StorageConnectionDisabledError is StorageConnectionDisabledError
 
 
 def test_unconfigured_session_metrics_is_not_retryable():

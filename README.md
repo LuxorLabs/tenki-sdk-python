@@ -134,6 +134,7 @@ sb = Sandbox.create(
 
 `allow_outbound=False` still blocks everything, regardless of `allow_domains`/`allow_cidrs`.
 The allowlist is checked against the names the sandbox resolves, the TLS server name (SNI), and the plaintext HTTP `Host`.
+`*.example.com` matches one subdomain label and `**.example.com` matches subdomains at any depth; neither matches `example.com` itself.
 Connections can only reach addresses that an allowed name resolved to or that fall in an allowed CIDR; traffic to an allowed CIDR is not inspected unless the sandbox uses outbound secret injection.
 UDP port 443 (HTTP/3, QUIC) is blocked for sandboxes with a domain allowlist, so clients fall back to HTTPS over TCP.
 Unless the sandbox uses outbound secret injection, HTTPS is not decrypted, so another site on the same CDN as an allowed name can be reached by sending its name in the encrypted `Host` header.
@@ -224,6 +225,25 @@ The session keeps the merged copy, so editing or deleting a named policy later d
 `sb.info.egress.policy_names` reads the pinned names back, and the other fields of `sb.info.egress` hold the merged policy.
 `AsyncSandbox.create` takes the same `egress_policies` argument.
 
+## Resume
+
+`resume()` returns once the sandbox is `RUNNING`, so the next call can use it right away.
+It raises `ResumeFailedError` with the restore error if the sandbox falls back to `PAUSED`.
+If the client `timeout` passes first, it raises `ResumeWaitTimeoutError`; the resume may still land, so call `wait_resumed()` to keep waiting.
+Calling `resume()` on a sandbox that is already `RESUMING` joins that resume instead of failing.
+`resume_async()` returns once the service accepts the resume, usually with the sandbox in `RESUMING`.
+Call `wait_resumed()` before running commands.
+It returns at `RUNNING`, raises `ResumeFailedError` if the resume fails, and raises `ResumeWaitTimeoutError`, a `TimeoutError`, after `timeout` seconds (default 180).
+For explicit local cancellation, pass a `threading.Event` as `cancel_event`; cancellation raises `ResumeWaitCancelledError` and leaves the remote resume running.
+
+```python
+sb.resume_async()
+sb.wait_resumed()
+```
+
+`AsyncSandbox` exposes the same operation through `await sb.resume_async()` and `await sb.wait_resumed()`.
+Its wait accepts an `asyncio.Event` or `threading.Event`.
+
 ## What survives a pause
 
 Pause captures the VM's full memory, not only its disk: a resumed sandbox is the
@@ -232,6 +252,10 @@ state, and the guest clock stops for the duration of the pause.
 
 `/tmp` is cleared across a pause. Keep durable state under `/home/tenki`, which
 is preserved.
+
+The kernel boot ID (`/proc/sys/kernel/random/boot_id`) changes on every resume,
+so it can't tell a resume from a restart. Memory-backed paths such as `/dev/shm`
+survive a pause but not a restart, so a token written there can.
 
 While a sandbox is paused it serves no traffic: preview requests return `404`
 until it resumes. The client connection itself is not dropped — a held
@@ -304,10 +328,12 @@ Auth resolution:
 
 1. `auth_token=` passed to `Client` or `Sandbox.create`
 2. `api_key=`, an alias for `auth_token`
-3. `TENKI_AUTH_TOKEN`
-4. `TENKI_API_KEY`
+3. `LUXORAI_AUTH_TOKEN`
+4. `LUXORAI_API_KEY`
+5. `TENKI_AUTH_TOKEN`
+6. `TENKI_API_KEY`
 
-Credentials must be a Tenki API key or service token starting with `tk_`. Missing
+Credentials must be an API key or service token starting with `lx_` or `tk_`. Missing
 credentials raise `MissingAuthTokenError`; nonempty credentials with any other
 prefix raise `InvalidAuthTokenError`. Blank or whitespace-only values count as
 absent. Requests authenticate with an `Authorization: Bearer` header.
@@ -325,7 +351,9 @@ for Ory session tokens and browser cookie values. Pass a `tk_` API key or
 service token through `auth_token`; the SDK sends it as an
 `Authorization: Bearer` credential.
 
-`TENKI_API_ENDPOINT` overrides the API URL; legacy `TENKI_API_URL` is also accepted.
+`LUXORAI_API_ENDPOINT` or `LUXORAI_API_URL` overrides the API URL; `TENKI_API_ENDPOINT`
+and legacy `TENKI_API_URL` are also accepted when no `LUXORAI_*` URL is set. Every
+`LUXORAI_*` variable takes precedence over its `TENKI_*` equivalent.
 
 ## Process API
 

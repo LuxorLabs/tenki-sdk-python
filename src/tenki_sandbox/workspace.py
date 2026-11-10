@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import os
-
 import grpc
 
-from ._transport import auth_metadata, grpc_target, resolve_auth_token
+from ._transport import SDK_CHANNEL_OPTIONS, auth_metadata, grpc_target, read_env, resolve_auth_token
+from .constants import CLOUD_API_URL_ENVS, DEFAULT_BASE_URL
 from .workspace_secrets import _AsyncSecrets, _Secrets
 
 
@@ -22,9 +21,7 @@ class _WorkspaceClientBase:
         root_certificates: bytes | None = None,
     ):
         metadata = auth_metadata(resolve_auth_token(auth_token, api_key))
-        endpoint = (
-            base_url or os.getenv("TENKI_CLOUD_API_URL") or "https://api.tenki.cloud"
-        )
+        endpoint = base_url or read_env(CLOUD_API_URL_ENVS) or DEFAULT_BASE_URL
         self._target, self._secure = grpc_target(endpoint)
         self._root_certificates = root_certificates
         self._channel = None
@@ -42,10 +39,12 @@ class _WorkspaceClientBase:
             api = grpc.aio if self._async else grpc
             self._channel = (
                 api.secure_channel(
-                    self._target, grpc.ssl_channel_credentials(self._root_certificates)
+                    self._target,
+                    grpc.ssl_channel_credentials(self._root_certificates),
+                    options=SDK_CHANNEL_OPTIONS,
                 )
                 if self._secure
-                else api.insecure_channel(self._target)
+                else api.insecure_channel(self._target, options=SDK_CHANNEL_OPTIONS)
             )
         return self._channel
 

@@ -71,6 +71,126 @@ class EgressHttpRule:
 
 
 @dataclass(frozen=True)
+class StorageSecret:
+    """A credential field: an existing s3_storage Tenki Secret, or a value Tenki stores as a new one."""
+
+    secret_name: str = ""
+    value: str = ""
+
+    @classmethod
+    def named(cls, secret_name: str) -> "StorageSecret":
+        return cls(secret_name=secret_name)
+
+    @classmethod
+    def from_value(cls, value: str) -> "StorageSecret":
+        return cls(value=value)
+
+
+@dataclass(frozen=True)
+class StorageConnectionCredentials:
+    """Leave a field as None on update to keep its current secret."""
+
+    access_key_id: StorageSecret | None = None
+    secret_access_key: StorageSecret | None = None
+    session_token: StorageSecret | None = None
+    r2_parent_token: StorageSecret | None = None
+    role_arn: str = ""
+
+
+@dataclass(frozen=True)
+class StorageConnectionSecrets:
+    """Names of the Tenki Secrets a connection reads."""
+
+    access_key_id: str = ""
+    secret_access_key: str = ""
+    session_token: str = ""
+    r2_parent_token: str = ""
+
+
+@dataclass(frozen=True)
+class StorageConnection:
+    id: str
+    workspace_id: str
+    name: str
+    provider: str
+    endpoint: str
+    bucket: str
+    region: str
+    auth_method: str
+    role_arn: str = ""
+    secrets: StorageConnectionSecrets = StorageConnectionSecrets()
+    # "READ_ONLY" or "READ_WRITE"
+    default_access: str = ""
+    revision: int = 0
+    # Subject an AWS role trust policy must match for keyless access.
+    oidc_subject_pattern: str = ""
+    active_mount_count: int = 0
+    default_mount_count: int = 0
+    last_tested_at: datetime | None = None
+    last_test_reason: str = ""
+    # Tenki disabled the connection: it accepts no new mounts and issues no credentials.
+    disabled: bool = False
+    disabled_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class StorageConnectionList:
+    connections: tuple[StorageConnection, ...]
+    # URL to register as an AWS IAM OIDC identity provider; empty when keyless AWS is unavailable.
+    oidc_issuer: str = ""
+    oidc_audience: str = ""
+
+
+@dataclass(frozen=True)
+class StorageConnectionTest:
+    reachable: bool
+    reason: str = ""
+    message: str = ""
+
+
+@dataclass(frozen=True)
+class StorageMountSpec:
+    """Name the connection by id or name; set default_mount_id to change a workspace default.
+
+    None for prefix or access keeps the default mount's value. An empty prefix mounts the whole bucket,
+    and access "" uses the connection's default access.
+    """
+
+    connection_id: str = ""
+    connection_name: str = ""
+    prefix: str | None = None
+    mount_path: str = ""
+    access: str | None = None
+    default_mount_id: str = ""
+
+
+@dataclass(frozen=True)
+class StorageMount:
+    id: str
+    session_id: str
+    spec: StorageMountSpec
+    connection_name: str = ""
+    state: str = ""
+    last_error: str = ""
+
+
+@dataclass(frozen=True)
+class StorageDefaultMount:
+    connection_id: str
+    mount_path: str
+    id: str = ""
+    prefix: str = ""
+    access: str = ""
+
+
+@dataclass(frozen=True)
+class StorageDefaults:
+    workspace_id: str
+    mounts: tuple[StorageDefaultMount, ...] = ()
+    revision: int = 0
+
+
+@dataclass(frozen=True)
 class SessionEgressPolicy:
     """Empty allowlists follow the session's tailnet policy when attached; otherwise they are unrestricted."""
 
