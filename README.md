@@ -10,6 +10,22 @@ pip install tenki
 > `import tenki_sandbox` keeps working (that module ships inside `tenki`), but
 > new code should use `import tenki`.
 
+### Luxor AI package name
+
+The same SDK is also published as `luxor-ai`, with the same version and code:
+
+```bash
+pip install luxor-ai
+```
+
+```python
+from luxor_ai import Sandbox
+```
+
+`tenki` keeps working and is still published. Both distributions ship the same
+`luxor_ai`, `tenki` and `tenki_sandbox` modules, so install one or the other,
+not both, in the same environment.
+
 ## Protobuf compatibility
 
 The SDK supports `protobuf>=5.29.5` with no upper bound. Its Python bindings are
