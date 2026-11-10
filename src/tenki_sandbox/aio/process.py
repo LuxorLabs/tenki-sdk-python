@@ -112,6 +112,7 @@ class AsyncProcess:
         timeout: float | int | object | None = None,
         privileged: bool = False,
         stream_only: bool = False,
+        with_secrets: bool = False,
     ) -> None:
         self.argv = normalize_argv(argv)
         self._stream_only = stream_only
@@ -135,6 +136,7 @@ class AsyncProcess:
                 stream_stdin=True,
                 timeout_ms=duration_ms(timeout),
                 privileged=privileged,
+                with_secrets=with_secrets,
             )
         )
         self._start_request = start
@@ -152,6 +154,7 @@ class AsyncProcess:
         stdin: bytes | str | None = None,
         privileged: bool = False,
         stream_only: bool = False,
+        with_secrets: bool = False,
     ) -> "AsyncProcess":
         proc = cls(
             session_id,
@@ -161,6 +164,7 @@ class AsyncProcess:
             timeout=timeout,
             privileged=privileged,
             stream_only=stream_only,
+            with_secrets=with_secrets,
         )
         proc._sandbox = (
             sandbox

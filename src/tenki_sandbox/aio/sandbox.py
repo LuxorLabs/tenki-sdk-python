@@ -29,6 +29,8 @@ from ..models import (
     ExposedPort,
     Image,
     SandboxInfo,
+    SecretsRefresh,
+    SecretVersion,
     SessionEgressPolicy,
     SessionMetrics,
     TailnetAttachment,
@@ -631,6 +633,7 @@ class AsyncSandbox:
         stdin: bytes | str | None = None,
         privileged: bool = False,
         stream_only: bool = False,
+        with_secrets: bool = False,
     ) -> AsyncProcess:
         rpc = await self._ensure_data_plane(verify_serving=False)
         if rpc is None:
@@ -645,6 +648,7 @@ class AsyncSandbox:
             stdin=stdin,
             privileged=privileged,
             stream_only=stream_only,
+            with_secrets=with_secrets,
         )
 
     async def exec(
@@ -656,9 +660,17 @@ class AsyncSandbox:
         input: bytes | str | None = None,
         check: bool = False,
         privileged: bool = False,
+        with_secrets: bool = False,
     ) -> CommandResult:
+        """Runs argv to completion; ``with_secrets`` adds the secrets delivered to the session, and ``env`` still wins."""
         proc = await self.start(
-            *argv, cwd=cwd, env=env, timeout=timeout, stdin=input, privileged=privileged
+            *argv,
+            cwd=cwd,
+            env=env,
+            timeout=timeout,
+            stdin=input,
+            privileged=privileged,
+            with_secrets=with_secrets,
         )
         if input is None:
             await proc.close_stdin()
@@ -758,6 +770,27 @@ class AsyncSandbox:
 
     async def update_tags(self, *tags: str) -> None:
         await self.update(tags=list(tags))
+
+    async def refresh_secrets(self) -> SecretsRefresh:
+        """Re-delivers the session's secret bindings at the workspace's current versions and restarts its
+        managed runtime. Processes started before the refresh keep their old values."""
+        try:
+            resp = await self._client._rpc.refresh_session_secrets(pb.RefreshSessionSecretsRequest(session_id=self.id))
+        except Exception as err:
+            raise map_rpc_error(err) from err
+        return SecretsRefresh(
+            changed=resp.changed,
+            versions=[
+                SecretVersion(
+                    secret_name=v.secret_name,
+                    version=v.version,
+                    environment_key=v.environment_key,
+                    file_path=v.file_path,
+                )
+                for v in resp.versions
+            ],
+            workflow_id=resp.workflow_id,
+        )
 
     async def update_ssh_authorized_keys(self, keys: list[str]) -> None:
         req = pb.UpdateSSHAuthorizedKeysRequest(session_id=self.id)

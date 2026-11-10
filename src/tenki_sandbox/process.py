@@ -247,6 +247,7 @@ class Process:
         stdin: bytes | str | None = None,
         privileged: bool = False,
         stream_only: bool = False,
+        with_secrets: bool = False,
     ) -> None:
         self.argv = normalize_argv(argv)
         self._stream_only = stream_only
@@ -272,6 +273,7 @@ class Process:
                 stream_stdin=True,
                 timeout_ms=duration_ms(timeout),
                 privileged=privileged,
+                with_secrets=with_secrets,
             )
         )
         self._start_request = start

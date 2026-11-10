@@ -77,7 +77,9 @@ class AsyncSandboxFS:
         mode: int = 0o644,
         truncate: bool = True,
         sync: bool = False,
+        privileged: bool = False,
     ) -> None:
+        """Streams chunks to path; ``privileged`` writes outside the workdir as root; setuid, setgid and sticky bits are never applied."""
         sent_all = False
 
         async def requests():
@@ -89,6 +91,7 @@ class AsyncSandboxFS:
                     mode=mode,
                     truncate=truncate,
                     sync=sync,
+                    privileged=privileged,
                 )
             )
             async for chunk in _aiter_chunks(chunks):

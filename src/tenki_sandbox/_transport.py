@@ -225,6 +225,7 @@ class GrpcSandboxRPC:
         "get_snapshot": "GetSnapshot",
         "get_snapshot_download_url": "GetSnapshotDownloadURL",
         "update_ssh_authorized_keys": "UpdateSSHAuthorizedKeys",
+        "refresh_session_secrets": "RefreshSessionSecrets",
         "list_session_snapshots": "ListSessionSnapshots",
         "list_workspace_snapshots": "ListWorkspaceSnapshots",
         "list_dangling_snapshots": "ListDanglingSnapshots",

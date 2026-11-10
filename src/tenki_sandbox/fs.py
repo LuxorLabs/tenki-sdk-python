@@ -60,7 +60,9 @@ class SandboxFS:
         mode: int = 0o644,
         truncate: bool = True,
         sync: bool = False,
+        privileged: bool = False,
     ) -> None:
+        """Streams chunks to path; ``privileged`` writes outside the workdir as root; setuid, setgid and sticky bits are never applied."""
         sent_all = False
 
         def requests():
@@ -72,6 +74,7 @@ class SandboxFS:
                     mode=mode,
                     truncate=truncate,
                     sync=sync,
+                    privileged=privileged,
                 )
             )
             for chunk in chunks:

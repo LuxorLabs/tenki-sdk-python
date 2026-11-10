@@ -13,6 +13,24 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+class SecretVersion:
+    """One secret binding of a session and the version it now carries; values never leave the engine."""
+
+    secret_name: str
+    version: int
+    environment_key: str = ""
+    file_path: str = ""
+
+
+@dataclass(frozen=True)
+class SecretsRefresh:
+    #: False when every binding already used the current version; the secrets are re-delivered either way.
+    changed: bool
+    versions: list[SecretVersion] = field(default_factory=list)
+    workflow_id: str = ""
+
+
+@dataclass(frozen=True)
 class CommandResult:
     argv: list[str]
     exit_code: int

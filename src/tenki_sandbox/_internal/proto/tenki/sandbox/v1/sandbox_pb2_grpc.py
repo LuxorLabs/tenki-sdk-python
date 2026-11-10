@@ -311,6 +311,11 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateSSHAuthorizedKeysRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateSSHAuthorizedKeysResponse.FromString,
                 _registered_method=True)
+        self.RefreshSessionSecrets = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/RefreshSessionSecrets',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.RefreshSessionSecretsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.RefreshSessionSecretsResponse.FromString,
+                _registered_method=True)
         self.CreateSnapshot = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/CreateSnapshot',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSnapshotRequest.SerializeToString,
@@ -881,6 +886,13 @@ class SandboxServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RefreshSessionSecrets(self, request, context):
+        """Re-delivers a RUNNING session's secret bindings at the workspace's current versions and restarts its managed runtime.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def CreateSnapshot(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -1432,6 +1444,11 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.UpdateSSHAuthorizedKeys,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateSSHAuthorizedKeysRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateSSHAuthorizedKeysResponse.SerializeToString,
+            ),
+            'RefreshSessionSecrets': grpc.unary_unary_rpc_method_handler(
+                    servicer.RefreshSessionSecrets,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.RefreshSessionSecretsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.RefreshSessionSecretsResponse.SerializeToString,
             ),
             'CreateSnapshot': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateSnapshot,
@@ -3214,6 +3231,33 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/UpdateSSHAuthorizedKeys',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateSSHAuthorizedKeysRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateSSHAuthorizedKeysResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RefreshSessionSecrets(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/RefreshSessionSecrets',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.RefreshSessionSecretsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.RefreshSessionSecretsResponse.FromString,
             options,
             channel_credentials,
             insecure,
