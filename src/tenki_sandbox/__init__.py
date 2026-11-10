@@ -263,6 +263,7 @@ from .workspace import AsyncWorkspaceClient, WorkspaceClient
 from .workspace_secrets import (
     SecretPage,
     SecretRepositoryPage,
+    SecretAvailability,
     SecretVersionPage,
     WorkspaceSecret,
     WorkspaceSecretError,
@@ -277,6 +278,7 @@ __all__ += [
     "WorkspaceSecretVersion",
     "SecretPage",
     "SecretRepositoryPage",
+    "SecretAvailability",
     "SecretVersionPage",
 ]
 

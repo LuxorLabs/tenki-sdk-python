@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Literal
 from uuid import uuid4
 
 import grpc
@@ -23,6 +24,10 @@ def _workspace_secret_error(error):
     return WorkspaceSecretError(error.details(), error.code())
 
 
+# Where a secret applies: every CI job and sandbox in the workspace, or CI jobs in one repository.
+SecretAvailability = Literal["workspace", "repository"]
+
+
 @dataclass(frozen=True)
 class WorkspaceSecret:
     id: str
@@ -36,6 +41,8 @@ class WorkspaceSecret:
     deleted_at: datetime | None = None
     # Repository (owner/name) whose CI jobs get the secret; None for a workspace secret.
     repository: str | None = None
+    # One-line note for the people who manage the secret; empty when there is none.
+    description: str = ""
 
 
 @dataclass(frozen=True)
@@ -91,6 +98,7 @@ def _metadata(secret) -> WorkspaceSecret:
         revoked_at=_time(secret, "revoked_at"),
         deleted_at=_time(secret, "deleted_at"),
         repository=secret.repository or None,
+        description=secret.description,
     )
 
 
@@ -100,8 +108,28 @@ def _repository(repository: str) -> str:
     return repository
 
 
+def _availability(availability: SecretAvailability | None, repository: str | None) -> int:
+    # As in the CLI: a repository alone means repository availability, and workspace refuses one.
+    if repository:
+        if availability == "workspace":
+            raise ValueError("availability 'workspace' cannot be combined with a repository")
+        _repository(repository)
+    if availability is None:
+        if repository:
+            return pb.SECRET_AVAILABILITY_REPOSITORY
+        return pb.SECRET_AVAILABILITY_UNSPECIFIED
+    if availability not in ("workspace", "repository"):
+        raise ValueError(f"availability must be 'workspace' or 'repository', got {availability!r}")
+    return pb.SecretAvailability.Value(f"SECRET_AVAILABILITY_{availability.upper()}")
+
+
 def _create_request(
-    workspace_id: str, repository: str, name: str, value: bytes, request_id: str | None
+    workspace_id: str,
+    name: str,
+    value: bytes,
+    repository: str | None,
+    description: str | None,
+    request_id: str | None,
 ):
     if not isinstance(value, bytes):
         raise TypeError("Secret value must be bytes")
@@ -110,7 +138,54 @@ def _create_request(
         name=name,
         value=value,
         request_id=request_id if request_id is not None else str(uuid4()),
-        repository=repository,
+        repository=_repository(repository) if repository else "",
+        description=description or "",
+    )
+
+
+def _update_request(
+    workspace_id: str,
+    secret_id: str,
+    expected_revision: int,
+    value: bytes | None,
+    active_version: int | None,
+    description: str | None,
+    availability: SecretAvailability | None,
+    repository: str | None,
+    request_id: str | None,
+):
+    request = pb.UpdateSecretRequest(
+        workspace_id=workspace_id,
+        secret_id=secret_id,
+        expected_revision=expected_revision,
+        request_id=request_id if request_id is not None else str(uuid4()),
+        availability=_availability(availability, repository),
+        repository=_repository(repository) if availability == "repository" else repository or "",
+    )
+    if value is not None:
+        if not isinstance(value, bytes):
+            raise TypeError("Secret value must be bytes")
+        request.value = value
+    if active_version is not None:
+        request.active_version = active_version
+    if description is not None:
+        request.description = description
+    return request
+
+
+def _list_request(
+    workspace_id: str,
+    page_size: int,
+    cursor: str,
+    availability: SecretAvailability | None,
+    repository: str | None,
+):
+    return pb.ListSecretsRequest(
+        workspace_id=workspace_id,
+        page_size=page_size,
+        cursor=cursor,
+        availability=_availability(availability, repository),
+        repository=repository or "",
     )
 
 
@@ -153,24 +228,14 @@ class _Secrets(_SecretsBase):
         name: str,
         value: bytes,
         *,
+        repository: str | None = None,
+        description: str | None = None,
         request_id: str | None = None,
     ) -> WorkspaceSecret:
-        """Create a workspace secret."""
-        request = _create_request(self._workspace_id, "", name, value, request_id)
-        return self._create(request)
-
-    def create_for_repository(
-        self,
-        repository: str,
-        name: str,
-        value: bytes,
-        *,
-        request_id: str | None = None,
-    ) -> WorkspaceSecret:
-        """Create a secret only CI jobs in ``repository`` (owner/name) get. It replaces
-        a workspace secret of the same name; the repository must be connected."""
+        """Create a secret. With ``repository`` (owner/name, connected to the workspace),
+        only CI jobs there get it, in place of a workspace secret of the same name."""
         request = _create_request(
-            self._workspace_id, _repository(repository), name, value, request_id
+            self._workspace_id, name, value, repository, description, request_id
         )
         return self._create(request)
 
@@ -190,21 +255,25 @@ class _Secrets(_SecretsBase):
         expected_revision: int,
         value: bytes | None = None,
         active_version: int | None = None,
+        description: str | None = None,
+        availability: SecretAvailability | None = None,
+        repository: str | None = None,
         request_id: str | None = None,
     ) -> WorkspaceSecret:
-        """Omitted/None value retains it; b"" creates an empty value."""
-        request = pb.UpdateSecretRequest(
-            workspace_id=self._workspace_id,
-            secret_id=secret_id,
-            expected_revision=expected_revision,
-            request_id=request_id if request_id is not None else str(uuid4()),
+        """Change what is set. A value or active_version restores a revoked secret; b"" creates an
+        empty value. description="" clears it; availability="repository", or repository alone,
+        moves the secret to repository."""
+        request = _update_request(
+            self._workspace_id,
+            secret_id,
+            expected_revision,
+            value,
+            active_version,
+            description,
+            availability,
+            repository,
+            request_id,
         )
-        if value is not None:
-            if not isinstance(value, bytes):
-                raise TypeError("Secret value must be bytes")
-            request.value = value
-        if active_version is not None:
-            request.active_version = active_version
         try:
             response = self._stub.UpdateSecret(
                 request, metadata=self._metadata, timeout=self._timeout
@@ -225,9 +294,18 @@ class _Secrets(_SecretsBase):
             raise _workspace_secret_error(err) from err
         return _metadata(response.secret)
 
-    def list(self, *, page_size: int = 0, cursor: str = "") -> SecretPage:
-        request = pb.ListSecretsRequest(
-            workspace_id=self._workspace_id, page_size=page_size, cursor=cursor
+    def list(
+        self,
+        *,
+        page_size: int = 0,
+        cursor: str = "",
+        availability: SecretAvailability | None = None,
+        repository: str | None = None,
+    ) -> SecretPage:
+        """availability filters the list; repository, with or without availability="repository",
+        narrows it to one repository."""
+        request = _list_request(
+            self._workspace_id, page_size, cursor, availability, repository
         )
         try:
             response = self._stub.ListSecrets(
@@ -242,7 +320,7 @@ class _Secrets(_SecretsBase):
     def list_repositories(
         self, *, page_size: int = 0, cursor: str = "", search: str = ""
     ) -> SecretRepositoryPage:
-        """Lists the connected repositories create_for_repository accepts."""
+        """Lists the connected repositories a secret can be limited to."""
         request = pb.ListSecretRepositoriesRequest(
             workspace_id=self._workspace_id,
             page_size=page_size,
@@ -339,24 +417,14 @@ class _AsyncSecrets(_SecretsBase):
         name: str,
         value: bytes,
         *,
+        repository: str | None = None,
+        description: str | None = None,
         request_id: str | None = None,
     ) -> WorkspaceSecret:
-        """Create a workspace secret."""
-        request = _create_request(self._workspace_id, "", name, value, request_id)
-        return await self._create(request)
-
-    async def create_for_repository(
-        self,
-        repository: str,
-        name: str,
-        value: bytes,
-        *,
-        request_id: str | None = None,
-    ) -> WorkspaceSecret:
-        """Create a secret only CI jobs in ``repository`` (owner/name) get. It replaces
-        a workspace secret of the same name; the repository must be connected."""
+        """Create a secret. With ``repository`` (owner/name, connected to the workspace),
+        only CI jobs there get it, in place of a workspace secret of the same name."""
         request = _create_request(
-            self._workspace_id, _repository(repository), name, value, request_id
+            self._workspace_id, name, value, repository, description, request_id
         )
         return await self._create(request)
 
@@ -376,21 +444,25 @@ class _AsyncSecrets(_SecretsBase):
         expected_revision: int,
         value: bytes | None = None,
         active_version: int | None = None,
+        description: str | None = None,
+        availability: SecretAvailability | None = None,
+        repository: str | None = None,
         request_id: str | None = None,
     ) -> WorkspaceSecret:
-        """Omitted/None value retains it; b"" creates an empty value."""
-        request = pb.UpdateSecretRequest(
-            workspace_id=self._workspace_id,
-            secret_id=secret_id,
-            expected_revision=expected_revision,
-            request_id=request_id if request_id is not None else str(uuid4()),
+        """Change what is set. A value or active_version restores a revoked secret; b"" creates an
+        empty value. description="" clears it; availability="repository", or repository alone,
+        moves the secret to repository."""
+        request = _update_request(
+            self._workspace_id,
+            secret_id,
+            expected_revision,
+            value,
+            active_version,
+            description,
+            availability,
+            repository,
+            request_id,
         )
-        if value is not None:
-            if not isinstance(value, bytes):
-                raise TypeError("Secret value must be bytes")
-            request.value = value
-        if active_version is not None:
-            request.active_version = active_version
         try:
             response = await self._stub.UpdateSecret(
                 request, metadata=self._metadata, timeout=self._timeout
@@ -411,9 +483,18 @@ class _AsyncSecrets(_SecretsBase):
             raise _workspace_secret_error(err) from err
         return _metadata(response.secret)
 
-    async def list(self, *, page_size: int = 0, cursor: str = "") -> SecretPage:
-        request = pb.ListSecretsRequest(
-            workspace_id=self._workspace_id, page_size=page_size, cursor=cursor
+    async def list(
+        self,
+        *,
+        page_size: int = 0,
+        cursor: str = "",
+        availability: SecretAvailability | None = None,
+        repository: str | None = None,
+    ) -> SecretPage:
+        """availability filters the list; repository, with or without availability="repository",
+        narrows it to one repository."""
+        request = _list_request(
+            self._workspace_id, page_size, cursor, availability, repository
         )
         try:
             response = await self._stub.ListSecrets(
@@ -428,7 +509,7 @@ class _AsyncSecrets(_SecretsBase):
     async def list_repositories(
         self, *, page_size: int = 0, cursor: str = "", search: str = ""
     ) -> SecretRepositoryPage:
-        """Lists the connected repositories create_for_repository accepts."""
+        """Lists the connected repositories a secret can be limited to."""
         request = pb.ListSecretRepositoriesRequest(
             workspace_id=self._workspace_id,
             page_size=page_size,

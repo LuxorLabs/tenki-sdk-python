@@ -50,6 +50,7 @@ def endpoint():
             if name == "CreateSecret":
                 secret = metadata()
                 secret.repository = request.repository
+                secret.description = request.description
                 return pb.CreateSecretResponse(secret=secret)
             if name == "ListSecrets":
                 return pb.ListSecretsResponse(secrets=[metadata()], next_cursor="next")
@@ -148,10 +149,11 @@ async def test_wire_contract(endpoint, client_type, workspace_id):
         )
         scoped = await invoke(
             client,
-            "create_for_repository",
-            "acme/api",
+            "create",
             "SCOPED",
             b"value",
+            repository="acme/api",
+            description="Deploy token",
             request_id="00000000-0000-4000-8000-000000000007",
         )
         assert all(header["authorization"] == "Bearer tk_test" for header in headers)
@@ -176,12 +178,14 @@ async def test_wire_contract(endpoint, client_type, workspace_id):
         assert requests[9].version == 1 and requests[9].expected_revision == 2
         assert requests[10].request_id == "00000000-0000-4000-8000-000000000005"
         assert requests[0].repository == "" and result.repository is None
+        assert result.description == ""
         assert requests[11].repository == "acme/api" and requests[11].name == "SCOPED"
+        assert requests[11].description == "Deploy token"
         assert requests[11].request_id == "00000000-0000-4000-8000-000000000007"
-        assert scoped.repository == "acme/api"
-        for repository in ("", "acme", "acme/api/extra", "/api"):
+        assert (scoped.repository, scoped.description) == ("acme/api", "Deploy token")
+        for repository in ("acme", "acme/api/extra", "/api"):
             with pytest.raises(ValueError, match="owner/name"):
-                await invoke(client, "create_for_repository", repository, "TOKEN", b"v")
+                await invoke(client, "create", "TOKEN", b"v", repository=repository)
         assert len(requests) == 12
         repositories = await invoke(
             client, "list_repositories", page_size=1, cursor="acme/a", search="acme"
@@ -194,6 +198,69 @@ async def test_wire_contract(endpoint, client_type, workspace_id):
             "acme",
         )
         assert requests[12].workspace_id == workspace_id
+        await invoke(
+            client,
+            "update",
+            "secret",
+            expected_revision=2,
+            description="",
+            availability="repository",
+            repository="acme/web",
+        )
+        await invoke(client, "update", "secret", expected_revision=2, availability="workspace")
+        await invoke(
+            client, "list", availability="repository", repository="acme/api", cursor="current"
+        )
+        assert requests[13].HasField("description") and requests[13].description == ""
+        assert (requests[13].availability, requests[13].repository) == (
+            pb.SECRET_AVAILABILITY_REPOSITORY,
+            "acme/web",
+        )
+        assert requests[14].availability == pb.SECRET_AVAILABILITY_WORKSPACE
+        assert not requests[14].HasField("description")
+        assert (requests[15].availability, requests[15].repository, requests[15].cursor) == (
+            pb.SECRET_AVAILABILITY_REPOSITORY,
+            "acme/api",
+            "current",
+        )
+        with pytest.raises(ValueError, match="owner/name"):
+            await invoke(
+                client,
+                "update",
+                "secret",
+                expected_revision=2,
+                availability="repository",
+                repository="acme",
+            )
+        with pytest.raises(ValueError, match="availability"):
+            await invoke(client, "list", availability="everywhere")
+        # A repository alone means repository availability, as in the CLI.
+        await invoke(client, "list", repository="acme/api")
+        await invoke(client, "update", "secret", expected_revision=2, repository="acme/web")
+        assert (requests[16].availability, requests[16].repository) == (
+            pb.SECRET_AVAILABILITY_REPOSITORY,
+            "acme/api",
+        )
+        assert (requests[17].availability, requests[17].repository) == (
+            pb.SECRET_AVAILABILITY_REPOSITORY,
+            "acme/web",
+        )
+        with pytest.raises(ValueError, match="owner/name"):
+            await invoke(client, "update", "secret", expected_revision=2, repository="acme")
+        with pytest.raises(ValueError, match="owner/name"):
+            await invoke(client, "list", repository="acme")
+        with pytest.raises(ValueError, match="cannot be combined"):
+            await invoke(
+                client,
+                "update",
+                "secret",
+                expected_revision=2,
+                availability="workspace",
+                repository="acme/api",
+            )
+        with pytest.raises(ValueError, match="cannot be combined"):
+            await invoke(client, "list", availability="workspace", repository="acme/api")
+        assert len(requests) == 18
         assert "value" not in asdict(result) and "ciphertext" not in asdict(result)
         assert "policy" not in asdict(result)
     finally:
@@ -239,7 +306,6 @@ def test_sync_async_signature_parity():
 
     for name in (
         "create",
-        "create_for_repository",
         "update",
         "get",
         "list",
