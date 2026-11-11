@@ -20,6 +20,11 @@ class RuntimeSecretFile(_SecretPath, total=False):
     raw: RuntimeSecretReference
 
 
+def _conflict_path(path: str) -> str:
+    # Both guest homes can land in the same directory, so they conflict with each other.
+    return "/home/tenki/" + path[len("/home/sandbox/"):] if path.startswith("/home/sandbox/") else path
+
+
 def valid_secret_files(files, count: int) -> bool:
     import re
 
@@ -27,11 +32,12 @@ def valid_secret_files(files, count: int) -> bool:
         return False
     for index, file in enumerate(files):
         target = file.path
-        if len(target.encode()) > 4096 or re.search(r"[\x00-\x1f]", target) or not re.match(r"^/(home/tenki|workspace|app)/.+", target):
+        if len(target.encode()) > 4096 or re.search(r"[\x00-\x1f]", target) or not re.match(r"^/(home/tenki|home/sandbox|workspace|app)/.+", target):
             return False
         if any(part in ("", ".", "..") for part in target.split("/")[1:]):
             return False
-        if any(index != j and (target == other.path or target.startswith(other.path + "/")) for j, other in enumerate(files)):
+        key = _conflict_path(target)
+        if any(index != j and (key == _conflict_path(other.path) or key.startswith(_conflict_path(other.path) + "/")) for j, other in enumerate(files)):
             return False
         refs = []
         kind = file.WhichOneof("format")

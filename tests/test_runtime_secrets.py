@@ -137,6 +137,23 @@ def test_runtime_file_contract(kind):
         TemplateSpec().start("app", secret_files=files).validate()
 
 
+@pytest.mark.parametrize("path,valid", [("/home/tenki/.env", True), ("/home/sandbox/.env", True), ("/home/sandbox", False), ("/home/other/.env", False)])
+def test_runtime_file_guest_homes(path, valid):
+    spec = TemplateSpec().start("app", secret_files=[{"path": path, "raw": {"name": "RAW"}}])
+    if valid:
+        spec.validate()
+    else:
+        with pytest.raises(Exception):
+            spec.validate()
+
+
+@pytest.mark.parametrize("first,second", [("/home/tenki/.env", "/home/sandbox/.env"), ("/home/sandbox/conf", "/home/tenki/conf/.env")])
+def test_runtime_file_alias_conflicts(first, second):
+    files = [{"path": first, "raw": {"name": "A"}}, {"path": second, "raw": {"name": "B"}}]
+    with pytest.raises(Exception):
+        TemplateSpec().start("app", secret_files=files).validate()
+
+
 def test_source_marker_grammar():
     from tenki_sandbox.secret_files import secret_file_names
     assert secret_file_names(r"a=secrets://TOKEN,b=secrets://TOKEN,literal=\secrets://IGNORE,header=\secrets://API") == ["TOKEN"]
