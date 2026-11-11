@@ -83,7 +83,7 @@ class AsyncClient:
         self.egress_policies = AsyncEgressPolicies(self._rpc)
         self.storage_connections = AsyncStorageConnections(self._rpc)
         self.snapshots = AsyncSnapshots(self._rpc)
-        self.templates = AsyncTemplates(self._rpc)
+        self.templates = AsyncTemplates(self._rpc, warning_handler=warning_handler)
         self.registry = AsyncRegistry(self._rpc)
 
     def __repr__(self) -> str:

@@ -88,7 +88,7 @@ class Client:
         self.egress_policies = EgressPolicies(self._rpc)
         self.storage_connections = StorageConnections(self._rpc)
         self.snapshots = Snapshots(self._rpc)
-        self.templates = Templates(self._rpc)
+        self.templates = Templates(self._rpc, warning_handler=warning_handler)
         self.registry = Registry(self._rpc)
 
     def __repr__(self) -> str:

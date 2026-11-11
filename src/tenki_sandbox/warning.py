@@ -5,7 +5,7 @@ import warnings
 from dataclasses import dataclass
 from typing import Callable
 
-from ._pb import pb
+from ._pb import pb, template_pb
 
 
 logger = logging.getLogger("tenki_sandbox")
@@ -17,6 +17,8 @@ class SandboxWarningCode:
     STICKY_OVERRIDES_IDLE_TIMEOUT = "STICKY_OVERRIDES_IDLE_TIMEOUT"
     MAX_DURATION_CAPPED = "MAX_DURATION_CAPPED"
     RESTORE_SECRETS_SKIPPED = "RESTORE_SECRETS_SKIPPED"
+    # Returned by template create, update and build calls.
+    SPEC_VERSION_DEPRECATED = "SPEC_VERSION_DEPRECATED"
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,23 @@ def sandbox_warnings_from_proto(proto_warnings) -> tuple[SandboxWarning, ...]:
         )
         for warning in proto_warnings
     )
+
+
+def template_warnings_from_proto(proto_warnings) -> tuple[SandboxWarning, ...]:
+    return tuple(
+        SandboxWarning(
+            code=_template_warning_code_from_proto(warning.code),
+            message=warning.message,
+        )
+        for warning in proto_warnings
+    )
+
+
+def _template_warning_code_from_proto(value: int) -> str:
+    try:
+        return template_pb.TemplateWarningCode.Name(value).removeprefix("TEMPLATE_WARNING_CODE_")
+    except ValueError:
+        return SandboxWarningCode.UNSPECIFIED
 
 
 def _sandbox_warning_code_from_proto(value: int) -> str:

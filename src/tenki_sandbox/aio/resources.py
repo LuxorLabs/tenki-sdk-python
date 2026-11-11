@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import time
 from collections.abc import Awaitable, Callable
+from dataclasses import replace
 from datetime import datetime
 
 from .._convert import snapshot, snapshot_download_url, template, template_build, volume
@@ -44,6 +45,7 @@ from ..resources import (  # shared request builders/id helpers; one canonical c
     template_id_of,
 )
 from ..template_spec import TemplateSpec
+from ..warning import WarningHandler, emit_warnings, template_warnings_from_proto
 
 
 class AsyncVolumes:
@@ -444,8 +446,9 @@ class AsyncSnapshots:
 
 
 class AsyncTemplates:
-    def __init__(self, rpc) -> None:
+    def __init__(self, rpc, *, warning_handler: WarningHandler | None = None) -> None:
         self._rpc = rpc
+        self._warning_handler = warning_handler
 
     async def create(
         self,
@@ -482,9 +485,12 @@ class AsyncTemplates:
         if workspace_id and workspace_id.strip():
             req.workspace_id = workspace_id.strip()
         try:
-            return template((await self._rpc.create_template(req)).template)
+            resp = await self._rpc.create_template(req)
         except Exception as err:
             raise map_template_spec_error(err) from err
+        warnings = template_warnings_from_proto(resp.warnings)
+        emit_warnings(warnings, self._warning_handler, stacklevel=4)
+        return replace(template(resp.template), warnings=warnings)
 
     async def update(
         self,
@@ -520,9 +526,12 @@ class AsyncTemplates:
             disk_size_gb=disk_size_gb,
         )
         try:
-            return template((await self._rpc.update_template(req)).template)
+            resp = await self._rpc.update_template(req)
         except Exception as err:
             raise map_template_spec_error(err) from err
+        warnings = template_warnings_from_proto(resp.warnings)
+        emit_warnings(warnings, self._warning_handler, stacklevel=4)
+        return replace(template(resp.template), warnings=warnings)
 
     async def get(self, template_ref: Template | str) -> Template:
         req = template_pb.GetTemplateRequest(template_id=template_id_of(template_ref))
@@ -581,13 +590,17 @@ class AsyncTemplates:
         if publish_raw_image is not None:
             req.publish_raw_image = publish_raw_image
         try:
-            build = template_build((await self._rpc.build_template(req)).build)
+            resp = await self._rpc.build_template(req)
         except Exception as err:
             raise map_rpc_error(err) from err
+        warnings = template_warnings_from_proto(resp.warnings)
+        emit_warnings(warnings, self._warning_handler, stacklevel=4)
+        build = replace(template_build(resp.build), warnings=warnings)
         if wait_for_completion:
-            return await self.wait_build(
+            completed = await self.wait_build(
                 build.id, timeout=timeout, on_event=on_event, cancel_event=cancel_event
             )
+            return replace(completed, warnings=warnings)
         return build
 
     async def get_build(self, build_ref: TemplateBuild | str) -> TemplateBuild:

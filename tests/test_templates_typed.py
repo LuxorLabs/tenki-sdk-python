@@ -3,7 +3,15 @@ import threading
 import pytest
 from google.protobuf.any_pb2 import Any
 
-from tenki_sandbox import Image, TemplateSpec
+from tenki_sandbox import (
+    AsyncClient,
+    Client,
+    Image,
+    SandboxWarning,
+    SandboxWarningCode,
+    SandboxWarningNotification,
+    TemplateSpec,
+)
 from tenki_sandbox._internal.proto.buf.validate import validate_pb2
 from tenki_sandbox._pb import registry_pb, template_pb
 from tenki_sandbox.aio.resources import AsyncTemplates
@@ -60,10 +68,11 @@ def _build_proto(state, events=(), with_image=False, failure=None):
 
 
 class FakeTemplatesRPC:
-    def __init__(self, build_states=None, create_error=None):
+    def __init__(self, build_states=None, create_error=None, warnings=()):
         self.requests = []
         self.build_states = list(build_states or [])
         self.create_error = create_error
+        self.warnings = list(warnings)
 
     def create_template(self, req):
         self.requests.append(("create_template", req))
@@ -72,7 +81,8 @@ class FakeTemplatesRPC:
         return template_pb.CreateTemplateResponse(
             template=_template_proto(
                 req.builder_spec if req.HasField("builder_spec") else None
-            )
+            ),
+            warnings=self.warnings,
         )
 
     def update_template(self, req):
@@ -80,7 +90,8 @@ class FakeTemplatesRPC:
         return template_pb.UpdateTemplateResponse(
             template=_template_proto(
                 req.builder_spec if req.HasField("builder_spec") else None
-            )
+            ),
+            warnings=self.warnings,
         )
 
     def get_template(self, req):
@@ -94,7 +105,8 @@ class FakeTemplatesRPC:
     def build_template(self, req):
         self.requests.append(("build_template", req))
         return template_pb.BuildTemplateResponse(
-            build=_build_proto(template_pb.TEMPLATE_BUILD_STATE_PENDING)
+            build=_build_proto(template_pb.TEMPLATE_BUILD_STATE_PENDING),
+            warnings=self.warnings,
         )
 
     def get_template_build(self, req):
@@ -120,8 +132,8 @@ class FakeTemplatesRPC:
 
 
 class AsyncFakeTemplatesRPC(FakeTemplatesRPC):
-    def __init__(self, build_states=None, create_error=None):
-        super().__init__(build_states, create_error)
+    def __init__(self, build_states=None, create_error=None, warnings=()):
+        super().__init__(build_states, create_error, warnings)
         for name in (
             "create_template",
             "update_template",
@@ -489,3 +501,73 @@ async def test_async_wait_build_preserves_event_handler_error():
 
     with pytest.raises(RuntimeError, match="handler failed"):
         await templates.wait_build(BUILD_ID, on_event=fail)
+
+
+_DEPRECATED_SPEC_VERSION = template_pb.TemplateWarning(
+    code=template_pb.TEMPLATE_WARNING_CODE_SPEC_VERSION_DEPRECATED,
+    message="specVersion is deprecated",
+)
+_EXPECTED_WARNINGS = (
+    SandboxWarning(
+        code=SandboxWarningCode.SPEC_VERSION_DEPRECATED,
+        message="specVersion is deprecated",
+    ),
+)
+
+
+def test_template_calls_retain_and_emit_warnings():
+    ready = _build_proto(template_pb.TEMPLATE_BUILD_STATE_READY, with_image=True)
+    rpc = FakeTemplatesRPC(build_states=[ready], warnings=[_DEPRECATED_SPEC_VERSION])
+    emitted = []
+    client = Client(rpc=rpc, warning_handler=emitted.append)
+
+    created = client.templates.create(name="node-api", spec=_spec())
+    updated = client.templates.update(created, spec=_spec())
+    build = client.templates.build(created)
+    completed = client.templates.build(created, wait_for_completion=True)
+
+    for result in (created, updated, build, completed):
+        assert result.warnings == _EXPECTED_WARNINGS
+    assert completed.state == "READY"
+    assert emitted == list(_EXPECTED_WARNINGS) * 4
+
+
+async def test_async_template_calls_retain_and_emit_warnings():
+    ready = _build_proto(template_pb.TEMPLATE_BUILD_STATE_READY, with_image=True)
+    rpc = AsyncFakeTemplatesRPC(
+        build_states=[ready], warnings=[_DEPRECATED_SPEC_VERSION]
+    )
+    emitted = []
+    client = AsyncClient(rpc=rpc, warning_handler=emitted.append)
+
+    created = await client.templates.create(name="node-api", spec=_spec())
+    updated = await client.templates.update(created, spec=_spec())
+    build = await client.templates.build(created)
+    completed = await client.templates.build(created, wait_for_completion=True)
+
+    for result in (created, updated, build, completed):
+        assert result.warnings == _EXPECTED_WARNINGS
+    assert completed.state == "READY"
+    assert emitted == list(_EXPECTED_WARNINGS) * 4
+
+
+def test_template_warning_unknown_code_maps_to_unspecified():
+    rpc = FakeTemplatesRPC(
+        warnings=[template_pb.TemplateWarning(code=99, message="future warning")]
+    )
+    emitted = []
+    created = Client(rpc=rpc, warning_handler=emitted.append).templates.create(
+        name="node-api", spec=_spec()
+    )
+    assert created.warnings == (
+        SandboxWarning(code=SandboxWarningCode.UNSPECIFIED, message="future warning"),
+    )
+    assert emitted == list(created.warnings)
+
+
+def test_template_warning_default_handler_points_at_caller():
+    rpc = FakeTemplatesRPC(warnings=[_DEPRECATED_SPEC_VERSION])
+    client = Client(rpc=rpc)
+    with pytest.warns(SandboxWarningNotification) as record:
+        client.templates.create(name="node-api", spec=_spec())
+    assert record[0].filename == __file__

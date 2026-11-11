@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Literal, Mapping
 
 from .disk import DiskUsage
 from .errors import CommandFailedError
+from .warning import SandboxWarning
 
 if TYPE_CHECKING:
     from .template_spec import TemplateSpec
@@ -585,6 +586,8 @@ class TemplateBuild:
     events: tuple[TemplateBuildEvent, ...] = ()
     provenance: TemplateBuildProvenance | None = None
     failure: TemplateBuildFailure | None = None
+    # Returned by the build call that started this build.
+    warnings: tuple[SandboxWarning, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -604,6 +607,8 @@ class Template:
     parent_workspace_id: str = ""
     spec: "TemplateSpec | None" = None
     spec_hash: str | None = None
+    # Returned by the create or update call that produced this value.
+    warnings: tuple[SandboxWarning, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -3,7 +3,9 @@ import json
 import pytest
 
 from tenki_sandbox import Image, TemplateSpec, TemplateSpecValidationError
+from tenki_sandbox._pb import template_pb
 from tenki_sandbox.models import Snapshot, Template
+from tenki_sandbox.template_spec import SPEC_VERSION, SPEC_VERSION_LUXOR
 
 
 def test_default_spec_uses_sandbox_base():
@@ -230,6 +232,41 @@ def test_from_json_rejects_unknown_fields_and_versions():
             json.dumps({"specVersion": "tenki.template.v2", "base": {"image": "sandbox"}})
         )
     assert "specVersion" in str(err.value)
+
+
+@pytest.mark.parametrize("version", [SPEC_VERSION, SPEC_VERSION_LUXOR])
+def test_spec_accepts_both_spec_versions(version):
+    spec = TemplateSpec.from_json(
+        json.dumps({"specVersion": version, "base": {"image": "sandbox"}})
+    )
+    spec.validate()
+    assert spec.to_dict()["specVersion"] == version
+
+
+def test_validate_rejects_unknown_spec_version():
+    proto = template_pb.TemplateBuildSpec(spec_version="acme.template.v9")
+    proto.base.image = "sandbox"
+    with pytest.raises(TemplateSpecValidationError) as err:
+        TemplateSpec.from_proto(proto).validate()
+    assert err.value.violations == (
+        "specVersion: must be 'tenki.template.v1' or 'luxor.template.v1'",
+    )
+
+
+def test_builder_emits_tenki_spec_version_and_leaves_workdir_to_server():
+    spec = (
+        TemplateSpec()
+        .with_git_context("https://github.com/acme/node-api", "main")
+        .run("npm ci")
+        .start("npm start")
+    )
+    proto = spec.to_proto()
+    assert proto.spec_version == SPEC_VERSION
+    assert proto.workdir == ""
+    assert proto.context.checkout.dest == ""
+    assert proto.steps[0].run.workdir == ""
+    assert proto.runtime.start.workdir == ""
+    spec.validate()
 
 
 def test_from_json_rejects_duplicate_fields():

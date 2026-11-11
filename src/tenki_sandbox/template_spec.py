@@ -1,4 +1,4 @@
-"""Immutable typed template build spec builder (tenki.template.v1).
+"""Immutable typed template build spec builder (tenki.template.v1 / luxor.template.v1).
 
 Every fluent method returns a new ``TemplateSpec``; instances are never
 mutated in place. The builder emits the shared ``TemplateBuildSpec`` proto,
@@ -21,10 +21,12 @@ from .secret_files import RuntimeSecretFile, valid_secret_files
 from .errors import TemplateSpecValidationError
 
 SPEC_VERSION = "tenki.template.v1"
+# Successor of SPEC_VERSION, accepted once enabled for the environment; defaults workdir to /home/sandbox.
+SPEC_VERSION_LUXOR = "luxor.template.v1"
+_SPEC_VERSIONS = (SPEC_VERSION, SPEC_VERSION_LUXOR)
+_SPEC_VERSION_MESSAGE = f"specVersion: must be {SPEC_VERSION!r} or {SPEC_VERSION_LUXOR!r}"
 
 _DEFAULT_BASE_IMAGE = "sandbox"
-_DEFAULT_WORKDIR = "/home/tenki"
-_DEFAULT_GIT_WORKDIR = "/home/tenki/app"
 _DEFAULT_RUN_TIMEOUT = 1800
 _DEFAULT_STOP_GRACE = 30
 _DEFAULT_READY_TIMEOUT = 60
@@ -729,10 +731,8 @@ class TemplateSpec:
             )
         except json_format.ParseError as err:
             raise TemplateSpecValidationError([str(err)]) from err
-        if proto.spec_version != SPEC_VERSION:
-            raise TemplateSpecValidationError(
-                [f"specVersion: must be {SPEC_VERSION!r}"]
-            )
+        if proto.spec_version not in _SPEC_VERSIONS:
+            raise TemplateSpecValidationError([_SPEC_VERSION_MESSAGE])
         return cls._wrap(proto)
 
     def validate(self) -> None:
@@ -760,17 +760,11 @@ def _with_defaults(proto):
     """Mirror the server's applyTemplateSpecDefaults for local validation."""
     p = template_pb.TemplateBuildSpec()
     p.CopyFrom(proto)
-    if not p.workdir:
-        p.workdir = _DEFAULT_GIT_WORKDIR if p.HasField("context") else _DEFAULT_WORKDIR
     if p.HasField("context"):
-        if not p.context.checkout.dest:
-            p.context.checkout.dest = p.workdir
         if p.context.checkout.mode == template_pb.TEMPLATE_CHECKOUT_MODE_UNSPECIFIED:
             p.context.checkout.mode = template_pb.TEMPLATE_CHECKOUT_MODE_CONTENTS
     for step in p.steps:
         if step.WhichOneof("operation") == "run":
-            if not step.run.workdir:
-                step.run.workdir = p.workdir
             if not step.run.timeout_seconds:
                 step.run.timeout_seconds = _DEFAULT_RUN_TIMEOUT
     if not p.HasField("runtime"):
@@ -778,13 +772,6 @@ def _with_defaults(proto):
     runtime = p.runtime
     if runtime.run_at == template_pb.TEMPLATE_RUNTIME_RUN_AT_UNSPECIFIED:
         runtime.run_at = template_pb.TEMPLATE_RUNTIME_RUN_AT_BOOT
-    if runtime.WhichOneof("entrypoint") == "start" and not runtime.start.workdir:
-        runtime.start.workdir = p.workdir
-    if (
-        runtime.WhichOneof("entrypoint") == "process_compose"
-        and not runtime.process_compose.workdir
-    ):
-        runtime.process_compose.workdir = p.workdir
     if (
         runtime.run_at != template_pb.TEMPLATE_RUNTIME_RUN_AT_BUILD
         and runtime.restart_policy == template_pb.TEMPLATE_RESTART_POLICY_UNSPECIFIED
@@ -847,8 +834,8 @@ def _check_path(
 
 def _validate_spec(p) -> list[str]:
     out: list[str] = []
-    if p.spec_version != SPEC_VERSION:
-        out.append(f"specVersion: must be {SPEC_VERSION!r}")
+    if p.spec_version not in _SPEC_VERSIONS:
+        out.append(_SPEC_VERSION_MESSAGE)
 
     base = p.base.WhichOneof("source")
     if base is None:
