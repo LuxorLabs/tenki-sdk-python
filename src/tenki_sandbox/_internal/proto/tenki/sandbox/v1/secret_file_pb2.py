@@ -24,14 +24,14 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\"tenki/sandbox/v1/secret_file.proto\x12\x10tenki.sandbox.v1\"N\n\x16RuntimeSecretReference\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12 \n\x0bplaceholder\x18\x02 \x01(\x08R\x0bplaceholder\"\xa5\x01\n\x11RuntimeSecretFile\x12\x12\n\x04path\x18\x01 \x01(\tR\x04path\x12<\n\x03raw\x18\x02 \x01(\x0b\x32(.tenki.sandbox.v1.RuntimeSecretReferenceH\x00R\x03raw\x12\x18\n\x06source\x18\x03 \x01(\tH\x00R\x06source\x12\x1a\n\x07\x63ontent\x18\x04 \x01(\tH\x00R\x07\x63ontentB\x08\n\x06\x66ormatB\xde\x01\n\x14\x63om.tenki.sandbox.v1B\x0fSecretFileProtoP\x01ZSgithub.com/LuxorLabs/tenki-sdk-go/sandbox/internal/proto/tenki/sandbox/v1;sandboxv1\xa2\x02\x03TSX\xaa\x02\x10Tenki.Sandbox.V1\xca\x02\x10Tenki\\Sandbox\\V1\xe2\x02\x1cTenki\\Sandbox\\V1\\GPBMetadata\xea\x02\x12Tenki::Sandbox::V1b\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\"tenki/sandbox/v1/secret_file.proto\x12\x10tenki.sandbox.v1\"N\n\x16RuntimeSecretReference\x12\x12\n\x04name\x18\x01 \x01(\tR\x04name\x12 \n\x0bplaceholder\x18\x02 \x01(\x08R\x0bplaceholder\"\xa5\x01\n\x11RuntimeSecretFile\x12\x12\n\x04path\x18\x01 \x01(\tR\x04path\x12<\n\x03raw\x18\x02 \x01(\x0b\x32(.tenki.sandbox.v1.RuntimeSecretReferenceH\x00R\x03raw\x12\x18\n\x06source\x18\x03 \x01(\tH\x00R\x06source\x12\x1a\n\x07\x63ontent\x18\x04 \x01(\tH\x00R\x07\x63ontentB\x08\n\x06\x66ormatB\xc8\x01\n\x14\x63om.tenki.sandbox.v1B\x0fSecretFileProtoP\x01Z=go.luxor.ai/sandbox/internal/proto/tenki/sandbox/v1;sandboxv1\xa2\x02\x03TSX\xaa\x02\x10Tenki.Sandbox.V1\xca\x02\x10Tenki\\Sandbox\\V1\xe2\x02\x1cTenki\\Sandbox\\V1\\GPBMetadata\xea\x02\x12Tenki::Sandbox::V1b\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'tenki.sandbox.v1.secret_file_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
-  _globals['DESCRIPTOR']._serialized_options = b'\n\024com.tenki.sandbox.v1B\017SecretFileProtoP\001ZSgithub.com/LuxorLabs/tenki-sdk-go/sandbox/internal/proto/tenki/sandbox/v1;sandboxv1\242\002\003TSX\252\002\020Tenki.Sandbox.V1\312\002\020Tenki\\Sandbox\\V1\342\002\034Tenki\\Sandbox\\V1\\GPBMetadata\352\002\022Tenki::Sandbox::V1'
+  _globals['DESCRIPTOR']._serialized_options = b'\n\024com.tenki.sandbox.v1B\017SecretFileProtoP\001Z=go.luxor.ai/sandbox/internal/proto/tenki/sandbox/v1;sandboxv1\242\002\003TSX\252\002\020Tenki.Sandbox.V1\312\002\020Tenki\\Sandbox\\V1\342\002\034Tenki\\Sandbox\\V1\\GPBMetadata\352\002\022Tenki::Sandbox::V1'
   _globals['_RUNTIMESECRETREFERENCE']._serialized_start=56
   _globals['_RUNTIMESECRETREFERENCE']._serialized_end=134
   _globals['_RUNTIMESECRETFILE']._serialized_start=137
