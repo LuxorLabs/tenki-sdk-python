@@ -1,14 +1,18 @@
-# Tenki Python SDK
+# Luxor Python SDK
 
-Python SDK for Tenki: cloud sandboxes (microVMs) for AI agents and code execution.
+Python SDK for [Luxor Sandbox](https://luxor.ai/docs/sandbox/sdk): cloud sandboxes (microVMs) for AI agents and code execution on Luxor Agent Cloud.
 
 ```bash
-pip install tenki
+pip install luxor-ai
 ```
 
-> The SDK is published as `tenki`. Existing code that does
-> `import tenki_sandbox` keeps working (that module ships inside `tenki`), but
-> new code should use `import tenki`.
+```python
+from luxor_ai import Sandbox
+```
+
+> The SDK was published as `tenki`. `pip install tenki` keeps working and
+> publishes the same code at the same version, and `import tenki` and
+> `import tenki_sandbox` still resolve to the same SDK as `import luxor_ai`.
 
 ## Protobuf compatibility
 
@@ -31,7 +35,7 @@ For local SDK tests, run `./scripts/test.sh`; it installs test dependencies in
 a versioned user cache when needed.
 
 ```python
-from tenki import Sandbox
+from luxor_ai import Sandbox
 
 # create() waits by default via a single server-held request and returns an
 # exec-ready sandbox with data-plane access primed (wait=False to skip).
@@ -75,12 +79,12 @@ Release does not close the shared SDK client.
 ## Tailnet attachment
 
 Use `TailnetAuthKey` so `str()` and `repr()` redact the credential.
-`wait_for_online` keeps the sandbox in creation until Tenki verifies the registered node.
+`wait_for_online` keeps the sandbox in creation until Luxor verifies the registered node.
 
 ```python
 import os
 
-from tenki import Sandbox, TailnetAttachment, TailnetAuthKey
+from luxor_ai import Sandbox, TailnetAttachment, TailnetAuthKey
 
 sb = Sandbox.create(
     tailnet=TailnetAttachment(
@@ -152,7 +156,7 @@ Without rules, every request to an allowed domain passes.
 Read-only access to package registries, plus `git clone` (but not `git push`) from GitHub:
 
 ```python
-from tenki_sandbox import EgressHttpRule, Sandbox
+from luxor_ai import EgressHttpRule, Sandbox
 
 registries = ("github.com", "codeload.github.com", "pypi.org", "files.pythonhosted.org")
 sb = Sandbox.create(
@@ -194,10 +198,10 @@ session = client.create(
 
 ### Named egress policies
 
-Save a policy once per workspace, from the SDK or with `tenki sandbox egress-policies create`:
+Save a policy once per workspace, from the SDK or with `luxor sandbox egress-policies create`:
 
 ```python
-from tenki_sandbox import Client, EgressHttpRule
+from luxor_ai import Client, EgressHttpRule
 
 policy = Client().egress_policies.create(
     "registries",
@@ -290,7 +294,7 @@ asyncio server (FastAPI, aiohttp, etc.).
 
 ```python
 import asyncio
-from tenki import AsyncSandbox
+from luxor_ai import AsyncSandbox
 
 
 async def main():
@@ -303,7 +307,7 @@ async def main():
         print(await sb.fs.read_text("input.txt"))
 
         proc = await sb.start("bash", "-lc", "read name; echo hi $name")
-        await proc.write_stdin("tenki\n")
+        await proc.write_stdin("luxor\n")
         await proc.close_stdin()
         async for chunk in proc.stdout:
             print(chunk.decode(), end="")
@@ -316,7 +320,7 @@ asyncio.run(main())
 The sync `Client` / `Sandbox` remain available for non-async consumers. SSH,
 `dial`, and host-port tunnels are also async: `AsyncSandbox.ssh()` returns an
 `AsyncSSHConn` (raw async `read`/`write`/`close`, matching the TS/Go SDKs; needs
-the `tenki[async]` extra for `websockets`), `dial()` returns an
+the `luxor-ai[async]` extra for `websockets`), `dial()` returns an
 `AsyncDialConn`, and `expose_host_port()` / `expose_host_port_resilient()` return
 async tunnels with `await tunnel.terminated.wait()` and `on_terminated` callbacks.
 For sync and async resilient tunnels, `address, port = tunnel.endpoint()` reads
@@ -333,7 +337,7 @@ Auth resolution:
 5. `TENKI_AUTH_TOKEN`
 6. `TENKI_API_KEY`
 
-Credentials must be an API key or service token starting with `lx_` or `tk_`. Missing
+Credentials must be an API key or service token starting with `lx_` (`tk_` is still accepted). Missing
 credentials raise `MissingAuthTokenError`; nonempty credentials with any other
 prefix raise `InvalidAuthTokenError`. Blank or whitespace-only values count as
 absent. Requests authenticate with an `Authorization: Bearer` header.
@@ -347,12 +351,12 @@ concurrency entry now uses the `max_concurrent_jobs` key.
 ### Migrating to v0.6.0
 
 Version 0.6.0 removes the `cookie_name` client and sandbox option and support
-for Ory session tokens and browser cookie values. Pass a `tk_` API key or
+for Ory session tokens and browser cookie values. Pass an `lx_` API key or
 service token through `auth_token`; the SDK sends it as an
 `Authorization: Bearer` credential.
 
-`LUXORAI_API_ENDPOINT` or `LUXORAI_API_URL` overrides the API URL; `TENKI_API_ENDPOINT`
-and legacy `TENKI_API_URL` are also accepted when no `LUXORAI_*` URL is set. Every
+`LUXORAI_API_ENDPOINT` or `LUXORAI_API_URL` points the client at another API host such as
+`https://api.luxor.ai`; `TENKI_API_ENDPOINT` and legacy `TENKI_API_URL` are still accepted when no `LUXORAI_*` URL is set. Every
 `LUXORAI_*` variable takes precedence over its `TENKI_*` equivalent.
 
 ## Process API
@@ -376,7 +380,7 @@ sb.exec(["sh", "-c", "echo hi"])  # equivalent
 
 ```python
 proc = sb.start("bash", "-lc", "read name; echo hello $name")
-proc.write_stdin("tenki\n")
+proc.write_stdin("luxor\n")
 proc.close_stdin()
 for chunk in proc.stdout:
     print(chunk.decode(), end="")
@@ -538,7 +542,7 @@ suppress emission while still reading `sb.warnings`:
 ```python
 import logging
 
-from tenki import Client, SandboxWarningCode
+from luxor_ai import Client, SandboxWarningCode
 
 logger = logging.getLogger(__name__)
 client = Client(warning_handler=lambda warning: logger.warning(warning.message))
@@ -556,7 +560,7 @@ Children are named `<name_prefix>-1` to `<name_prefix>-N`, and an unset prefix d
 `AsyncSandbox.fork()` takes the same arguments.
 
 ```python
-from tenki import ForkFailedError
+from luxor_ai import ForkFailedError
 
 try:
     children = sb.fork(count=3, name_prefix="trial", wait=True)
@@ -609,10 +613,10 @@ Notes:
 - `sb.ssh()` / `client.ssh(session_id)` discover an active gateway and return
   `SSHConn`, an `io.RawIOBase` socket usable anywhere paramiko accepts one.
 - The SSH username is `tenki`.
-- `TENKI_SANDBOX_GATEWAY_URL` overrides the gateway WebSocket URL (it is
+- `LUXORAI_SANDBOX_GATEWAY_URL` (or `TENKI_SANDBOX_GATEWAY_URL`) overrides the gateway WebSocket URL (it is
   otherwise derived from the API endpoint).
 - Certificate RPCs use the Connect protocol over HTTPS (same as the Go SDK and
-  the `tenki` CLI), so they work through standard HTTP load balancers.
+  the `luxor` CLI), so they work through standard HTTP load balancers.
 - `sb.update_ssh_authorized_keys([...])` additionally plants long-lived public
   keys in the guest's `authorized_keys` if you prefer key-based auth for the
   in-guest sshd.
@@ -632,7 +636,7 @@ since npm reports `ENOSPC` as a warning and still exits successfully with a brok
 ## Resource APIs
 
 ```python
-from tenki import Client, GiB
+from luxor_ai import Client, GiB
 
 client = Client()
 
@@ -667,7 +671,7 @@ value). Builds freeze the normalized spec + `spec_hash` server-side and return
 a private digest-addressed `Image`, the normal sandbox launch source.
 
 ```python
-from tenki import Client, TemplateSpec
+from luxor_ai import Client, TemplateSpec
 
 client = Client()
 
@@ -710,7 +714,7 @@ See `examples/template_builder.py` for the full filesystem/memory workflow.
 Workspace clients manage secrets independently of sandbox Sessions:
 
 ```python
-from tenki import WorkspaceClient
+from luxor_ai import WorkspaceClient
 
 with WorkspaceClient(workspace_id=workspace_id) as workspace:
     secret = workspace.secrets.create(
@@ -721,8 +725,9 @@ with WorkspaceClient(workspace_id=workspace_id) as workspace:
 ```
 
 `AsyncWorkspaceClient` has the same methods and arguments. Use `async with`
-and await each operation. Authentication uses `TENKI_AUTH_TOKEN` or `TENKI_API_KEY`.
-Set `base_url` or `TENKI_CLOUD_API_URL` to override the cloud API endpoint
+and await each operation. Authentication uses `LUXORAI_AUTH_TOKEN` or `LUXORAI_API_KEY`
+(`TENKI_AUTH_TOKEN` and `TENKI_API_KEY` are still accepted). Set `base_url` or
+`LUXORAI_CLOUD_API_URL` (or `TENKI_CLOUD_API_URL`) to override the cloud API endpoint
 independently of sandbox configuration. Set `workspace_id` once on the client. An omitted or empty workspace ID uses the authenticated
 workspace key's scope; other callers must specify one.
 
@@ -734,7 +739,7 @@ revoked secret, while description and availability changes don't. `description="
 Revoking without `version` revokes every version. Revoking the active version revokes the secret
 until a new value or an unrevoked version is made active.
 
-`create("TOKEN", value_bytes, repository="acme/api")` creates a secret that only Tenki CI jobs in
+`create("TOKEN", value_bytes, repository="acme/api")` creates a secret that only Luxor CI jobs in
 that repository receive, replacing a workspace secret with the same name. The repository must be
 connected to the workspace; `list_repositories` pages through the connected repositories and can
 filter them with `search`. `update` moves a secret with `availability="workspace"`, or with
@@ -771,7 +776,7 @@ Put `secrets://API_TOKEN` in any text file, regardless of filename or extension.
 
 ```python
 from pathlib import Path
-from tenki import TemplateSpec
+from luxor_ai import TemplateSpec
 
 # Built template: source is already inside the image.
 spec = TemplateSpec().start("python3 /app/server.py", secret_files=[
@@ -799,7 +804,7 @@ Guest values remain frozen across retries, restart, and ordinary resume; replace
 Create `API_TOKEN` through the workspace Secrets client, then save and select a request policy:
 
 ```python
-from tenki import SecretRequestRule
+from luxor_ai import SecretRequestRule
 
 workspace_client.secrets.policies.create("example", [SecretRequestRule(
     origin="https://api.example.com", methods=["POST"], path_prefix="/v1/",
