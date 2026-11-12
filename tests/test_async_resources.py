@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+import asyncio
+import time
+
 import pytest
 
 from tenki_sandbox import (
     AsyncClient,
     SnapshotFailedError,
+    SnapshotNotFoundError,
     SnapshotWaitTimeoutError,
     VolumeNotFoundError,
 )
 from tenki_sandbox._pb import pb
 
-from _async_fakes import FakeControlRPC
+from _async_fakes import FakeControlRPC, FakeRPCError
 
 
 def _vol(state=pb.VOLUME_STATE_AVAILABLE) -> pb.Volume:
@@ -151,3 +155,49 @@ async def test_async_template_build_forwards_environment_and_secrets():
         "GIT_TOKEN": "token",
         "NPM_TOKEN": "npm",
     }
+
+
+class LaggingReplicaSnapshotRPC(FakeControlRPC):
+    """Answers NOT_FOUND for the first `misses` gets, like a replica that has not caught up."""
+
+    def __init__(self, misses):
+        super().__init__()
+        self.misses = misses
+        self.gets = 0
+
+    async def get_snapshot(self, req):
+        self.gets += 1
+        if self.misses is None or self.gets <= self.misses:
+            raise FakeRPCError("NOT_FOUND", "snapshot not found")
+        return pb.GetSnapshotResponse(
+            snapshot=pb.Snapshot(
+                id=req.snapshot_id,
+                state=pb.SNAPSHOT_STATE_READY,
+                durability_state=pb.SNAPSHOT_DURABILITY_STATE_DURABLE,
+            )
+        )
+
+
+@pytest.mark.parametrize("wait", ["wait_ready", "wait_durable"])
+async def test_async_snapshot_waits_retry_not_found_right_after_create(monkeypatch, wait):
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(asyncio, "sleep", lambda _seconds: real_sleep(0))
+    rpc = LaggingReplicaSnapshotRPC(misses=2)
+    snap = await getattr(AsyncClient(rpc=rpc).snapshots, wait)("snap-1", timeout=30)
+    assert snap.id == "snap-1"
+    assert rpc.gets == 3
+
+
+@pytest.mark.parametrize("wait", ["wait_ready", "wait_durable"])
+async def test_async_snapshot_waits_fail_on_not_found_after_the_grace(monkeypatch, wait):
+    from tenki_sandbox import constants
+
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(constants, "SNAPSHOT_NOT_FOUND_GRACE", 0.2)
+    monkeypatch.setattr(asyncio, "sleep", lambda _seconds: real_sleep(0.05))
+    started = time.monotonic()
+    with pytest.raises(SnapshotNotFoundError):
+        await getattr(AsyncClient(rpc=LaggingReplicaSnapshotRPC(misses=None)).snapshots, wait)(
+            "snap-missing", timeout=30
+        )
+    assert 0.2 <= time.monotonic() - started < 5

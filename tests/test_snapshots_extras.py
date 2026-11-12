@@ -338,3 +338,55 @@ def test_wait_ready_timeout_explains_how_to_keep_waiting():
     ) as excinfo:
         Client(rpc=rpc).snapshots.wait_ready("snap-1", timeout=0.01)
     assert isinstance(excinfo.value, TimeoutError)
+
+
+# ---------------------------------------------------------------------------
+# not found right after create (read replica lag)
+# ---------------------------------------------------------------------------
+
+
+real_sleep = time.sleep
+
+
+class LaggingReplicaRPC(FakeRPC):
+    """Answers "snapshot not found" for the first `misses` gets, like a replica that has not caught up."""
+
+    def __init__(self, misses):
+        super().__init__()
+        self.misses = misses
+        self.gets = 0
+
+    def get_snapshot(self, req):
+        self.gets += 1
+        if self.misses is None or self.gets <= self.misses:
+            raise SnapshotNotFoundError("snapshot not found")
+        return super().get_snapshot(req)
+
+
+def test_wait_ready_retries_not_found_right_after_create():
+    rpc = LaggingReplicaRPC(misses=2)
+    snap = Client(rpc=rpc).snapshots.wait_ready("snap-1", timeout=30)
+    assert snap.id == "snap-1"
+    assert rpc.gets == 3
+
+
+def test_wait_durable_retries_not_found_right_after_create(monkeypatch):
+    monkeypatch.setattr(time, "sleep", lambda _seconds: None)
+    rpc = LaggingReplicaRPC(misses=2)
+    snap = Client(rpc=rpc).snapshots.wait_durable("snap-1", timeout=30)
+    assert snap.durability_state == "DURABLE"
+    assert rpc.gets == 3
+
+
+@pytest.mark.parametrize("wait", ["wait_ready", "wait_durable"])
+def test_snapshot_waits_fail_on_not_found_after_the_grace(monkeypatch, wait):
+    from tenki_sandbox import constants
+
+    monkeypatch.setattr(constants, "SNAPSHOT_NOT_FOUND_GRACE", 0.2)
+    monkeypatch.setattr(time, "sleep", lambda _seconds: real_sleep(0.05))
+    rpc = LaggingReplicaRPC(misses=None)
+    started = time.monotonic()
+    with pytest.raises(SnapshotNotFoundError):
+        getattr(Client(rpc=rpc).snapshots, wait)("snap-missing", timeout=30)
+    assert 0.2 <= time.monotonic() - started < 5
+

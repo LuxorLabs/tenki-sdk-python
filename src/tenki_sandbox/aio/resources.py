@@ -9,6 +9,7 @@ from datetime import datetime
 
 from .._convert import snapshot, snapshot_download_url, template, template_build, volume
 from .. import _storage
+from .. import constants
 from .._pb import pb, template_pb
 from .._pagination import advance_page_token
 from .._time import timestamp
@@ -387,9 +388,16 @@ class AsyncSnapshots:
             raise map_rpc_error(err) from err
 
     async def wait_durable(self, snapshot_id: str, *, timeout: float = 300) -> Snapshot:
-        deadline = time.monotonic() + timeout
+        started = time.monotonic()
+        deadline = started + timeout
         while time.monotonic() < deadline:
-            snap = await self.get(snapshot_id)
+            try:
+                snap = await self.get(snapshot_id)
+            except SnapshotNotFoundError:
+                if time.monotonic() - started >= constants.SNAPSHOT_NOT_FOUND_GRACE:
+                    raise
+                await asyncio.sleep(2)
+                continue
             if snap.durability_state == "DURABLE":
                 return snap
             if snap.durability_state == "PROPAGATION_FAILED":
@@ -425,9 +433,16 @@ class AsyncSnapshots:
             raise map_rpc_error(err) from err
 
     async def wait_ready(self, snapshot_id: str, *, timeout: float = 300) -> Snapshot:
-        deadline = time.monotonic() + timeout
+        started = time.monotonic()
+        deadline = started + timeout
         while time.monotonic() < deadline:
-            snap = await self.get(snapshot_id)
+            try:
+                snap = await self.get(snapshot_id)
+            except SnapshotNotFoundError:
+                if time.monotonic() - started >= constants.SNAPSHOT_NOT_FOUND_GRACE:
+                    raise
+                await asyncio.sleep(0.5)
+                continue
             if snap.state == "READY":
                 return snap
             if snap.state == "FAILED":

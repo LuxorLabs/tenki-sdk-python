@@ -2,6 +2,8 @@ DEFAULT_BASE_URL = "https://api.tenki.cloud"
 DEFAULT_CREATE_TIMEOUT = 180.0
 DEFAULT_EXEC_TIMEOUT = 30.0
 DEFAULT_SNAPSHOT_TIMEOUT = 300.0
+# Snapshot waits retry "not found" this long: a lagging read replica may not have a just-created snapshot yet.
+SNAPSHOT_NOT_FOUND_GRACE = 10.0
 DEFAULT_TEMPLATE_BUILD_TIMEOUT = 600.0
 DEFAULT_VOLUME_DETACH_TIMEOUT = 120.0
 
