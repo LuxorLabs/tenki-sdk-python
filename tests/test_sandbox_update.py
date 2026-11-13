@@ -8,10 +8,6 @@ from tenki_sandbox import Client, SandboxWarningCode, SandboxWarningNotification
 from tenki_sandbox._pb import pb
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _make_session(**kwargs) -> pb.SandboxSession:
     defaults = dict(id="sess-1", name="my-box", state=pb.SESSION_STATE_RUNNING)
     defaults.update(kwargs)
@@ -43,10 +39,6 @@ class FakeRPC:
         self.ssh_keys_request = req
         return pb.UpdateSSHAuthorizedKeysResponse()
 
-
-# ---------------------------------------------------------------------------
-# sandbox.update
-# ---------------------------------------------------------------------------
 
 def test_update_name():
     rpc = FakeRPC()
@@ -185,10 +177,6 @@ def test_update_tags_alias():
     sandbox.update_tags("a", "b")
     assert list(rpc.update_request.tags) == ["a", "b"]
 
-
-# ---------------------------------------------------------------------------
-# sandbox.update_ssh_authorized_keys
-# ---------------------------------------------------------------------------
 
 def test_update_ssh_authorized_keys():
     rpc = FakeRPC()

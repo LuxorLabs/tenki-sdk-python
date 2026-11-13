@@ -93,7 +93,7 @@ def test_ws_header_kwarg_selects_by_signature():
 
 async def test_async_ssh_uses_extra_headers_on_legacy_websockets(monkeypatch):
     # websockets 12.x/13.x top-level connect only accepts extra_headers; passing
-    # additional_headers (pre-fix behavior) would TypeError and kill async SSH.
+    # additional_headers would TypeError and kill async SSH.
     captured = {}
     fake = _FakeWS([b"SSH-2.0-x\r\n"])
 

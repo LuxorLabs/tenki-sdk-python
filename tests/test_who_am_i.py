@@ -6,11 +6,6 @@ from tenki_sandbox import Client, Identity, IdentityWorkspace
 from tenki_sandbox._pb import pb
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _proto_workspace(workspace_id="ws-1", name="acme"):
     return pb.WhoAmIWorkspace(workspace_id=workspace_id, name=name)
 
@@ -27,11 +22,6 @@ class FakeRPC:
 
 def _simple_resp(owner_type="USER", owner_id="user-1") -> pb.WhoAmIResponse:
     return pb.WhoAmIResponse(owner_type=owner_type, owner_id=owner_id)
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 
 def test_who_am_i_calls_rpc():

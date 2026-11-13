@@ -287,7 +287,6 @@ def test_forward_ping_sends_pong():
         pb.HostPortTunnelResponse(ping=pb.HostPortTunnelKeepalivePing(ping_id=42)),
     ]
     t._forward(iter(frames))
-    # outbound should have pong
     frame = outbound.get_nowait()
     assert frame.WhichOneof("payload") == "pong"
     assert frame.pong.ping_id == 42

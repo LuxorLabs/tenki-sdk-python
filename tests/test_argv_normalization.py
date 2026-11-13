@@ -88,9 +88,8 @@ def test_varargs_argv_is_unchanged():
     assert wire_cmd("sh", "-c", "echo hi") == ["sh", "-c", "echo hi"]
 
 
-# A closed list of container types missed these: they are not list/tuple/set/
-# dict, so they used to stringify to a repr and ENOENT exactly like the lone
-# list did. Rejection keys on "str() falls back to a repr" instead.
+# These are not list/tuple/set/dict, so rejection keys on "str() falls back to
+# a repr" rather than on a closed list of container types.
 @pytest.mark.parametrize(
     "factory",
     [
@@ -136,9 +135,8 @@ class Flagish:
         return "--flag"
 
 
-# Every one of these worked before argv normalization existed, so every one has
-# to keep its exact result: only the shapes that could never resolve to a binary
-# are allowed to change behavior.
+# Each of these must keep its exact result: only shapes that could never
+# resolve to a binary may change behavior.
 @pytest.mark.parametrize(
     ("part", "expected"),
     [

@@ -21,7 +21,6 @@ def _make_conn_no_thread(frames):
     response_iter = iter(frames)
 
     conn = DialConn.__new__(DialConn)
-    # Call io.RawIOBase.__init__ manually
     import io
     io.RawIOBase.__init__(conn)
     conn._outbound = outbound
@@ -298,7 +297,6 @@ def test_dial_conn_close_puts_none_in_inbound():
 def test_dial_conn_close_idempotent():
     conn, outbound = _make_conn_no_thread([])
     conn.close()
-    # drain
     while not outbound.empty():
         outbound.get_nowait()
     while not conn._inbound.empty():
@@ -357,6 +355,5 @@ def test_pump_exception_puts_mapped_error_in_inbound():
 def test_pump_finally_puts_none_in_outbound():
     conn, outbound = _make_conn_no_thread([])
     conn._pump(iter([]))
-    # outbound should get None
     item = outbound.get_nowait()
     assert item is None

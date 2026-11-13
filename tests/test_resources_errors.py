@@ -222,7 +222,7 @@ def test_git_failure_classification(details, want_retryable, want_stderr):
     assert mapped.exit_code == 128
     # stderr must be just the git output, not the engine wrapper prefix.
     assert mapped.stderr == want_stderr
-    # Must no longer collapse into the un-actionable InvalidStateError.
+    # Must not collapse into the un-actionable InvalidStateError.
     assert not isinstance(mapped, InvalidStateError)
 
 

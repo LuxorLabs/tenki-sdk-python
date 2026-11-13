@@ -105,10 +105,10 @@ class HostPortTunnel:
         with self._finish_lock:
             if self._cb_fired:
                 term = self._termination
-        # fired outside lock to avoid deadlock
             else:
                 self._callbacks.append(cb)
                 return
+        # Fired outside the lock to avoid deadlock.
         t = threading.Thread(target=cb, args=(term,), daemon=True)
         t.start()
 

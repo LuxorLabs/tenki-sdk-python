@@ -13,7 +13,6 @@ from .errors import (
     UnauthorizedError,
 )
 
-# WebSocket opcode constants
 _OPCODE_BINARY = 2
 _OPCODE_CLOSE = 8
 

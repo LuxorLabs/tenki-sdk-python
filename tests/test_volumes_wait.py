@@ -6,10 +6,6 @@ from tenki_sandbox import Client, VolumeNotFoundError
 from tenki_sandbox._pb import pb
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _vol(state=pb.VOLUME_STATE_AVAILABLE) -> pb.Volume:
     return pb.Volume(id="vol-1", workspace_id="ws-1", name="cache", size_bytes=1024, state=state)
 
@@ -22,10 +18,6 @@ class FakeRPC:
         state = next(self._states)
         return pb.GetVolumeResponse(volume=_vol(state=state))
 
-
-# ---------------------------------------------------------------------------
-# volumes.wait_ready
-# ---------------------------------------------------------------------------
 
 def test_wait_ready_returns_when_available():
     rpc = FakeRPC([pb.VOLUME_STATE_AVAILABLE])
