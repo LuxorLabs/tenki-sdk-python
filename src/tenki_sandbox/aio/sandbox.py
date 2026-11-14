@@ -904,10 +904,8 @@ class AsyncSandbox:
             resp = await self._client._rpc.list_exposed_ports(
                 pb.ListExposedPortsRequest(session_id=self.id)
             )
-            # The shared converter also carries the wildcard fields; rebuilding
-            # ExposedPort by hand here silently dropped them, so listing an
-            # exposure reported wildcard=False/UNSPECIFIED for the same port
-            # expose_port had just described correctly.
+            # The shared converter also carries the wildcard fields, keeping this
+            # consistent with expose_port.
             return [exposed_port(item) for item in resp.ports]
         except Exception as err:
             raise map_rpc_error(err) from err
