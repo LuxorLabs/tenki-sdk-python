@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tenki"
-version = "1.5.1"
+version = "1.5.2"
 description = "Luxor AI Python SDK: cloud sandboxes (microVMs) for AI agents and code execution on Luxor Agent Cloud"
 readme = "README.md"
 requires-python = ">=3.10"
