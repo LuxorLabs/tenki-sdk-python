@@ -14,9 +14,9 @@ Send it privately regardless of whether we answer.
 
 ## What is in scope
 
-This repository: the `tenki` / `tenki_sandbox` Python client, its transport and credential handling, and the generated protobuf bindings it ships.
+This repository: the `luxor-ai` Python client (`luxor_ai`, also importable as `tenki` / `tenki_sandbox`), its transport and credential handling, and the generated protobuf bindings it ships.
 
-Two things are out of scope because they are not ours to fix here, though we would still like to hear about them: the Tenki Cloud service the SDK talks to (report those through Tenki Cloud's own channel), and bugs in your own code that uses the SDK.
+Two things are out of scope because they are not ours to fix here, though we would still like to hear about them: the Luxor Agent Cloud service the SDK talks to (report those through Luxor Agent Cloud's own channel), and bugs in your own code that uses the SDK.
 
 ## What deserves a report
 
@@ -28,4 +28,4 @@ The SDK carries an auth token and session credentials and opens connections to t
 
 ## Supported versions
 
-There are no long-term support branches. Whatever gets fixed goes out in the next release of the `tenki` package on PyPI, and nothing is backported. Upgrade to the latest release before reporting.
+There are no long-term support branches. Whatever gets fixed goes out in the next release of the `luxor-ai` package on PyPI (also published as `tenki`), and nothing is backported. Upgrade to the latest release before reporting.

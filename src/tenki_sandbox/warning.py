@@ -30,7 +30,7 @@ class SandboxWarning:
 class SandboxWarningNotification(UserWarning):
     def __init__(self, warning: SandboxWarning) -> None:
         self.warning = warning
-        super().__init__(f"tenki sandbox warning [{warning.code}]: {warning.message}")
+        super().__init__(f"luxor sandbox warning [{warning.code}]: {warning.message}")
 
 
 WarningHandler = Callable[[SandboxWarning], None]

@@ -244,7 +244,7 @@ def _flatten_packages(packages: tuple) -> list[str]:
 class TemplateSpec:
     """Immutable local builder for the typed v1 template build spec.
 
-    The default spec starts from the Tenki base image ``sandbox``. Local
+    The default spec starts from the Luxor base image ``sandbox``. Local
     ``validate()`` rejects obvious errors; the server remains authoritative
     and owns canonical hashing (no local ``hash()``).
     """
@@ -271,7 +271,7 @@ class TemplateSpec:
     # Base selection (exactly one of image / template / snapshot)
 
     def from_image(self, image: Any) -> "TemplateSpec":
-        """Base on a Tenki-managed image ID or registry ref (or an Image)."""
+        """Base on a Luxor-managed image ID or registry ref (or an Image)."""
         ref = _image_ref(image)
 
         def mutate(p):

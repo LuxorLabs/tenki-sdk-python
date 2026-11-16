@@ -1,4 +1,4 @@
-"""Async (grpc.aio) client for the Tenki Sandbox SDK.
+"""Async (grpc.aio) client for the Luxor Sandbox SDK.
 
 Mirrors the synchronous surface with native async/await. Import from here or the
 re-exported ``tenki_sandbox.AsyncClient`` / ``tenki_sandbox.AsyncSandbox``.

@@ -153,7 +153,7 @@ class AsyncVolumes:
 
 
 class AsyncStorageConnections:
-    """Workspace storage connections; credentials live in Tenki Secrets under the s3_storage scope."""
+    """Workspace storage connections; credentials live in Luxor Secrets under the s3_storage scope."""
 
     def __init__(self, rpc) -> None:
         self._rpc = rpc

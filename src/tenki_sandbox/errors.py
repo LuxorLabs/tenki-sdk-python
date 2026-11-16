@@ -128,7 +128,7 @@ class StorageMountAttachCancelledError(SandboxError):
 
 
 class StorageConnectionDisabledError(SandboxError):
-    """Tenki disabled the storage connection; contact support to restore it."""
+    """Luxor disabled the storage connection; contact support to restore it."""
 
 
 class VolumeInUseError(SandboxError):
@@ -590,7 +590,7 @@ def map_rpc_error(err: Exception) -> SandboxError:
             return RateLimitedError(details)
         return QuotaExceededError(details)
     if code_name == "FAILED_PRECONDITION":
-        if "disabled by tenki" in msg:
+        if "disabled by luxor" in msg or "disabled by tenki" in msg:
             return StorageConnectionDisabledError(details)
         if "terminated" in msg:
             return SessionTerminatedError(details)

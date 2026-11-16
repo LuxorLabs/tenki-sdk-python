@@ -149,6 +149,12 @@ def test_connection_disabled_by_tenki_has_its_own_error():
     )
     assert isinstance(disabled, StorageConnectionDisabledError)
     assert not isinstance(disabled, InvalidStateError)
+    assert isinstance(
+        map_rpc_error(
+            FakeRpcError("FAILED_PRECONDITION", 'storage connection "Build cache" was disabled by Luxor; contact support')
+        ),
+        StorageConnectionDisabledError,
+    )
     assert tenki_sandbox.StorageConnectionDisabledError is StorageConnectionDisabledError
 
 

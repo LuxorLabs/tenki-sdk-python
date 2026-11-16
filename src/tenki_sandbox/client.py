@@ -314,7 +314,7 @@ class Client:
             raise map_rpc_error(err) from err
 
     def list_ci_runner_sizes(self) -> CIRunnerSizes:
-        """Tenki CI runner sizes for the API key's workspace, within its job-size limits."""
+        """Luxor CI runner sizes for the API key's workspace, within its job-size limits."""
         try:
             return ci_runner_sizes(self._rpc.list_ci_runner_sizes(pb.ListCIRunnerSizesRequest()))
         except Exception as err:

@@ -91,7 +91,7 @@ class EgressHttpRule:
 
 @dataclass(frozen=True)
 class StorageSecret:
-    """A credential field: an existing s3_storage Tenki Secret, or a value Tenki stores as a new one."""
+    """A credential field: an existing s3_storage Luxor Secret, or a value Luxor stores as a new one."""
 
     secret_name: str = ""
     value: str = ""
@@ -118,7 +118,7 @@ class StorageConnectionCredentials:
 
 @dataclass(frozen=True)
 class StorageConnectionSecrets:
-    """Names of the Tenki Secrets a connection reads."""
+    """Names of the Luxor Secrets a connection reads."""
 
     access_key_id: str = ""
     secret_access_key: str = ""
@@ -147,7 +147,7 @@ class StorageConnection:
     default_mount_count: int = 0
     last_tested_at: datetime | None = None
     last_test_reason: str = ""
-    # Tenki disabled the connection: it accepts no new mounts and issues no credentials.
+    # Luxor disabled the connection: it accepts no new mounts and issues no credentials.
     disabled: bool = False
     disabled_at: datetime | None = None
 
@@ -487,7 +487,7 @@ class Identity:
 
 @dataclass(frozen=True)
 class CIRunnerSize:
-    """A Linux x64 runner size a Tenki CI job can run on."""
+    """A Linux x64 runner size a Luxor CI job can run on."""
 
     runs_on_label: str
     cpu: int
@@ -496,7 +496,7 @@ class CIRunnerSize:
 
 @dataclass(frozen=True)
 class CIRunnerSizes:
-    """The sizes Tenki CI can run for a workspace, within its job-size limits, smallest first."""
+    """The sizes Luxor CI can run for a workspace, within its job-size limits, smallest first."""
 
     sizes: tuple["CIRunnerSize", ...] = ()
     default_runs_on_label: str = ""
