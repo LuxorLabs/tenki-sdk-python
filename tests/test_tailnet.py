@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import asyncio
 from typing import cast
 
 import pytest
@@ -9,6 +10,7 @@ from tenki_sandbox import (
     AsyncClient,
     Client,
     TailnetAttachment,
+    TailnetPort,
     TailnetAuthKey,
     TailnetProvider,
     TailnetStatus,
@@ -207,3 +209,83 @@ async def test_saved_profile_reference_reaches_async_client():
     assert rpc.request.tailnet.profile_id == profile_id
     assert rpc.request.tailnet.profile_revision == 3
     assert rpc.request.tailnet.auth_key == ""
+
+
+@pytest.mark.parametrize("protocol", ["tcp", "udp"])
+def test_typed_tailnet_port_preserves_transport(protocol):
+    request = build_create_session_request(tailnet=TailnetAttachment(
+        auth_key=TailnetAuthKey("sentinel"), exposed_ports=(TailnetPort(6081, protocol),)
+    ))
+    assert list(request.tailnet.expose_ports) == []
+    assert request.tailnet.exposed_ports[0].port == 6081
+    assert request.tailnet.exposed_ports[0].protocol == {"tcp": pb.TAILNET_PORT_PROTOCOL_TCP, "udp": pb.TAILNET_PORT_PROTOCOL_UDP}[protocol]
+
+
+@pytest.mark.parametrize("port,protocol", [(0, "udp"), (65536, "udp"), (True, "udp"), (6081, "sctp"), (6081, "")])
+def test_typed_tailnet_port_rejects_invalid(port, protocol):
+    with pytest.raises(ValueError):
+        TailnetPort(port, protocol)
+
+
+def test_sync_old_server_is_terminated_before_returning_handle():
+    class OldRPC(SyncRPC):
+        terminated = False
+        def terminate_session(self, request, *, timeout):
+            assert timeout == 10.0
+            self.terminated = True
+            assert request.session_id == response().session.id
+    rpc = OldRPC()
+    with pytest.raises(RuntimeError, match="session terminated"):
+        Client(rpc=rpc).create(wait=False, tailnet=TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), exposed_ports=(TailnetPort(6081,"udp"),)))
+    assert rpc.terminated
+
+
+@pytest.mark.asyncio
+async def test_async_old_server_is_terminated_before_returning_handle():
+    class OldRPC(AsyncRPC):
+        terminated = False
+        async def terminate_session(self, request, *, timeout):
+            assert timeout == 10.0
+            self.terminated = True
+            assert request.session_id == response().session.id
+    rpc = OldRPC()
+    with pytest.raises(RuntimeError, match="session terminated"):
+        await AsyncClient(rpc=rpc).create(wait=False, tailnet=TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), exposed_ports=(TailnetPort(6081,"udp"),)))
+    assert rpc.terminated
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cleanup_error", [False, True])
+async def test_async_unsupported_tailnet_cleanup_survives_create_cancellation(cleanup_error):
+    started, release, completed = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    class OldRPC(AsyncRPC):
+        async def terminate_session(self, request, *, timeout):
+            assert timeout == 10.0
+            started.set()
+            await release.wait()
+            completed.set()
+            if cleanup_error:
+                raise asyncio.TimeoutError("cleanup deadline")
+    task = asyncio.create_task(AsyncClient(rpc=OldRPC()).create(
+        wait=False, tailnet=TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), exposed_ports=(TailnetPort(6081,"udp"),))
+    ))
+    await asyncio.wait_for(started.wait(), 1)
+    task.cancel()
+    await asyncio.sleep(0)
+    assert not task.done()
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert completed.is_set()
+
+
+@pytest.mark.asyncio
+async def test_async_unsupported_tailnet_cleanup_timeout_is_reported():
+    class OldRPC(AsyncRPC):
+        async def terminate_session(self, request, *, timeout):
+            assert timeout == 10.0
+            raise asyncio.TimeoutError("cleanup deadline")
+    with pytest.raises(RuntimeError, match="cleanup failed"):
+        await AsyncClient(rpc=OldRPC()).create(
+            wait=False, tailnet=TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), exposed_ports=(TailnetPort(6081,"udp"),))
+        )

@@ -264,6 +264,18 @@ TailnetProvider = Literal["tailscale"]
 
 
 @dataclass(frozen=True)
+class TailnetPort:
+    port: int
+    protocol: Literal["tcp", "udp"]
+
+    def __post_init__(self) -> None:
+        if isinstance(self.port, bool) or not isinstance(self.port, int) or not 1 <= self.port <= 65535:
+            raise ValueError("invalid tailnet exposed port")
+        if self.protocol not in ("tcp", "udp"):
+            raise ValueError("tailnet exposed port protocol must be tcp or udp")
+
+
+@dataclass(frozen=True)
 class TailnetAttachment:
     auth_key: TailnetAuthKey | None = None
     hostname: str = ""
@@ -280,6 +292,7 @@ class TailnetAttachment:
     provider: TailnetProvider = "tailscale"
     profile_id: str | None = None
     profile_revision: int = 0
+    exposed_ports: tuple[TailnetPort, ...] = ()
 
 
 @dataclass(frozen=True)

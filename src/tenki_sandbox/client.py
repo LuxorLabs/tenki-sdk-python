@@ -225,6 +225,16 @@ class Client:
         except Exception as err:
             raise map_rpc_error(err) from err
 
+        if any(
+            (port.port, port.protocol) not in {(accepted.port, accepted.protocol) for accepted in resp.session.tailnet_status.exposed_ports}
+            for port in req.tailnet.exposed_ports
+        ):
+            try:
+                self._rpc.terminate_session(pb.TerminateSessionRequest(session_id=resp.session.id), timeout=10.0)
+            except Exception as err:
+                raise RuntimeError(f"sandbox {resp.session.id}: server did not acknowledge tailnet exposed ports; cleanup failed") from err
+            raise RuntimeError("server does not support requested tailnet exposed ports; session terminated")
+
         warnings = sandbox_warnings_from_proto(resp.warnings)
         sandbox = Sandbox(
             self,
@@ -573,6 +583,7 @@ def _tailnet_attachment_proto(attachment: TailnetAttachment):
         accept_routes=attachment.accept_routes,
         wake_on_connect=attachment.wake_on_connect,
         expose_ports=attachment.expose_ports,
+        exposed_ports=[pb.TailnetPort(port=endpoint.port, protocol={"tcp": pb.TAILNET_PORT_PROTOCOL_TCP, "udp": pb.TAILNET_PORT_PROTOCOL_UDP}[endpoint.protocol]) for endpoint in attachment.exposed_ports],
         wait_for_online=attachment.wait_for_online,
         **credential,
         profile_revision=attachment.profile_revision,

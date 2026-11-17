@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 
 from .._convert import ci_runner_sizes, identity, sandbox_info, session_metrics, workspace_usage_limit
 from .._pagination import advance_page_token
@@ -222,6 +224,27 @@ class AsyncClient:
             resp = await self._rpc.create_session(req)
         except Exception as err:
             raise map_rpc_error(err) from err
+
+        if any(
+            (port.port, port.protocol) not in {(accepted.port, accepted.protocol) for accepted in resp.session.tailnet_status.exposed_ports}
+            for port in req.tailnet.exposed_ports
+        ):
+            try:
+                cleanup = asyncio.create_task(asyncio.wait_for(
+                    self._rpc.terminate_session(pb.TerminateSessionRequest(session_id=resp.session.id), timeout=10.0),
+                    timeout=10.0,
+                ))
+                try:
+                    await asyncio.shield(cleanup)
+                except asyncio.CancelledError as cancellation:
+                    try:
+                        await asyncio.shield(cleanup)
+                    except (Exception, asyncio.CancelledError):
+                        pass
+                    raise cancellation
+            except Exception as err:
+                raise RuntimeError(f"sandbox {resp.session.id}: server did not acknowledge tailnet exposed ports; cleanup failed") from err
+            raise RuntimeError("server does not support requested tailnet exposed ports; session terminated")
 
         warnings = sandbox_warnings_from_proto(resp.warnings)
         sandbox = AsyncSandbox(

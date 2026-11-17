@@ -84,13 +84,14 @@ Use `TailnetAuthKey` so `str()` and `repr()` redact the credential.
 ```python
 import os
 
-from luxor_ai import Sandbox, TailnetAttachment, TailnetAuthKey
+from luxor_ai import Sandbox, TailnetAttachment, TailnetAuthKey, TailnetPort
 
 sb = Sandbox.create(
     tailnet=TailnetAttachment(
         auth_key=TailnetAuthKey(os.environ["TAILNET_AUTH_KEY"]),
         tags=("tag:sandbox",),
         expose_ports=(3000,),
+        exposed_ports=(TailnetPort(6081, "udp"),),
         accept_routes=True,
         wait_for_online=True,
     )
