@@ -18,7 +18,7 @@ class PaginationStalledError(SandboxError):
 class MissingAuthTokenError(SandboxError):
     def __init__(self) -> None:
         super().__init__(
-            "missing auth token: set LUXORAI_AUTH_TOKEN or LUXORAI_API_KEY"
+            "missing auth token: set LUXOR_AUTH_TOKEN or LUXOR_API_KEY"
             " (or TENKI_AUTH_TOKEN or TENKI_API_KEY)"
         )
 

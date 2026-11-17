@@ -11,6 +11,7 @@ from .constants import (
     AUTH_TOKEN_ENVS,
     BASE_URL_ENVS,
     DEFAULT_BASE_URL,
+    ENV_LUXOR_API_KEY,
     GATEWAY_URL_ENVS,
     SDK_USER_AGENT,
 )
@@ -18,9 +19,12 @@ from .errors import InvalidAuthTokenError, MissingAuthTokenError, map_rpc_error
 
 
 def read_env(names: tuple[str, ...]) -> str:
-    """Returns the first non-blank environment value among names, trimmed, in order."""
+    """Returns the first usable environment value among names, trimmed, in order."""
     for name in names:
         value = (os.getenv(name) or "").strip()
+        # LUXOR_API_KEY is also the Luxor Mining Pool key name, so other values count as unset.
+        if name == ENV_LUXOR_API_KEY and not value.startswith(API_KEY_PREFIXES):
+            continue
         if value:
             return value
     return ""

@@ -34,8 +34,8 @@ from tenki_sandbox.errors import PermissionDeniedError, SandboxError, SnapshotNo
 def test_async_client_requires_auth_without_injected_rpc(monkeypatch):
     monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
-    monkeypatch.delenv("LUXORAI_AUTH_TOKEN", raising=False)
-    monkeypatch.delenv("LUXORAI_API_KEY", raising=False)
+    monkeypatch.delenv("LUXOR_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("LUXOR_API_KEY", raising=False)
     with pytest.raises(MissingAuthTokenError):
         AsyncClient()
 
@@ -201,8 +201,8 @@ def test_async_client_rejects_invalid_auth_tokens(auth_token, rpc):
 def test_async_client_accepts_api_key_as_an_alias_for_auth_token(rpc, monkeypatch):
     monkeypatch.delenv("TENKI_AUTH_TOKEN", raising=False)
     monkeypatch.delenv("TENKI_API_KEY", raising=False)
-    monkeypatch.delenv("LUXORAI_AUTH_TOKEN", raising=False)
-    monkeypatch.delenv("LUXORAI_API_KEY", raising=False)
+    monkeypatch.delenv("LUXOR_AUTH_TOKEN", raising=False)
+    monkeypatch.delenv("LUXOR_API_KEY", raising=False)
 
     assert AsyncClient(api_key="tk_alias", rpc=rpc).auth_token == "tk_alias"
 

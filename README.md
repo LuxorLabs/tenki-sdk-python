@@ -332,8 +332,8 @@ Auth resolution:
 
 1. `auth_token=` passed to `Client` or `Sandbox.create`
 2. `api_key=`, an alias for `auth_token`
-3. `LUXORAI_AUTH_TOKEN`
-4. `LUXORAI_API_KEY`
+3. `LUXOR_AUTH_TOKEN`
+4. `LUXOR_API_KEY`
 5. `TENKI_AUTH_TOKEN`
 6. `TENKI_API_KEY`
 
@@ -341,6 +341,8 @@ Credentials must be an API key or service token starting with `lx_` (`tk_` is st
 credentials raise `MissingAuthTokenError`; nonempty credentials with any other
 prefix raise `InvalidAuthTokenError`. Blank or whitespace-only values count as
 absent. Requests authenticate with an `Authorization: Bearer` header.
+
+`LUXOR_API_KEY` is only used when it starts with `lx_` or `tk_`; any other value is ignored.
 
 ### Migrating to v0.7.0
 
@@ -355,9 +357,9 @@ for Ory session tokens and browser cookie values. Pass an `lx_` API key or
 service token through `auth_token`; the SDK sends it as an
 `Authorization: Bearer` credential.
 
-`LUXORAI_API_ENDPOINT` or `LUXORAI_API_URL` points the client at another API host such as
-`https://api.luxor.ai`; `TENKI_API_ENDPOINT` and legacy `TENKI_API_URL` are still accepted when no `LUXORAI_*` URL is set. Every
-`LUXORAI_*` variable takes precedence over its `TENKI_*` equivalent.
+`LUXOR_API_ENDPOINT` or `LUXOR_API_URL` points the client at another API host such as
+`https://api.luxor.ai`; `TENKI_API_ENDPOINT` and legacy `TENKI_API_URL` are still accepted when no `LUXOR_*` URL is set. Every
+`LUXOR_*` variable takes precedence over its `TENKI_*` equivalent.
 
 ## Process API
 
@@ -613,7 +615,7 @@ Notes:
 - `sb.ssh()` / `client.ssh(session_id)` discover an active gateway and return
   `SSHConn`, an `io.RawIOBase` socket usable anywhere paramiko accepts one.
 - The SSH username is `tenki`.
-- `LUXORAI_SANDBOX_GATEWAY_URL` (or `TENKI_SANDBOX_GATEWAY_URL`) overrides the gateway WebSocket URL (it is
+- `LUXOR_SANDBOX_GATEWAY_URL` (or `TENKI_SANDBOX_GATEWAY_URL`) overrides the gateway WebSocket URL (it is
   otherwise derived from the API endpoint).
 - Certificate RPCs use the Connect protocol over HTTPS (same as the Go SDK and
   the `luxor` CLI), so they work through standard HTTP load balancers.
@@ -725,9 +727,9 @@ with WorkspaceClient(workspace_id=workspace_id) as workspace:
 ```
 
 `AsyncWorkspaceClient` has the same methods and arguments. Use `async with`
-and await each operation. Authentication uses `LUXORAI_AUTH_TOKEN` or `LUXORAI_API_KEY`
+and await each operation. Authentication uses `LUXOR_AUTH_TOKEN` or `LUXOR_API_KEY`
 (`TENKI_AUTH_TOKEN` and `TENKI_API_KEY` are still accepted). Set `base_url` or
-`LUXORAI_CLOUD_API_URL` (or `TENKI_CLOUD_API_URL`) to override the cloud API endpoint
+`LUXOR_CLOUD_API_URL` (or `TENKI_CLOUD_API_URL`) to override the cloud API endpoint
 independently of sandbox configuration. Set `workspace_id` once on the client. An omitted or empty workspace ID uses the authenticated
 workspace key's scope; other callers must specify one.
 

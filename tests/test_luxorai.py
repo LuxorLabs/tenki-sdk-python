@@ -1,4 +1,4 @@
-"""LUXORAI_* environment precedence, lx_ API keys and SDK identity headers."""
+"""LUXOR_* environment precedence, lx_ API keys and SDK identity headers."""
 
 from __future__ import annotations
 
@@ -29,12 +29,12 @@ from tenki_sandbox.data_plane import DataPlaneCredentialManager, GrpcDataPlaneRP
 
 SDK_VERSION = version("tenki")
 ENV_NAMES = (
-    "LUXORAI_AUTH_TOKEN",
-    "LUXORAI_API_KEY",
-    "LUXORAI_API_ENDPOINT",
-    "LUXORAI_API_URL",
-    "LUXORAI_SANDBOX_GATEWAY_URL",
-    "LUXORAI_CLOUD_API_URL",
+    "LUXOR_AUTH_TOKEN",
+    "LUXOR_API_KEY",
+    "LUXOR_API_ENDPOINT",
+    "LUXOR_API_URL",
+    "LUXOR_SANDBOX_GATEWAY_URL",
+    "LUXOR_CLOUD_API_URL",
     "TENKI_AUTH_TOKEN",
     "TENKI_API_KEY",
     "TENKI_API_ENDPOINT",
@@ -50,13 +50,13 @@ def _clean_env(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
-def test_luxorai_auth_token_wins_over_tenki(monkeypatch):
+def test_luxor_auth_token_wins_over_tenki(monkeypatch):
     monkeypatch.setenv("TENKI_AUTH_TOKEN", "tk_tenki_auth")
     monkeypatch.setenv("TENKI_API_KEY", "tk_tenki_key")
-    monkeypatch.setenv("LUXORAI_API_KEY", "lx_luxorai_key")
-    assert resolve_auth_token(None) == "lx_luxorai_key"
-    monkeypatch.setenv("LUXORAI_AUTH_TOKEN", "lx_luxorai_auth")
-    assert resolve_auth_token(None) == "lx_luxorai_auth"
+    monkeypatch.setenv("LUXOR_API_KEY", "lx_luxor_key")
+    assert resolve_auth_token(None) == "lx_luxor_key"
+    monkeypatch.setenv("LUXOR_AUTH_TOKEN", "lx_luxor_auth")
+    assert resolve_auth_token(None) == "lx_luxor_auth"
 
 
 def test_tenki_auth_token_is_the_fallback(monkeypatch):
@@ -64,18 +64,51 @@ def test_tenki_auth_token_is_the_fallback(monkeypatch):
     assert resolve_auth_token(None) == "tk_tenki_key"
 
 
-def test_whitespace_luxorai_auth_token_falls_back_to_tenki(monkeypatch):
-    monkeypatch.setenv("LUXORAI_AUTH_TOKEN", " \t ")
+def test_whitespace_luxor_auth_token_falls_back_to_tenki(monkeypatch):
+    monkeypatch.setenv("LUXOR_AUTH_TOKEN", " \t ")
     monkeypatch.setenv("TENKI_AUTH_TOKEN", "tk_tenki_auth")
     assert resolve_auth_token(None) == "tk_tenki_auth"
 
 
 @pytest.mark.parametrize("client_type", [Client, AsyncClient])
-def test_luxorai_urls_win_over_tenki(monkeypatch, client_type):
+@pytest.mark.parametrize("key", ["lx_luxor_key", "tk_luxor_key", "  lx_padded_key  "])
+def test_luxor_api_key_with_known_prefix_is_used(monkeypatch, client_type, key):
+    monkeypatch.setenv("LUXOR_API_KEY", key)
+    monkeypatch.setenv("TENKI_API_KEY", "tk_tenki_key")
+    assert resolve_auth_token(None) == key.strip()
+    assert client_type().auth_token == key.strip()
+
+
+@pytest.mark.parametrize("client_type", [Client, AsyncClient])
+def test_unprefixed_luxor_api_key_falls_back_to_tenki(monkeypatch, client_type):
+    monkeypatch.setenv("LUXOR_API_KEY", "pool-key-123")
+    monkeypatch.setenv("TENKI_API_KEY", "tk_tenki_key")
+    assert resolve_auth_token(None) == "tk_tenki_key"
+    assert client_type().auth_token == "tk_tenki_key"
+
+
+@pytest.mark.parametrize("client_type", [Client, AsyncClient, WorkspaceClient])
+def test_unprefixed_luxor_api_key_alone_is_missing_auth(monkeypatch, client_type):
+    monkeypatch.setenv("LUXOR_API_KEY", "pool-key-123")
+    with pytest.raises(tenki_sandbox.MissingAuthTokenError, match="LUXOR_AUTH_TOKEN"):
+        resolve_auth_token(None)
+    with pytest.raises(tenki_sandbox.MissingAuthTokenError):
+        client_type()
+
+
+def test_unprefixed_luxor_auth_token_is_not_guarded(monkeypatch):
+    monkeypatch.setenv("LUXOR_AUTH_TOKEN", "pool-key-123")
+    monkeypatch.setenv("TENKI_API_KEY", "tk_tenki_key")
+    with pytest.raises(tenki_sandbox.InvalidAuthTokenError):
+        resolve_auth_token(None)
+
+
+@pytest.mark.parametrize("client_type", [Client, AsyncClient])
+def test_luxor_urls_win_over_tenki(monkeypatch, client_type):
     monkeypatch.setenv("TENKI_API_ENDPOINT", "https://api.tenki.example")
     monkeypatch.setenv("TENKI_SANDBOX_GATEWAY_URL", "wss://gateway.tenki.example")
-    monkeypatch.setenv("LUXORAI_API_URL", "https://api.luxor.example")
-    monkeypatch.setenv("LUXORAI_SANDBOX_GATEWAY_URL", "wss://gateway.luxor.example")
+    monkeypatch.setenv("LUXOR_API_URL", "https://api.luxor.example")
+    monkeypatch.setenv("LUXOR_SANDBOX_GATEWAY_URL", "wss://gateway.luxor.example")
     client = client_type(auth_token="lx_test", rpc=object())
     assert client.base_url == "https://api.luxor.example"
     assert client.gateway_url == "wss://gateway.luxor.example"
@@ -91,9 +124,9 @@ def test_tenki_urls_are_the_fallback(monkeypatch, client_type):
     assert not client._gateway_explicit
 
 
-def test_luxorai_api_endpoint_derives_luxor_gateway(monkeypatch):
-    monkeypatch.setenv("LUXORAI_API_ENDPOINT", "https://api.luxor.ai")
-    monkeypatch.setenv("LUXORAI_API_URL", "https://ignored.luxor.example")
+def test_luxor_api_endpoint_derives_luxor_gateway(monkeypatch):
+    monkeypatch.setenv("LUXOR_API_ENDPOINT", "https://api.luxor.ai")
+    monkeypatch.setenv("LUXOR_API_URL", "https://ignored.luxor.example")
     client = Client(auth_token="lx_test", rpc=object())
     assert client.base_url == "https://api.luxor.ai"
     assert client.gateway_url == "wss://sandbox-gateway.luxor.ai"
@@ -183,15 +216,15 @@ def workspace_endpoint():
     server.stop(0).wait()
 
 
-def test_workspace_client_reads_luxorai_env_and_sends_sdk_identity(monkeypatch, workspace_endpoint):
+def test_workspace_client_reads_luxor_env_and_sends_sdk_identity(monkeypatch, workspace_endpoint):
     endpoint, seen = workspace_endpoint
     monkeypatch.setenv("TENKI_CLOUD_API_URL", "http://127.0.0.1:1")
-    monkeypatch.setenv("LUXORAI_CLOUD_API_URL", endpoint)
+    monkeypatch.setenv("LUXOR_CLOUD_API_URL", endpoint)
     monkeypatch.setenv("TENKI_AUTH_TOKEN", "tk_tenki")
-    monkeypatch.setenv("LUXORAI_AUTH_TOKEN", "lx_luxorai")
+    monkeypatch.setenv("LUXOR_AUTH_TOKEN", "lx_luxor")
     with WorkspaceClient() as client:
         client.secrets.get("secret")
-    assert seen[0]["authorization"] == "Bearer lx_luxorai"
+    assert seen[0]["authorization"] == "Bearer lx_luxor"
     assert seen[0]["x-luxor-client-family"] == "python"
     assert seen[0]["user-agent"].startswith(f"luxor-sandbox-python/{SDK_VERSION} ")
 
