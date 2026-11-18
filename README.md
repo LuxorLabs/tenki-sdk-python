@@ -528,6 +528,9 @@ sb = client.create(
 )
 ```
 
+- `pause_retention` must be positive and at most the workspace's pause
+  retention limit, which is also the default when unset; a larger value is
+  rejected with `InvalidArgument`.
 - `max_duration` caps total lifetime; `sb.extend(seconds)` pushes the deadline
   (`sb.info.timeout_at`) while running.
 - `sticky=True` runs the session until it is terminated, for keep-warm use

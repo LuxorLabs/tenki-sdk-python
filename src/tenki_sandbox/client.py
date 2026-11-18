@@ -179,6 +179,10 @@ class Client:
 
         ``idle_timeout_minutes`` is deprecated and ignored: sandboxes do not
         auto-pause on idle.
+
+        ``pause_retention`` is how long a paused session is kept resumable. It
+        must be at most the workspace's pause retention limit, which is also
+        the default when unset or not positive; a larger value is rejected.
         """
         req = build_create_session_request(
             workspace_id=workspace_id,
@@ -519,8 +523,9 @@ def build_create_session_request(
             DeprecationWarning,
             stacklevel=3,
         )
-    if pause_retention is not None:
-        req.pause_retention.CopyFrom(duration(pause_retention))
+    retention = duration(pause_retention)
+    if retention is not None and (retention.seconds > 0 or retention.nanos > 0):
+        req.pause_retention.CopyFrom(retention)
     if cpu_cores is not None:
         req.cpu_cores = cpu_cores
     if memory_mb is not None:

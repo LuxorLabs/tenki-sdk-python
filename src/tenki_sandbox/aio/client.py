@@ -176,6 +176,10 @@ class AsyncClient:
 
         ``idle_timeout_minutes`` is deprecated and ignored: sandboxes do not
         auto-pause on idle.
+
+        ``pause_retention`` is how long a paused session is kept resumable. It
+        must be at most the workspace's pause retention limit, which is also
+        the default when unset or not positive; a larger value is rejected.
         """
         req = build_create_session_request(
             workspace_id=workspace_id,
