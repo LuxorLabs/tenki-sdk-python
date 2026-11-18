@@ -95,6 +95,14 @@ class QuotaExceededError(SandboxError):
     pass
 
 
+class VolumeLimitExceededError(QuotaExceededError):
+    """Also a QuotaExceededError, which older SDK versions raised here."""
+
+
+class CapacityUnavailableError(QuotaExceededError):
+    """Also a QuotaExceededError, which older SDK versions raised here."""
+
+
 class PortLimitExceededError(SandboxError):
     pass
 
@@ -143,8 +151,12 @@ class SnapshotNotFoundError(SandboxError):
     pass
 
 
-class SnapshotNotDurableError(SandboxError):
-    pass
+class SnapshotNotDurableError(InvalidStateError):
+    """Also an InvalidStateError, which older SDK versions raised here."""
+
+
+class SessionExpiredError(SessionNotFoundError):
+    """Also a SessionNotFoundError, which older SDK versions raised here."""
 
 
 class SnapshotFailedError(SandboxError, RuntimeError):
@@ -181,6 +193,10 @@ class ResumeWaitTimeoutError(SandboxError, TimeoutError):
 
 class TemplateNotFoundError(SandboxError):
     pass
+
+
+class TemplateBuildNotFoundError(TemplateNotFoundError):
+    """Also a TemplateNotFoundError, which older SDK versions raised here."""
 
 
 class RegistryImageNotFoundError(SandboxError):
@@ -265,8 +281,8 @@ class InvalidResourceConfigError(SandboxError, ValueError):
     pass
 
 
-class SSHUnavailableError(SandboxError):
-    pass
+class SSHUnavailableError(InvalidStateError):
+    """Also an InvalidStateError, which older SDK versions raised here."""
 
 
 class GitOperationFailedError(SandboxError):
@@ -558,16 +574,22 @@ def map_rpc_error(err: Exception) -> SandboxError:
             return StorageConnectionNotFoundError(details)
         if "storage mount" in msg:
             return StorageMountNotFoundError(details)
+        if "template build" in msg:
+            return TemplateBuildNotFoundError(details)
         if "template" in msg:
             return TemplateNotFoundError(details)
-        if "snapshot" in msg:
-            return SnapshotNotFoundError(details)
-        if "volume" in msg:
-            return VolumeNotFoundError(details)
         if "registry image" in msg:
             return RegistryImageNotFoundError(details)
         if "no such file or directory" in msg:
             return FileNotFoundError(details)
+        if "session" in msg:
+            return SessionNotFoundError(details)
+        if "snapshot" in msg:
+            return SnapshotNotFoundError(details)
+        if "volume" in msg:
+            return VolumeNotFoundError(details)
+        if "artifact" in msg:
+            return SessionExpiredError(details)
         return SessionNotFoundError(details)
     if code_name == "ALREADY_EXISTS":
         if "template" in msg:
@@ -586,12 +608,20 @@ def map_rpc_error(err: Exception) -> SandboxError:
             )
         if "maximum exposed ports" in msg:
             return PortLimitExceededError(details)
+        if "volume" in msg:
+            return VolumeLimitExceededError(details)
         if "rate limit" in msg:
             return RateLimitedError(details)
+        if "capacity" in msg:
+            return CapacityUnavailableError(details)
         return QuotaExceededError(details)
     if code_name == "FAILED_PRECONDITION":
         if "disabled by luxor" in msg or "disabled by tenki" in msg:
             return StorageConnectionDisabledError(details)
+        if "snapshot not yet durable" in msg:
+            return SnapshotNotDurableError(details)
+        if "template build already in progress" in msg or "build in progress" in msg:
+            return TemplateBuildInProgressError(details)
         if "terminated" in msg:
             return SessionTerminatedError(details)
         if _GIT_FAILURE.search(details):
@@ -611,15 +641,15 @@ def map_rpc_error(err: Exception) -> SandboxError:
             return VolumeInUseError(details)
         if "inbound access is disabled" in msg:
             return InboundDisabledError(details)
-        if "template build already in progress" in msg or "build in progress" in msg:
-            return TemplateBuildInProgressError(details)
+        if "ssh" in msg:
+            return SSHUnavailableError(details)
         return InvalidStateError(details)
     if code_name == "ABORTED" and "cancelled by a detach" in msg:
         return StorageMountAttachCancelledError(details)
     if code_name == "ABORTED" and msg.startswith("resume failed"):
         return ResumeFailedError(details)
     if code_name == "UNAVAILABLE":
-        mapped = SandboxError(details)
+        mapped = SSHUnavailableError(details) if "ssh" in msg else SandboxError(details)
         mapped.retryable = True
         return mapped
     return SandboxError(details)

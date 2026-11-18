@@ -419,3 +419,52 @@ class FakeRpcError(Exception):
 
     def details(self):
         return self._details
+
+
+@pytest.mark.parametrize(
+    ("code", "details", "want"),
+    [
+        ("NOT_FOUND", "template build 0193 not found", "TemplateBuildNotFoundError"),
+        ("NOT_FOUND", "template base not found", "TemplateNotFoundError"),
+        ("NOT_FOUND", "", "SessionNotFoundError"),
+        ("NOT_FOUND", "registry image for snapshot abc not found", "RegistryImageNotFoundError"),
+        ("NOT_FOUND", "open /mnt/volume/a.txt: no such file or directory", "FileNotFoundError"),
+        ("NOT_FOUND", "stat /data/snapshot/x: no such file or directory", "FileNotFoundError"),
+        ("NOT_FOUND", "snapshot not found for session abc", "SessionNotFoundError"),
+        ("NOT_FOUND", "volume not found for session abc", "SessionNotFoundError"),
+        ("NOT_FOUND", "volume for snapshot abc not found", "SnapshotNotFoundError"),
+        ("NOT_FOUND", "artifact expired", "SessionExpiredError"),
+        ("RESOURCE_EXHAUSTED", "volume limit reached for workspace", "VolumeLimitExceededError"),
+        ("RESOURCE_EXHAUSTED", "no capacity in region", "CapacityUnavailableError"),
+        ("RESOURCE_EXHAUSTED", "workspace quota exceeded", "QuotaExceededError"),
+        ("FAILED_PRECONDITION", "snapshot not yet durable", "SnapshotNotDurableError"),
+        ("FAILED_PRECONDITION", "template build already in progress; session terminated", "TemplateBuildInProgressError"),
+        ("FAILED_PRECONDITION", "ssh is not enabled for this sandbox", "SSHUnavailableError"),
+        ("FAILED_PRECONDITION", "sandbox is not ready", "InvalidStateError"),
+        ("UNAVAILABLE", "ssh endpoint unavailable", "SSHUnavailableError"),
+    ],
+)
+def test_error_mapping_matches_go_and_typescript(code, details, want):
+    mapped = map_rpc_error(FakeRpcError(code, details))
+    assert type(mapped).__name__ == want
+    assert getattr(tenki_sandbox, want) is type(mapped)
+
+
+@pytest.mark.parametrize(
+    ("code", "details", "old"),
+    [
+        ("NOT_FOUND", "template build not found", "TemplateNotFoundError"),
+        ("NOT_FOUND", "artifact not found", "SessionNotFoundError"),
+        ("RESOURCE_EXHAUSTED", "session volume limit exceeded", "QuotaExceededError"),
+        ("RESOURCE_EXHAUSTED", "tailnet capacity exhausted", "QuotaExceededError"),
+        ("FAILED_PRECONDITION", "snapshot not yet durable", "InvalidStateError"),
+        ("FAILED_PRECONDITION", "session is not ready for ssh key updates", "InvalidStateError"),
+    ],
+)
+def test_new_error_types_still_match_previous_handlers(code, details, old):
+    assert isinstance(map_rpc_error(FakeRpcError(code, details)), getattr(tenki_sandbox, old))
+
+
+def test_unavailable_stays_retryable():
+    assert map_rpc_error(FakeRpcError("UNAVAILABLE", "ssh endpoint unavailable")).retryable
+    assert map_rpc_error(FakeRpcError("UNAVAILABLE", "upstream connect error")).retryable
