@@ -293,6 +293,7 @@ class TailnetAttachment:
     profile_id: str | None = None
     profile_revision: int = 0
     exposed_ports: tuple[TailnetPort, ...] = ()
+    accept_dns: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -306,6 +307,7 @@ class TailnetStatus:
     error: str = ""
     device_retained: bool = False
     provider: str = "tailscale"
+    accept_dns: bool | None = None
 
 
 @dataclass(frozen=True)

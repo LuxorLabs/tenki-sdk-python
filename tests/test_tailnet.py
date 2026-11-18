@@ -229,6 +229,7 @@ def test_typed_tailnet_port_rejects_invalid(port, protocol):
 
 def test_sync_old_server_is_terminated_before_returning_handle():
     class OldRPC(SyncRPC):
+        _accepts_call_timeout = True
         terminated = False
         def terminate_session(self, request, *, timeout):
             assert timeout == 10.0
@@ -243,6 +244,7 @@ def test_sync_old_server_is_terminated_before_returning_handle():
 @pytest.mark.asyncio
 async def test_async_old_server_is_terminated_before_returning_handle():
     class OldRPC(AsyncRPC):
+        _accepts_call_timeout = True
         terminated = False
         async def terminate_session(self, request, *, timeout):
             assert timeout == 10.0
@@ -252,6 +254,44 @@ async def test_async_old_server_is_terminated_before_returning_handle():
     with pytest.raises(RuntimeError, match="session terminated"):
         await AsyncClient(rpc=rpc).create(wait=False, tailnet=TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), exposed_ports=(TailnetPort(6081,"udp"),)))
     assert rpc.terminated
+@pytest.mark.parametrize("accept_dns", [None, False, True])
+def test_tailnet_dns_presence(accept_dns):
+    req = build_create_session_request(tailnet=TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), accept_dns=accept_dns))
+    assert req.tailnet.HasField("accept_dns") is (accept_dns is not None)
+    if accept_dns is not None:
+        assert req.tailnet.accept_dns is accept_dns
+
+
+@pytest.mark.parametrize("accept_dns", [False, True])
+def test_sync_old_api_dns_rejection_cleans_up(accept_dns):
+    class OldRPC(SyncRPC):
+        def terminate_session(self, req):
+            self.terminated = req.session_id
+            return pb.TerminateSessionResponse()
+
+    rpc = OldRPC()
+    with pytest.raises(RuntimeError, match="did not acknowledge"):
+        Client(rpc=rpc).create(wait=False, tailnet=TailnetAttachment(
+            auth_key=TailnetAuthKey("sentinel"), accept_dns=accept_dns,
+        ))
+    assert rpc.terminated == "session-1"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("accept_dns", [False, True])
+async def test_async_old_api_dns_rejection_cleans_up(accept_dns):
+    class OldRPC(AsyncRPC):
+        async def terminate_session(self, req):
+            self.terminated = req.session_id
+            return pb.TerminateSessionResponse()
+
+    rpc = OldRPC()
+    with pytest.raises(RuntimeError, match="did not acknowledge"):
+        await AsyncClient(rpc=rpc).create(wait=False, tailnet=TailnetAttachment(
+            auth_key=TailnetAuthKey("sentinel"), accept_dns=accept_dns,
+        ))
+    assert rpc.terminated == "session-1"
+
 
 
 @pytest.mark.asyncio
@@ -259,6 +299,7 @@ async def test_async_old_server_is_terminated_before_returning_handle():
 async def test_async_unsupported_tailnet_cleanup_survives_create_cancellation(cleanup_error):
     started, release, completed = asyncio.Event(), asyncio.Event(), asyncio.Event()
     class OldRPC(AsyncRPC):
+        _accepts_call_timeout = True
         async def terminate_session(self, request, *, timeout):
             assert timeout == 10.0
             started.set()
@@ -282,6 +323,7 @@ async def test_async_unsupported_tailnet_cleanup_survives_create_cancellation(cl
 @pytest.mark.asyncio
 async def test_async_unsupported_tailnet_cleanup_timeout_is_reported():
     class OldRPC(AsyncRPC):
+        _accepts_call_timeout = True
         async def terminate_session(self, request, *, timeout):
             assert timeout == 10.0
             raise asyncio.TimeoutError("cleanup deadline")
@@ -289,3 +331,92 @@ async def test_async_unsupported_tailnet_cleanup_timeout_is_reported():
         await AsyncClient(rpc=OldRPC()).create(
             wait=False, tailnet=TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), exposed_ports=(TailnetPort(6081,"udp"),))
         )
+
+def test_dns_cleanup_uses_bounded_transport_deadline():
+    class TimedRPC(SyncRPC):
+        _accepts_call_timeout = True
+        def terminate_session(self, req, *, timeout):
+            self.cleanup_timeout = timeout
+            return pb.TerminateSessionResponse()
+
+    rpc = TimedRPC()
+    with pytest.raises(RuntimeError, match="did not acknowledge"):
+        Client(rpc=rpc).create(wait=False, tailnet=TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), accept_dns=True))
+    assert rpc.cleanup_timeout == 10.0
+
+
+@pytest.mark.asyncio
+async def test_dns_cleanup_survives_async_cancellation():
+    class BlockingRPC(AsyncRPC):
+        _accepts_call_timeout = True
+        def __init__(self):
+            super().__init__()
+            self.entered = asyncio.Event()
+            self.release = asyncio.Event()
+            self.terminated = False
+        async def terminate_session(self, req, *, timeout):
+            self.cleanup_timeout = timeout
+            self.entered.set()
+            await self.release.wait()
+            self.terminated = True
+            return pb.TerminateSessionResponse()
+
+    rpc = BlockingRPC()
+    task = asyncio.create_task(AsyncClient(rpc=rpc).create(wait=False, tailnet=TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), accept_dns=True)))
+    await rpc.entered.wait()
+    task.cancel()
+    await asyncio.sleep(0)
+    assert not task.done()
+    rpc.release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert rpc.terminated
+    assert rpc.cleanup_timeout == 10.0
+
+
+@pytest.mark.asyncio
+async def test_dns_cleanup_async_deadline(monkeypatch):
+    from tenki_sandbox import _compatibility
+    monkeypatch.setattr(_compatibility, "_CLEANUP_TIMEOUT_SECONDS", 0.01)
+    class StalledRPC(AsyncRPC):
+        async def terminate_session(self, req):
+            await asyncio.Event().wait()
+
+    with pytest.raises(RuntimeError, match="did not acknowledge") as error:
+        await AsyncClient(rpc=StalledRPC()).create(wait=False, tailnet=TailnetAttachment(auth_key=TailnetAuthKey("sentinel"), accept_dns=True))
+    assert isinstance(error.value.__cause__, TimeoutError)
+
+
+def test_dns_cleanup_real_sync_transport_forwards_timeout():
+    from types import SimpleNamespace
+    from tenki_sandbox._compatibility import cleanup_unacknowledged_session
+    from tenki_sandbox._transport import GrpcSandboxRPC
+
+    calls = []
+    def terminate(request, *, metadata, timeout):
+        calls.append((request.session_id, timeout))
+        return pb.TerminateSessionResponse()
+    rpc = object.__new__(GrpcSandboxRPC)
+    rpc._stub = SimpleNamespace(TerminateSession=terminate)
+    rpc._metadata = ()
+    rpc._timeout = None
+    cleanup_unacknowledged_session(rpc, "fixture")
+    assert calls == [("fixture", 10.0)]
+
+
+@pytest.mark.asyncio
+async def test_dns_cleanup_real_async_transport_forwards_timeout():
+    from types import SimpleNamespace
+    from tenki_sandbox._compatibility import cleanup_unacknowledged_session_async
+    from tenki_sandbox.aio._transport import AsyncGrpcSandboxRPC
+
+    calls = []
+    async def terminate(request, *, metadata, timeout):
+        calls.append((request.session_id, timeout))
+        return pb.TerminateSessionResponse()
+    rpc = object.__new__(AsyncGrpcSandboxRPC)
+    rpc._stub = SimpleNamespace(TerminateSession=terminate)
+    rpc._metadata = ()
+    rpc._timeout = None
+    await cleanup_unacknowledged_session_async(rpc, "fixture")
+    assert calls == [("fixture", 10.0)]

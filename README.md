@@ -825,3 +825,8 @@ Policies belong to a workspace and apply only to sessions that select them. Temp
 Every referenced location must match a selected policy before the request is forwarded. Existing egress rules still apply. An unavailable resolver fails closed. Ordinary values and absent fields remain unchanged.
 
 HTTPS interception requires a capable node and guest trust in the managed CA. Permit only trusted origins and paths: an upstream that echoes credentials can expose a value to the guest. See the [workspace secrets guide](../../../docs/src/product/workspace-secrets.md) for location limits and lifecycle behavior.
+
+Set `TailnetAttachment(accept_dns=True, ...)` to resolve short MagicDNS names through the attachment.
+This requires a guest with the unchanged Tenki systemd-resolved configuration.
+Omitting the option preserves existing DNS behavior; explicit `false` disables managed short-name search.
+Managed DNS must be enabled for your workspace.

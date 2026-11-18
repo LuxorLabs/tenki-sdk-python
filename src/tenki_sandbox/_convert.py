@@ -184,6 +184,7 @@ def tailnet_status(proto) -> TailnetStatus:
         owner=proto.owner,
         error=proto.error,
         device_retained=proto.device_retained,
+        accept_dns=proto.accept_dns if proto.HasField("accept_dns") else None,
     )
 
 

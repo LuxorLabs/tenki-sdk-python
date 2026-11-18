@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from ._compatibility import cleanup_unacknowledged_session
+
 import warnings
 
 from ._convert import (
@@ -230,10 +232,20 @@ class Client:
             for port in req.tailnet.exposed_ports
         ):
             try:
-                self._rpc.terminate_session(pb.TerminateSessionRequest(session_id=resp.session.id), timeout=10.0)
+                cleanup_unacknowledged_session(self._rpc, resp.session.id)
             except Exception as err:
                 raise RuntimeError(f"sandbox {resp.session.id}: server did not acknowledge tailnet exposed ports; cleanup failed") from err
             raise RuntimeError("server does not support requested tailnet exposed ports; session terminated")
+
+        if tailnet is not None and tailnet.accept_dns is not None:
+            status = resp.session.tailnet_status
+            if not status.HasField("accept_dns") or status.accept_dns != tailnet.accept_dns:
+                error = RuntimeError("API did not acknowledge managed tailnet DNS configuration")
+                try:
+                    cleanup_unacknowledged_session(self._rpc, resp.session.id)
+                except Exception as cleanup_error:
+                    raise error from cleanup_error
+                raise error
 
         warnings = sandbox_warnings_from_proto(resp.warnings)
         sandbox = Sandbox(
@@ -581,6 +593,7 @@ def _tailnet_attachment_proto(attachment: TailnetAttachment):
         control_url=attachment.control_url,
         exit_node=attachment.exit_node,
         accept_routes=attachment.accept_routes,
+        accept_dns=attachment.accept_dns,
         wake_on_connect=attachment.wake_on_connect,
         expose_ports=attachment.expose_ports,
         exposed_ports=[pb.TailnetPort(port=endpoint.port, protocol={"tcp": pb.TAILNET_PORT_PROTOCOL_TCP, "udp": pb.TAILNET_PORT_PROTOCOL_UDP}[endpoint.protocol]) for endpoint in attachment.exposed_ports],
