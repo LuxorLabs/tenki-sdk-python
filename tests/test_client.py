@@ -1339,6 +1339,43 @@ def test_template_runtime_failure_preserves_running_sandbox():
     assert mapped.sandbox.runtime_state == "FAILED"
 
 
+@pytest.mark.asyncio
+async def test_runtime_failure_cleans_up_missing_public_egress():
+    from types import SimpleNamespace
+
+    from google.protobuf.any_pb2 import Any
+    from tenki_sandbox.aio.client import AsyncClient
+    from tenki_sandbox.errors import _grpc_status_message_class
+
+    packed = Any()
+    packed.Pack(pb.TemplateRuntimeFailure(session=pb.SandboxSession(id="session-1", state=pb.SESSION_STATE_RUNNING)))
+    status = _grpc_status_message_class()(code=9, message="template runtime failed", details=[packed])
+    terminated = []
+
+    def fail(_request):
+        raise FakeRuntimeError(status.SerializeToString())
+
+    def terminate(request):
+        terminated.append(request.session_id)
+
+    def sync_rpc():
+        return SimpleNamespace(create_session_with_public_egress=fail, terminate_session=terminate)
+
+    async def async_fail(request):
+        fail(request)
+
+    async def async_terminate(request):
+        terminate(request)
+
+    with pytest.raises(RuntimeError, match="does not support public egress"):
+        Client(rpc=sync_rpc()).create(public_egress={"tcp_ports": [443]}, wait=False)
+    with pytest.raises(RuntimeError, match="does not support public egress"):
+        await AsyncClient(rpc=SimpleNamespace(create_session_with_public_egress=async_fail, terminate_session=async_terminate)).create(
+            public_egress={"tcp_ports": [443]}, wait=False
+        )
+    assert terminated == ["session-1", "session-1"]
+
+
 def test_volume_attach_detach_updates_frozen_info():
     rpc = FakeRPC()
     sandbox = Client(rpc=rpc).create(workspace_id="ws-1", wait=False)
@@ -1826,3 +1863,22 @@ def test_client_enables_http2_keepalive(monkeypatch):
         "grpc.primary_user_agent": f"luxor-sandbox-python/{SDK_VERSION}",
         "grpc.max_receive_message_length": 33 << 20,
     }
+
+def test_create_cleans_up_when_old_server_drops_public_egress():
+    rpc = FakeRPC()
+    rpc.create_session_with_public_egress = lambda req: pb.CreateSessionWithPublicEgressResponse(response=rpc.create_session(req.request))
+    client = Client(rpc=rpc)
+    with pytest.raises(RuntimeError, match="does not support public egress"):
+        client.create(public_egress={}, wait=False)
+    assert len(rpc.requests["terminate_session"]) == 1
+
+def test_create_does_not_allocate_without_public_egress_api_support():
+    rpc = FakeRPC()
+    def unsupported(req):
+        raise FakeRPCError("UNIMPLEMENTED")
+    rpc.create_session_with_public_egress = unsupported
+    client = Client(rpc=rpc)
+    with pytest.raises(SandboxError, match="UNIMPLEMENTED"):
+        client.create(public_egress={}, wait=False)
+    assert not rpc.requests["create_session"]
+    assert not rpc.requests["terminate_session"]

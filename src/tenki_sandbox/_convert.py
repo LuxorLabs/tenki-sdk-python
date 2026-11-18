@@ -7,6 +7,7 @@ from google.protobuf.json_format import MessageToDict
 from ._pb import pb, registry_pb, template_pb
 from ._time import datetime_from_proto
 from .models import (
+    PublicEgressSpec,
     CIRunnerSize,
     CIRunnerSizes,
     EgressHttpRule,
@@ -151,6 +152,7 @@ def session_egress_policy(proto, policy_names=()) -> SessionEgressPolicy:
         allow_cidrs=tuple(proto.allow_cidrs),
         intercept_https=proto.intercept_https,
         allowed_ports=tuple(proto.allowed_ports),
+        public_egress={"tcp_ports": proto.public_egress.tcp_ports, "udp_ports": proto.public_egress.udp_ports} if proto.HasField("public_egress") else None,
         http_rules=tuple(
             EgressHttpRule(
                 domains=tuple(rule.domains),
@@ -172,6 +174,28 @@ def egress_http_rule_proto(rule: EgressHttpRule) -> "pb.SessionEgressHttpRule":
         raise ValueError("an egress HTTP rule may set only one of path_exact, path_prefix, path_regex")
     return pb.SessionEgressHttpRule(domains=list(rule.domains), methods=list(rule.methods), **chosen)
 
+
+def inline_egress_policy_proto(
+    *,
+    allow_domains: list[str] | None,
+    allow_cidrs: list[str] | None,
+    intercept_https: bool,
+    allowed_ports: list[int] | None,
+    public_egress: PublicEgressSpec | None,
+    http_rules: list[EgressHttpRule] | None,
+) -> "pb.SessionEgressPolicy | None":
+    if public_egress is None and not (
+        allow_domains or allow_cidrs or intercept_https or allowed_ports or http_rules
+    ):
+        return None
+    return pb.SessionEgressPolicy(
+        allow_domains=list(allow_domains or []),
+        allow_cidrs=list(allow_cidrs or []),
+        intercept_https=intercept_https,
+        allowed_ports=allowed_ports,
+        public_egress=public_egress,
+        http_rules=[egress_http_rule_proto(rule) for rule in http_rules or []],
+    )
 
 def tailnet_status(proto) -> TailnetStatus:
     return TailnetStatus(
@@ -721,3 +745,8 @@ def template(proto) -> Template:
         else None,
         spec_hash=proto.spec_hash if proto.HasField("spec_hash") else None,
     )
+
+def public_egress_acknowledged(requested, actual):
+    if requested is None:
+        return True
+    return actual is not None and all(port in requested.get("tcp_ports", []) for port in actual.get("tcp_ports", [])) and all(port in requested.get("udp_ports", []) for port in actual.get("udp_ports", []))

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Literal, Mapping
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Literal, Mapping, Sequence, TypedDict
 
 from .disk import DiskUsage
 from .errors import CommandFailedError
@@ -209,6 +210,11 @@ class StorageDefaults:
     revision: int = 0
 
 
+class PublicEgressSpec(TypedDict, total=False):
+    tcp_ports: Sequence[int]
+    udp_ports: Sequence[int]
+
+
 @dataclass(frozen=True)
 class SessionEgressPolicy:
     """Empty allowlists follow the session's tailnet policy when attached; otherwise they are unrestricted."""
@@ -220,6 +226,12 @@ class SessionEgressPolicy:
     # Named workspace egress policies pinned at create; the fields above hold their merged expansion.
     policy_names: tuple[str, ...] = ()
     allowed_ports: tuple[int, ...] = ()
+    public_egress: Mapping[str, Sequence[int]] | None = field(default=None, hash=False)
+
+    def __post_init__(self) -> None:
+        if self.public_egress is not None:
+            ports = {protocol: tuple(values) for protocol, values in self.public_egress.items()}
+            object.__setattr__(self, "public_egress", MappingProxyType(ports))
 
 
 @dataclass(frozen=True)

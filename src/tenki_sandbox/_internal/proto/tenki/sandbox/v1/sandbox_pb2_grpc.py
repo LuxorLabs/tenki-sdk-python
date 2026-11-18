@@ -66,6 +66,11 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionResponse.FromString,
                 _registered_method=True)
+        self.CreateSessionWithPublicEgress = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/CreateSessionWithPublicEgress',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithPublicEgressRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithPublicEgressResponse.FromString,
+                _registered_method=True)
         self.CreateSessionCredential = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/CreateSessionCredential',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionCredentialRequest.SerializeToString,
@@ -496,10 +501,20 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyResponse.FromString,
                 _registered_method=True)
+        self.CreateEgressPolicyWithPublicEgress = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/CreateEgressPolicyWithPublicEgress',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyWithPublicEgressRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyWithPublicEgressResponse.FromString,
+                _registered_method=True)
         self.UpdateEgressPolicy = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/UpdateEgressPolicy',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyResponse.FromString,
+                _registered_method=True)
+        self.UpdateEgressPolicyWithPublicEgress = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/UpdateEgressPolicyWithPublicEgress',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyWithPublicEgressRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyWithPublicEgressResponse.FromString,
                 _registered_method=True)
         self.GetEgressPolicy = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/GetEgressPolicy',
@@ -584,6 +599,12 @@ class SandboxServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def CreateSession(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateSessionWithPublicEgress(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1114,7 +1135,19 @@ class SandboxServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateEgressPolicyWithPublicEgress(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def UpdateEgressPolicy(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateEgressPolicyWithPublicEgress(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1199,6 +1232,11 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.CreateSession,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionResponse.SerializeToString,
+            ),
+            'CreateSessionWithPublicEgress': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateSessionWithPublicEgress,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithPublicEgressRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithPublicEgressResponse.SerializeToString,
             ),
             'CreateSessionCredential': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateSessionCredential,
@@ -1630,10 +1668,20 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyResponse.SerializeToString,
             ),
+            'CreateEgressPolicyWithPublicEgress': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateEgressPolicyWithPublicEgress,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyWithPublicEgressRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyWithPublicEgressResponse.SerializeToString,
+            ),
             'UpdateEgressPolicy': grpc.unary_unary_rpc_method_handler(
                     servicer.UpdateEgressPolicy,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyResponse.SerializeToString,
+            ),
+            'UpdateEgressPolicyWithPublicEgress': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateEgressPolicyWithPublicEgress,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyWithPublicEgressRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyWithPublicEgressResponse.SerializeToString,
             ),
             'GetEgressPolicy': grpc.unary_unary_rpc_method_handler(
                     servicer.GetEgressPolicy,
@@ -1908,6 +1956,33 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/CreateSession',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateSessionWithPublicEgress(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/CreateSessionWithPublicEgress',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithPublicEgressRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithPublicEgressResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -4241,6 +4316,33 @@ class SandboxService(object):
             _registered_method=True)
 
     @staticmethod
+    def CreateEgressPolicyWithPublicEgress(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/CreateEgressPolicyWithPublicEgress',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyWithPublicEgressRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateEgressPolicyWithPublicEgressResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def UpdateEgressPolicy(request,
             target,
             options=(),
@@ -4257,6 +4359,33 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/UpdateEgressPolicy',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateEgressPolicyWithPublicEgress(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/UpdateEgressPolicyWithPublicEgress',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyWithPublicEgressRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.UpdateEgressPolicyWithPublicEgressResponse.FromString,
             options,
             channel_credentials,
             insecure,

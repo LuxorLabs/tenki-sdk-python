@@ -36,3 +36,19 @@ async def cleanup_unacknowledged_session_async(rpc, session_id: str) -> None:
         raise
     if cancelled:
         raise asyncio.CancelledError
+
+
+def cleanup_unsupported_public_egress(rpc, session_id):
+    try:
+        cleanup_unacknowledged_session(rpc, session_id)
+    except Exception as err:
+        raise RuntimeError("Server does not support public egress restrictions; cleanup failed") from err
+    raise RuntimeError("Server does not support public egress restrictions")
+
+
+async def cleanup_unsupported_public_egress_async(rpc, session_id):
+    try:
+        await cleanup_unacknowledged_session_async(rpc, session_id)
+    except Exception as err:
+        raise RuntimeError("Server does not support public egress restrictions; cleanup failed") from err
+    raise RuntimeError("Server does not support public egress restrictions")

@@ -30,6 +30,7 @@ from .errors import (
 from .fs import SandboxFS
 from .git import SandboxGit
 from .models import (
+    PublicEgressSpec,
     CommandResult,
     EgressHttpRule,
     ExposedPort,
@@ -300,6 +301,7 @@ class Sandbox:
         allow_cidrs: list[str] | None = None,
         intercept_https: bool = False,
         allowed_ports: list[int] | None = None,
+        public_egress: PublicEgressSpec | None = None,
         http_rules: list[EgressHttpRule] | None = None,
         egress_policies: list[str] | None = None,
         max_duration: float | int | object | None = None,
@@ -362,6 +364,7 @@ class Sandbox:
                 allow_cidrs=allow_cidrs,
                 intercept_https=intercept_https,
                 allowed_ports=allowed_ports,
+                public_egress=public_egress,
                 http_rules=http_rules,
                 egress_policies=egress_policies,
                 max_duration=max_duration,

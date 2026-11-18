@@ -172,6 +172,7 @@ class GrpcSandboxRPC:
     _accepts_call_timeout = True
     _methods = {
         "create_session": "CreateSession",
+        "create_session_with_public_egress": "CreateSessionWithPublicEgress",
         "create_session_credential": "CreateSessionCredential",
         "get_session": "GetSession",
         "get_session_metrics": "GetSessionMetrics",
@@ -207,7 +208,9 @@ class GrpcSandboxRPC:
         "update_volume": "UpdateVolume",
         "delete_volume": "DeleteVolume",
         "create_egress_policy": "CreateEgressPolicy",
+        "create_egress_policy_with_public_egress": "CreateEgressPolicyWithPublicEgress",
         "update_egress_policy": "UpdateEgressPolicy",
+        "update_egress_policy_with_public_egress": "UpdateEgressPolicyWithPublicEgress",
         "get_egress_policy": "GetEgressPolicy",
         "list_egress_policies": "ListEgressPolicies",
         "delete_egress_policy": "DeleteEgressPolicy",

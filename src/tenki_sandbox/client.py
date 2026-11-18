@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from ._compatibility import cleanup_unsupported_public_egress
 from ._compatibility import cleanup_unacknowledged_session
 
 import warnings
 
 from ._convert import (
     ci_runner_sizes,
-    egress_http_rule_proto,
+    inline_egress_policy_proto,
     identity,
+    public_egress_acknowledged,
     sandbox_info,
     session_metrics,
     workspace_usage_limit,
@@ -26,8 +28,9 @@ from ._transport import (
     resolve_gateway_url,
 )
 from .constants import GATEWAY_URL_ENVS
-from .errors import WaitReadyFailedError, map_rpc_error
+from .errors import TemplateRuntimeFailedError, WaitReadyFailedError, map_rpc_error
 from .models import (
+    PublicEgressSpec,
     CIRunnerSizes,
     EgressHttpRule,
     Identity,
@@ -120,6 +123,7 @@ class Client:
         allow_cidrs: list[str] | None = None,
         intercept_https: bool = False,
         allowed_ports: list[int] | None = None,
+        public_egress: PublicEgressSpec | None = None,
         http_rules: list[EgressHttpRule] | None = None,
         egress_policies: list[str] | None = None,
         max_duration: float | int | object | None = None,
@@ -185,6 +189,7 @@ class Client:
             allow_cidrs=allow_cidrs,
             intercept_https=intercept_https,
             allowed_ports=allowed_ports,
+            public_egress=public_egress,
             http_rules=http_rules,
             egress_policies=egress_policies,
             max_duration=max_duration,
@@ -223,9 +228,17 @@ class Client:
         )
 
         try:
-            resp = self._rpc.create_session(req)
+            if public_egress is not None:
+                resp = self._rpc.create_session_with_public_egress(pb.CreateSessionWithPublicEgressRequest(request=req)).response
+            else:
+                resp = self._rpc.create_session(req)
         except Exception as err:
-            raise map_rpc_error(err) from err
+            mapped = map_rpc_error(err)
+            if isinstance(mapped, TemplateRuntimeFailedError) and mapped.sandbox is not None:
+                session = mapped.sandbox
+                if session.id and not public_egress_acknowledged(public_egress, session.egress.public_egress):
+                    cleanup_unsupported_public_egress(self._rpc, session.id)
+            raise mapped from err
 
         if any(
             (port.port, port.protocol) not in {(accepted.port, accepted.protocol) for accepted in resp.session.tailnet_status.exposed_ports}
@@ -247,10 +260,14 @@ class Client:
                     raise error from cleanup_error
                 raise error
 
+        info = sandbox_info(resp.session)
+        if not public_egress_acknowledged(public_egress, info.egress.public_egress):
+            cleanup_unsupported_public_egress(self._rpc, resp.session.id)
+
         warnings = sandbox_warnings_from_proto(resp.warnings)
         sandbox = Sandbox(
             self,
-            sandbox_info(resp.session),
+            info,
             warnings=warnings,
             owns_client=_owns_client,
             data_plane_endpoint=resp.data_plane_endpoint,
@@ -417,6 +434,7 @@ def build_create_session_request(
     allow_cidrs: list[str] | None = None,
     intercept_https: bool = False,
     allowed_ports: list[int] | None = None,
+    public_egress: PublicEgressSpec | None = None,
     http_rules: list[EgressHttpRule] | None = None,
     egress_policies: list[str] | None = None,
     max_duration: float | int | object | None = None,
@@ -482,16 +500,16 @@ def build_create_session_request(
         req.workspace_id = workspace_id.strip()
     if tags:
         req.tags.extend(_normalize_tags(tags))
-    if allow_domains or allow_cidrs or intercept_https or allowed_ports or http_rules:
-        req.egress.CopyFrom(
-            pb.SessionEgressPolicy(
-                allow_domains=list(allow_domains or []),
-                allow_cidrs=list(allow_cidrs or []),
-                intercept_https=intercept_https,
-                allowed_ports=allowed_ports,
-                http_rules=[egress_http_rule_proto(rule) for rule in http_rules or []],
-            )
-        )
+    inline_egress = inline_egress_policy_proto(
+        allow_domains=allow_domains,
+        allow_cidrs=allow_cidrs,
+        intercept_https=intercept_https,
+        allowed_ports=allowed_ports,
+        public_egress=public_egress,
+        http_rules=http_rules,
+    )
+    if inline_egress is not None:
+        req.egress.CopyFrom(inline_egress)
     if max_duration is not None:
         req.max_duration.CopyFrom(duration(max_duration))
     if idle_timeout_minutes is not None:

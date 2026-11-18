@@ -54,9 +54,23 @@ class NotFound(Exception):
         return self._message
 
 
+class UnsupportedPublicEgress(Exception):
+    def code(self):
+        return type("Code", (), {"name": "UNIMPLEMENTED"})()
+
+    def __str__(self):
+        return "unsupported compatibility route"
+
+
 class EgressPolicyRPC:
     def __init__(self):
         self.requests = []
+
+    def create_egress_policy_with_public_egress(self, req):
+        raise UnsupportedPublicEgress()
+
+    def update_egress_policy_with_public_egress(self, req):
+        raise UnsupportedPublicEgress()
 
     def create_egress_policy(self, req):
         self.requests.append(req)
@@ -201,3 +215,23 @@ def test_missing_policy_names_never_map_to_another_not_found_error(message):
     err = map_rpc_error(NotFound(message))
     assert isinstance(err, EgressPolicyNotFoundError)
     assert not isinstance(err, (TemplateNotFoundError, VolumeNotFoundError, SessionNotFoundError))
+
+def test_public_restriction_refuses_old_api_before_named_mutation():
+    rpc = EgressPolicyRPC()
+    policies = EgressPolicies(rpc)
+    with pytest.raises(Exception, match="unsupported compatibility route"):
+        policies.create("ports", public_egress={})
+    with pytest.raises(Exception, match="unsupported compatibility route"):
+        policies.update("ports", expected_revision=1, public_egress={})
+    assert not rpc.requests
+
+
+@pytest.mark.asyncio
+async def test_async_public_restriction_refuses_old_api_before_named_mutation():
+    rpc = AsyncEgressPolicyRPC()
+    policies = AsyncEgressPolicies(rpc)
+    with pytest.raises(Exception, match="unsupported compatibility route"):
+        await policies.create("ports", public_egress={})
+    with pytest.raises(Exception, match="unsupported compatibility route"):
+        await policies.update("ports", expected_revision=1, public_egress={})
+    assert not rpc.requests
