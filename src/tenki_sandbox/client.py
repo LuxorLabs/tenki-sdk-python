@@ -28,6 +28,7 @@ from ._transport import (
     resolve_gateway_url,
 )
 from .constants import GATEWAY_URL_ENVS
+from .data_plane import warm_data_plane_endpoints
 from .errors import TemplateRuntimeFailedError, WaitReadyFailedError, map_rpc_error
 from .models import (
     PublicEgressSpec,
@@ -268,6 +269,7 @@ class Client:
         if not public_egress_acknowledged(public_egress, info.egress.public_egress):
             cleanup_unsupported_public_egress(self._rpc, resp.session.id)
 
+        warm_data_plane_endpoints(resp.data_plane_warm_endpoints)
         warnings = sandbox_warnings_from_proto(resp.warnings)
         sandbox = Sandbox(
             self,

@@ -108,6 +108,44 @@ def _acquire_shared_channel(target: str, secure: bool):
     return shared[0], release
 
 
+# Keep a warmed candidate channel pooled long enough for a session placed on that host to reuse it.
+_DATA_PLANE_WARM_HOLD_SECONDS = 30.0
+_DATA_PLANE_WARM_TIMEOUT_SECONDS = 10.0
+_DATA_PLANE_WARM_MAX_ENDPOINTS = 8
+_warm_tasks: set[asyncio.Task] = set()
+
+
+def warm_data_plane_endpoints(endpoints) -> None:
+    """Open shared channels to candidate hosts before placement; no RPC is sent."""
+    loop = asyncio.get_running_loop()
+    for endpoint in list(endpoints)[:_DATA_PLANE_WARM_MAX_ENDPOINTS]:
+        endpoint = endpoint.strip()
+        if not endpoint.startswith("https://"):
+            continue
+        try:
+            target, secure = grpc_target(endpoint)
+        except Exception:
+            continue
+        with _shared_channels_lock:
+            if (loop, target, secure) in _shared_channels:
+                continue
+        channel, release = _acquire_shared_channel(target, secure)
+
+        async def _warm(channel=channel, release=release) -> None:
+            try:
+                try:
+                    await asyncio.wait_for(channel.channel_ready(), _DATA_PLANE_WARM_TIMEOUT_SECONDS)
+                except Exception:
+                    pass
+                await asyncio.sleep(_DATA_PLANE_WARM_HOLD_SECONDS)
+            finally:
+                await release()
+
+        task = loop.create_task(_warm())
+        _warm_tasks.add(task)
+        task.add_done_callback(_warm_tasks.discard)
+
+
 def _rpc_error_message(err) -> str:
     details = getattr(err, "details", None)
     if callable(details):

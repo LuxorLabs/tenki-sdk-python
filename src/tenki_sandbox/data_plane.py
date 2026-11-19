@@ -90,6 +90,39 @@ def _acquire_shared_channel(endpoint: str):
     return shared[0], release
 
 
+# Keep a warmed candidate channel pooled long enough for a session placed on that host to reuse it.
+_DATA_PLANE_WARM_HOLD_SECONDS = 30.0
+_DATA_PLANE_WARM_TIMEOUT_SECONDS = 10.0
+_DATA_PLANE_WARM_MAX_ENDPOINTS = 8
+
+
+def warm_data_plane_endpoints(endpoints: Iterable[str]) -> None:
+    """Open shared channels to candidate hosts before placement; no RPC is sent."""
+    for endpoint in list(endpoints)[:_DATA_PLANE_WARM_MAX_ENDPOINTS]:
+        endpoint = endpoint.strip()
+        if not endpoint.startswith("https://"):
+            continue
+        try:
+            key = grpc_target(endpoint)
+        except Exception:
+            continue
+        with _shared_channels_lock:
+            if key in _shared_channels:
+                continue
+        channel, release = _acquire_shared_channel(endpoint)
+
+        def _warm(channel=channel, release=release) -> None:
+            try:
+                grpc.channel_ready_future(channel).result(timeout=_DATA_PLANE_WARM_TIMEOUT_SECONDS)
+            except Exception:
+                pass
+            timer = threading.Timer(_DATA_PLANE_WARM_HOLD_SECONDS, release)
+            timer.daemon = True
+            timer.start()
+
+        threading.Thread(target=_warm, name="tenki-dp-warm", daemon=True).start()
+
+
 def _rpc_error_message(err) -> str:
     details = getattr(err, "details", None)
     if callable(details):
