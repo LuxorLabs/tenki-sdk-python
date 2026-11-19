@@ -357,7 +357,7 @@ class FakeRPC:
                 buf += bytes(frame.data)
         if path is not None:
             self.files[path] = buf
-        return pb.WriteFileStreamResponse()
+        return pb.WriteFileStreamResponse(path=path or "", bytes_written=len(buf))
 
     def read_file_stream(self, req):
         data = self.files[req.path]

@@ -277,6 +277,15 @@ class StreamClosedError(SandboxError):
     pass
 
 
+class IncompleteWriteError(SandboxError):
+    """The sandbox acknowledged a write without saving every byte sent."""
+
+
+def ensure_full_write(path: str, sent: int, written: int) -> None:
+    if written != sent:
+        raise IncompleteWriteError(f"write incomplete: {path}: sent {sent} bytes, sandbox wrote {written}")
+
+
 class InvalidResourceConfigError(SandboxError, ValueError):
     pass
 
@@ -653,3 +662,25 @@ def map_rpc_error(err: Exception) -> SandboxError:
         mapped.retryable = True
         return mapped
     return SandboxError(details)
+
+
+def map_write_error(err: Exception) -> SandboxError:
+    """Map errors from write RPCs, the only RPCs whose DATA_LOSS means an incomplete write."""
+    mapped = map_rpc_error(err)
+    if not isinstance(mapped, IncompleteWriteError) and _has_data_loss_status(err):
+        return IncompleteWriteError(str(mapped))
+    return mapped
+
+
+def _has_data_loss_status(err: BaseException) -> bool:
+    # The transports raise map_rpc_error(err) from err, so the gRPC status sits somewhere on the __cause__ chain.
+    seen: set[int] = set()
+    source: BaseException | None = err
+    while source is not None and id(source) not in seen:
+        seen.add(id(source))
+        code_fn = getattr(source, "code", None)
+        code = code_fn() if callable(code_fn) else None
+        if getattr(code, "name", None) == "DATA_LOSS":
+            return True
+        source = source.__cause__
+    return False

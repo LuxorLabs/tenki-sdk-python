@@ -73,7 +73,7 @@ class FakeDataPlaneRPC(FakeControlRPC):
                 buf += bytes(frame.data)
         if path is not None:
             self.files[path] = buf
-        return pb.WriteFileStreamResponse()
+        return pb.WriteFileStreamResponse(path=path or "", bytes_written=len(buf))
 
     async def stat(self, req):
         if req.path not in self.files:

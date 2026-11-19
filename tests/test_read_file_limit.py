@@ -193,7 +193,9 @@ async def test_async_read_bytes_above_the_cap_over_grpc_raises_file_too_large():
 def _write_data_plane(received: list):
     def write_file(request, _context):
         received.append(len(request.request.content))
-        return pb.SandboxSessionDataPlaneServiceWriteFileResponse(response=pb.WriteFileResponse())
+        return pb.SandboxSessionDataPlaneServiceWriteFileResponse(
+            response=pb.WriteFileResponse(size_bytes=len(request.request.content))
+        )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         server = grpc.server(executor, options=[("grpc.max_receive_message_length", 64 << 20)])

@@ -12,10 +12,13 @@ class WriteCapture:
         self.starts = []
 
     def record(self, frames):
+        received = 0
         for frame in frames:
             if frame.WhichOneof("payload") == "start":
                 self.starts.append(frame.start)
-        return pb.WriteFileStreamResponse()
+            elif frame.WhichOneof("payload") == "data":
+                received += len(frame.data)
+        return pb.WriteFileStreamResponse(bytes_written=received)
 
 
 class SyncSecretsRPC(FakeRPC):
@@ -43,10 +46,13 @@ class AsyncSecretsRPC(FakeDataPlaneRPC):
         self.refresh_requests = []
 
     async def write_file_stream(self, requests):
+        received = 0
         async for frame in requests:
             if frame.WhichOneof("payload") == "start":
                 self.write_starts.append(frame.start)
-        return pb.WriteFileStreamResponse()
+            elif frame.WhichOneof("payload") == "data":
+                received += len(frame.data)
+        return pb.WriteFileStreamResponse(bytes_written=received)
 
     async def refresh_session_secrets(self, req):
         self.refresh_requests.append(req)

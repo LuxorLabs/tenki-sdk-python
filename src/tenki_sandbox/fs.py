@@ -5,7 +5,7 @@ from typing import Iterable
 
 from ._convert import file_info
 from ._pb import pb
-from .errors import FileNotFoundError, StreamClosedError, map_rpc_error
+from .errors import FileNotFoundError, SandboxError, StreamClosedError, ensure_full_write, map_rpc_error, map_write_error
 from .models import FileInfo
 
 
@@ -17,9 +17,10 @@ class SandboxFS:
     def write_bytes(self, path: str, data: bytes) -> None:
         """Write up to 32 MiB; larger content raises ``FileTooLargeError``, so write it with ``write_stream``."""
         try:
-            self._rpc.write_file(pb.WriteFileRequest(session_id=self._session_id, path=path, content=data))
+            resp = self._rpc.write_file(pb.WriteFileRequest(session_id=self._session_id, path=path, content=data))
         except Exception as err:
-            raise map_rpc_error(err) from err
+            raise map_write_error(err) from err
+        ensure_full_write(path, len(data), resp.size_bytes)
 
     def write_text(self, path: str, text: str, *, encoding: str = "utf-8") -> None:
         self.write_bytes(path, text.encode(encoding))
@@ -63,10 +64,12 @@ class SandboxFS:
         privileged: bool = False,
     ) -> None:
         """Streams chunks to path; ``privileged`` writes outside the workdir as root; setuid, setgid and sticky bits are never applied."""
+        sent = 0
         sent_all = False
+        source_errors: list[Exception] = []
 
         def requests():
-            nonlocal sent_all
+            nonlocal sent, sent_all
             yield pb.WriteFileStreamRequest(
                 start=pb.WriteFileStreamStart(
                     session_id=self._session_id,
@@ -77,19 +80,30 @@ class SandboxFS:
                     privileged=privileged,
                 )
             )
-            for chunk in chunks:
-                if isinstance(chunk, str):
-                    chunk = chunk.encode()
-                yield pb.WriteFileStreamRequest(data=chunk)
+            try:
+                for chunk in chunks:
+                    if isinstance(chunk, str):
+                        chunk = chunk.encode()
+                    sent += len(chunk)
+                    yield pb.WriteFileStreamRequest(data=chunk)
+            except Exception as err:
+                source_errors.append(err)  # grpc reports only "Exception iterating requests!"
+                raise
             sent_all = True
 
         try:
-            self._rpc.write_file_stream(requests())
+            resp = self._rpc.write_file_stream(requests())
         except Exception as err:
-            raise map_rpc_error(err) from err
+            if source_errors:
+                source = source_errors[0]
+                if isinstance(source, SandboxError):
+                    raise source
+                raise SandboxError(str(source)) from source
+            raise map_write_error(err) from err
         # An early OK would otherwise truncate silently; this only catches frames not yet handed to the transport.
         if not sent_all:
             raise StreamClosedError("server ended the write stream before all data was sent")
+        ensure_full_write(path, sent, resp.bytes_written)
 
     def upload(self, local_path: str | Path, remote_path: str, *, chunk_bytes: int = 1024 * 1024) -> None:
         path = Path(local_path)
