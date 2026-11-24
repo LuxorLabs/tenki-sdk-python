@@ -356,6 +356,10 @@ class SandboxInfo:
     last_resume_error: str = ""
     terminal_error: str = ""
     tailnet_status: TailnetStatus | None = None
+    # "RESTRICTED" when the platform limits outbound traffic to its allowlist of developer services.
+    network_mode: str = "UNSPECIFIED"
+    # "NEVER_PURCHASED" when the workspace has not purchased credits; "UNSPECIFIED" unless restricted.
+    network_restriction_reason: str = "UNSPECIFIED"
 
 
 # Numeric durations use seconds, matching Python timeout and TTL APIs.

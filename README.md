@@ -146,6 +146,14 @@ Unless the sandbox uses outbound secret injection, HTTPS is not decrypted, so an
 Without HTTPS interception, other ports remain open to addresses an allowed name resolves to.
 Read the allowlist back from `sb.info.egress`.
 
+### Restricted network
+
+New sandboxes in a workspace that hasn't purchased credits can only reach a list of common developer services (package registries, Git hosting, container registries, AI model providers) on TCP ports 80, 443 and 22.
+Creating one returns a `SandboxWarningCode.RESTRICTED_NETWORK` warning, and `sb.network_mode` is `"RESTRICTED"` with `sb.network_restriction_reason` `"NEVER_PURCHASED"`; otherwise `network_mode` is `"FULL"`.
+`allow_domains` narrows that list: domains outside it are dropped, and create fails when none remain. `allow_cidrs` is rejected.
+`sb.info.egress` still returns only the allowlist you passed.
+To get full network access, purchase credits and create a new sandbox.
+
 ### Inspecting HTTPS requests
 
 With `intercept_https=True`, the egress proxy terminates the session's HTTPS with a managed CA the guest trusts, and a request whose `Host` differs from the TLS server name gets 421.

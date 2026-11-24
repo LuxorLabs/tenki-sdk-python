@@ -439,6 +439,14 @@ class Sandbox:
     def tailnet_status(self) -> TailnetStatus | None:
         return self._info.tailnet_status
 
+    @property
+    def network_mode(self) -> str:
+        return self._info.network_mode
+
+    @property
+    def network_restriction_reason(self) -> str:
+        return self._info.network_restriction_reason
+
     def __enter__(self) -> "Sandbox":
         return self
 

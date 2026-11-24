@@ -333,7 +333,21 @@ def sandbox_info(proto) -> SandboxInfo:
             if proto.HasField("tailnet_status")
             else None
         ),
+        network_mode=_enum_name(pb.SessionNetworkMode, proto.network_mode, "SESSION_NETWORK_MODE_"),
+        network_restriction_reason=_enum_name(
+            pb.SessionNetworkRestrictionReason,
+            proto.network_restriction_reason,
+            "SESSION_NETWORK_RESTRICTION_REASON_",
+        ),
     )
+
+
+# Values from a newer server than this SDK read as UNSPECIFIED.
+def _enum_name(enum, value: int, prefix: str) -> str:
+    try:
+        return enum.Name(value).removeprefix(prefix)
+    except ValueError:
+        return "UNSPECIFIED"
 
 
 def exposed_port(resp) -> ExposedPort:
