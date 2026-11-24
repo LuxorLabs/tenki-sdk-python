@@ -291,6 +291,45 @@ async def test_async_sandbox_metrics_uses_its_session_id():
     assert rpc.requests["get_session_metrics"][-1].session_id == "session-1"
 
 
+async def test_async_get_session_cost_maps_unset_optional_values():
+    rpc = FakeControlRPC()
+    cost = await AsyncClient(rpc=rpc).get_session_cost("session-1")
+
+    assert rpc.requests["get_session_cost"][-1].session_id == "session-1"
+    assert cost.session_id == "session-1"
+    assert cost.status == "ACCRUING"
+    assert cost.total_usd is None
+    assert cost.as_of is None
+    assert cost.lines[0].item == "CPU"
+    assert cost.lines[0].unit == "VCPU_SECOND"
+    assert cost.lines[0].amount_usd == "0.0024"
+    assert cost.lines[0].ended_at is None
+
+
+async def test_async_batch_get_session_costs_returns_costs_and_missing_ids():
+    rpc = FakeControlRPC()
+    result = await AsyncClient(rpc=rpc).batch_get_session_costs(
+        ["session-1", "session-2"], workspace_id=" ws-1 "
+    )
+
+    req = rpc.requests["batch_get_session_costs"][-1]
+    assert list(req.session_ids) == ["session-1", "session-2"]
+    assert req.workspace_id == "ws-1"
+    assert [cost.session_id for cost in result.costs] == ["session-1"]
+    assert result.costs[0].status == "FINAL"
+    assert result.costs[0].total_usd == "0.5"
+    assert result.missing_session_ids == ("session-2",)
+
+
+async def test_async_sandbox_cost_uses_its_session_id():
+    rpc = FakeControlRPC()
+    sandbox = await AsyncClient(rpc=rpc).get("session-1")
+    cost = await sandbox.cost()
+
+    assert cost.session_id == "session-1"
+    assert rpc.requests["get_session_cost"][-1].session_id == "session-1"
+
+
 async def test_async_create_retains_and_emits_warnings_once():
     rpc = _rpc_with_create_warning(FakeControlRPC())
     emitted = []

@@ -86,6 +86,16 @@ class SandboxServiceStub(object):
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionMetricsRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionMetricsResponse.FromString,
                 _registered_method=True)
+        self.GetSessionCost = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/GetSessionCost',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionCostRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionCostResponse.FromString,
+                _registered_method=True)
+        self.BatchGetSessionCosts = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/BatchGetSessionCosts',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.BatchGetSessionCostsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.BatchGetSessionCostsResponse.FromString,
+                _registered_method=True)
         self.WaitSession = channel.unary_stream(
                 '/tenki.sandbox.v1.SandboxService/WaitSession',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.WaitSessionRequest.SerializeToString,
@@ -624,6 +634,20 @@ class SandboxServiceServicer(object):
 
     def GetSessionMetrics(self, request, context):
         """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSessionCost(self, request, context):
+        """Returns what a session has cost so far, at list price before credits.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def BatchGetSessionCosts(self, request, context):
+        """Returns the cost of up to 100 sessions in one workspace.
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -1252,6 +1276,16 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.GetSessionMetrics,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionMetricsRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionMetricsResponse.SerializeToString,
+            ),
+            'GetSessionCost': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSessionCost,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionCostRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionCostResponse.SerializeToString,
+            ),
+            'BatchGetSessionCosts': grpc.unary_unary_rpc_method_handler(
+                    servicer.BatchGetSessionCosts,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.BatchGetSessionCostsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.BatchGetSessionCostsResponse.SerializeToString,
             ),
             'WaitSession': grpc.unary_stream_rpc_method_handler(
                     servicer.WaitSession,
@@ -2064,6 +2098,60 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/GetSessionMetrics',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionMetricsRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionMetricsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetSessionCost(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/GetSessionCost',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionCostRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.GetSessionCostResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def BatchGetSessionCosts(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/BatchGetSessionCosts',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.BatchGetSessionCostsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.BatchGetSessionCostsResponse.FromString,
             options,
             channel_credentials,
             insecure,

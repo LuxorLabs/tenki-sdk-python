@@ -176,6 +176,8 @@ class GrpcSandboxRPC:
         "create_session_credential": "CreateSessionCredential",
         "get_session": "GetSession",
         "get_session_metrics": "GetSessionMetrics",
+        "get_session_cost": "GetSessionCost",
+        "batch_get_session_costs": "BatchGetSessionCosts",
         "wait_session": "WaitSession",
         "list_workspace_sandboxes": "ListWorkspaceSandboxes",
         "update_session": "UpdateSession",

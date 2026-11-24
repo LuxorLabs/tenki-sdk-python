@@ -77,6 +77,36 @@ class FakeControlRPC:
             cpu=pb.SessionCPUUsageAverage(limit_cores=2, sample_count=3),
         )
 
+    async def get_session_cost(self, req):
+        self._record("get_session_cost", req)
+        return pb.GetSessionCostResponse(
+            cost=pb.SessionCost(
+                session_id=req.session_id,
+                status=pb.SESSION_COST_STATUS_ACCRUING,
+                lines=[
+                    pb.SessionCostLine(
+                        item=pb.SESSION_COST_ITEM_CPU,
+                        quantity="120",
+                        unit=pb.SESSION_COST_UNIT_VCPU_SECOND,
+                        amount_usd="0.0024",
+                    )
+                ],
+            )
+        )
+
+    async def batch_get_session_costs(self, req):
+        self._record("batch_get_session_costs", req)
+        return pb.BatchGetSessionCostsResponse(
+            costs=[
+                pb.SessionCost(
+                    session_id=req.session_ids[0],
+                    status=pb.SESSION_COST_STATUS_FINAL,
+                    total_usd="0.5",
+                )
+            ],
+            missing_session_ids=list(req.session_ids[1:]),
+        )
+
     def wait_session(self, req, **kwargs):
         self._record("wait_session", req)
         states = list(self.wait_states)

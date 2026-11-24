@@ -39,6 +39,7 @@ from .models import (
     SecretsRefresh,
     SecretVersion,
     SessionEgressPolicy,
+    SessionCost,
     SessionMetrics,
     TailnetAttachment,
     TailnetStatus,
@@ -456,6 +457,9 @@ class Sandbox:
 
     def metrics(self, *, window: float | int | object | None = None) -> SessionMetrics:
         return self._client.get_session_metrics(self.id, window=window)
+
+    def cost(self) -> SessionCost:
+        return self._client.get_session_cost(self.id)
 
     def wait_ready(self, timeout: float = 180) -> None:
         deadline = time.monotonic() + timeout

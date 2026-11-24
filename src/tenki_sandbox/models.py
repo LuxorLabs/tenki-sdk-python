@@ -393,6 +393,45 @@ class SessionMetrics:
     memory: SessionMemoryUsageAverage = field(default_factory=SessionMemoryUsageAverage)
 
 
+SessionCostStatus = Literal["UNSPECIFIED", "ACCRUING", "FINAL", "UNAVAILABLE"]
+SessionCostItem = Literal["UNSPECIFIED", "CPU", "MEMORY", "DISK", "PAUSED_STORAGE"]
+SessionCostUnit = Literal["UNSPECIFIED", "VCPU_SECOND", "GIB_SECOND"]
+
+
+# Quantities and USD amounts stay decimal strings so no precision is lost.
+@dataclass(frozen=True)
+class SessionCostLine:
+    item: SessionCostItem = "UNSPECIFIED"
+    quantity: str = ""
+    unit: SessionCostUnit = "UNSPECIFIED"
+    amount_usd: str = ""
+    started_at: datetime | None = None
+    #: None while the cost is still accruing.
+    ended_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class SessionCost:
+    """What a session has cost so far, at list price before credits."""
+
+    session_id: str
+    status: SessionCostStatus = "UNSPECIFIED"
+    #: None while accruing with nothing metered yet; "0" means nothing was billed.
+    total_usd: str | None = None
+    lines: tuple[SessionCostLine, ...] = ()
+    #: Usage up to this time is counted; None until the first metering tick.
+    as_of: datetime | None = None
+    billed_running_seconds: int = 0
+    billed_paused_seconds: int = 0
+
+
+@dataclass(frozen=True)
+class SessionCostBatch:
+    costs: tuple[SessionCost, ...] = ()
+    #: Requested sessions that do not exist in the workspace.
+    missing_session_ids: tuple[str, ...] = ()
+
+
 @dataclass(frozen=True)
 class ExposedPort:
     port: int

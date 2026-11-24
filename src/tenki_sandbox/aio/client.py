@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from typing import Sequence
+
 from .._compatibility import cleanup_unacknowledged_session_async
 
 from .._compatibility import cleanup_unsupported_public_egress_async
 
-from .._convert import ci_runner_sizes, identity, sandbox_info, session_metrics, workspace_usage_limit, public_egress_acknowledged
+from .._convert import ci_runner_sizes, identity, sandbox_info, session_cost, session_costs, session_metrics, workspace_usage_limit, public_egress_acknowledged
 from .._pagination import advance_page_token
 from .._pb import pb
 from .._time import duration
@@ -31,6 +33,8 @@ from ..models import (
     EgressHttpRule,
     Identity,
     Image,
+    SessionCost,
+    SessionCostBatch,
     SessionMetrics,
     TailnetAttachment,
     Template,
@@ -310,6 +314,29 @@ class AsyncClient:
             req.window.CopyFrom(duration(window))
         try:
             return session_metrics(await self._rpc.get_session_metrics(req))
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def get_session_cost(self, sandbox_id: str) -> SessionCost:
+        try:
+            resp = await self._rpc.get_session_cost(pb.GetSessionCostRequest(session_id=sandbox_id.strip()))
+            return session_cost(resp.cost)
+        except Exception as err:
+            raise map_rpc_error(err) from err
+
+    async def batch_get_session_costs(
+        self, sandbox_ids: Sequence[str], *, workspace_id: str | None = None
+    ) -> SessionCostBatch:
+        """Costs of up to 100 sessions in one workspace, the caller's by default."""
+        if isinstance(sandbox_ids, str):
+            raise TypeError("sandbox_ids must be a sequence of IDs, not a single string")
+        req = pb.BatchGetSessionCostsRequest(
+            session_ids=[sandbox_id.strip() for sandbox_id in sandbox_ids]
+        )
+        if workspace_id and workspace_id.strip():
+            req.workspace_id = workspace_id.strip()
+        try:
+            return session_costs(await self._rpc.batch_get_session_costs(req))
         except Exception as err:
             raise map_rpc_error(err) from err
 

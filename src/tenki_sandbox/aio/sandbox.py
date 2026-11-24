@@ -33,6 +33,7 @@ from ..models import (
     SecretsRefresh,
     SecretVersion,
     SessionEgressPolicy,
+    SessionCost,
     SessionMetrics,
     TailnetAttachment,
     TailnetStatus,
@@ -483,6 +484,9 @@ class AsyncSandbox:
         self, *, window: float | int | object | None = None
     ) -> SessionMetrics:
         return await self._client.get_session_metrics(self.id, window=window)
+
+    async def cost(self) -> SessionCost:
+        return await self._client.get_session_cost(self.id)
 
     async def wait_ready(self, timeout: float = 180) -> None:
         deadline = time.monotonic() + timeout

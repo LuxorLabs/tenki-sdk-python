@@ -26,6 +26,9 @@ from .models import (
     RegistryTag,
     RegistryVersionDeleteResult,
     ResolvedRegistryRef,
+    SessionCost,
+    SessionCostLine,
+    SessionCostBatch,
     SessionCPUUsageAverage,
     SessionMemoryUsageAverage,
     SessionMetrics,
@@ -99,6 +102,44 @@ def _memory_usage_average(proto) -> SessionMemoryUsageAverage:
         first_sample_at=datetime_from_proto(proto.first_sample_at) if proto.HasField("first_sample_at") else None,
         last_sample_at=datetime_from_proto(proto.last_sample_at) if proto.HasField("last_sample_at") else None,
     )
+
+
+def session_cost(proto) -> SessionCost:
+    return SessionCost(
+        session_id=proto.session_id,
+        status=_enum_name(pb.SessionCostStatus, proto.status, "SESSION_COST_STATUS_"),
+        total_usd=proto.total_usd if proto.HasField("total_usd") else None,
+        lines=tuple(_session_cost_line(line) for line in proto.lines),
+        as_of=datetime_from_proto(proto.as_of) if proto.HasField("as_of") else None,
+        billed_running_seconds=int(proto.billed_running_seconds),
+        billed_paused_seconds=int(proto.billed_paused_seconds),
+    )
+
+
+def session_costs(proto) -> SessionCostBatch:
+    return SessionCostBatch(
+        costs=tuple(session_cost(cost) for cost in proto.costs),
+        missing_session_ids=tuple(proto.missing_session_ids),
+    )
+
+
+def _session_cost_line(proto) -> SessionCostLine:
+    return SessionCostLine(
+        item=_enum_name(pb.SessionCostItem, proto.item, "SESSION_COST_ITEM_"),
+        quantity=proto.quantity,
+        unit=_enum_name(pb.SessionCostUnit, proto.unit, "SESSION_COST_UNIT_"),
+        amount_usd=proto.amount_usd,
+        started_at=datetime_from_proto(proto.started_at) if proto.HasField("started_at") else None,
+        ended_at=datetime_from_proto(proto.ended_at) if proto.HasField("ended_at") else None,
+    )
+
+
+# Values added by a newer engine map to UNSPECIFIED.
+def _enum_name(enum, value: int, prefix: str):
+    try:
+        return enum.Name(value).removeprefix(prefix)
+    except ValueError:
+        return "UNSPECIFIED"
 
 
 def _duration_seconds(value) -> float:
