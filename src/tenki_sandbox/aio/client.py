@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Sequence
 
+from ..github_token import github_injection_credentials, github_injection_env
 from .._compatibility import cleanup_unacknowledged_session_async
 
 from .._compatibility import cleanup_unsupported_public_egress_async
@@ -27,6 +28,13 @@ from ..client import (
 from ..constants import GATEWAY_URL_ENVS
 from .data_plane import warm_data_plane_endpoints
 from ..errors import TemplateRuntimeFailedError, WaitReadyFailedError, map_rpc_error
+from ..injection_credentials import (
+    InjectionCredentialInput,
+    InjectionCredentialMetadata,
+    injection_input,
+    injection_metadata,
+    safe_injection_error,
+)
 from ..models import (
     PublicEgressSpec,
     CIRunnerSizes,
@@ -154,6 +162,7 @@ class AsyncClient:
         disable_storage_defaults: bool = False,
         excluded_default_mount_ids: list[str] | None = None,
         github_token: str | None = None,
+        github_token_injection: bool = False,
         sticky: bool = False,
         wait_for_runtime: bool = False,
         tailnet: TailnetAttachment | None = None,
@@ -186,6 +195,207 @@ class AsyncClient:
         must be at most the workspace's pause retention limit, which is also
         the default when unset or not positive; a larger value is rejected.
         """
+        sandbox, _ = await self._create(
+            None,
+            workspace_id=workspace_id,
+            name=name,
+            wait=wait,
+            timeout=timeout,
+            allow_inbound=allow_inbound,
+            allow_outbound=allow_outbound,
+            allow_domains=allow_domains,
+            allow_cidrs=allow_cidrs,
+            intercept_https=intercept_https,
+            allowed_ports=allowed_ports,
+            public_egress=public_egress,
+            http_rules=http_rules,
+            egress_policies=egress_policies,
+            max_duration=max_duration,
+            idle_timeout_minutes=idle_timeout_minutes,
+            pause_retention=pause_retention,
+            cpu_cores=cpu_cores,
+            memory_mb=memory_mb,
+            disk_size_gb=disk_size_gb,
+            metadata=metadata,
+            tags=tags,
+            env=env,
+            ssh_authorized_keys=ssh_authorized_keys,
+            snapshot_id=snapshot_id,
+            image=image,
+            from_template_spec=from_template_spec,
+            setup_env=setup_env,
+            setup_secrets=setup_secrets,
+            direct_runtime=direct_runtime,
+            secret_files=secret_files,
+            secret_policies=secret_policies,
+            secret_overrides=secret_overrides,
+            enable_opencode=enable_opencode,
+            clone_repo_url=clone_repo_url,
+            volumes=volumes,
+            storage_mounts=storage_mounts,
+            disable_storage_defaults=disable_storage_defaults,
+            excluded_default_mount_ids=excluded_default_mount_ids,
+            github_token=github_token,
+            github_token_injection=github_token_injection,
+            sticky=sticky,
+            wait_for_runtime=wait_for_runtime,
+            tailnet=tailnet,
+            disable_tailnet=disable_tailnet,
+            _owns_client=_owns_client,
+        )
+        return sandbox
+
+    async def create_with_injection_credentials(
+        self,
+        credentials: list[InjectionCredentialInput],
+        *,
+        workspace_id: str | None = None,
+        name: str | None = None,
+        wait: bool = True,
+        timeout: float | None = None,
+        allow_inbound: bool = True,
+        allow_outbound: bool = True,
+        allow_domains: list[str] | None = None,
+        allow_cidrs: list[str] | None = None,
+        intercept_https: bool = False,
+        allowed_ports: list[int] | None = None,
+        public_egress: PublicEgressSpec | None = None,
+        http_rules: list[EgressHttpRule] | None = None,
+        egress_policies: list[str] | None = None,
+        max_duration: float | int | object | None = None,
+        idle_timeout_minutes: int | None = None,
+        pause_retention: float | int | object | None = None,
+        cpu_cores: int | None = None,
+        memory_mb: int | None = None,
+        disk_size_gb: int | None = None,
+        metadata: dict[str, str] | None = None,
+        tags: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        ssh_authorized_keys: list[str] | None = None,
+        snapshot_id: str | None = None,
+        image: str | Image | None = None,
+        from_template_spec: str | Template | None = None,
+        setup_env: dict[str, str] | None = None,
+        setup_secrets: dict[str, str] | None = None,
+        direct_runtime: TemplateSpec | None = None,
+        secret_files: list[RuntimeSecretFile] | None = None,
+        secret_policies: list[str] | None = None,
+        secret_overrides: dict[str, str] | None = None,
+        enable_opencode: bool = False,
+        clone_repo_url: str | None = None,
+        volumes: list[dict | tuple] | None = None,
+        storage_mounts: list[StorageMountSpec | dict] | None = None,
+        disable_storage_defaults: bool = False,
+        excluded_default_mount_ids: list[str] | None = None,
+        github_token: str | None = None,
+        github_token_injection: bool = False,
+        sticky: bool = False,
+        wait_for_runtime: bool = False,
+        tailnet: TailnetAttachment | None = None,
+        disable_tailnet: bool = False,
+        _owns_client: bool = False,
+    ) -> tuple[AsyncSandbox, list[InjectionCredentialMetadata]]:
+        if credentials is None:
+            raise TypeError("credentials must be a list")
+        return await self._create(
+            credentials,
+            workspace_id=workspace_id,
+            name=name,
+            wait=wait,
+            timeout=timeout,
+            allow_inbound=allow_inbound,
+            allow_outbound=allow_outbound,
+            allow_domains=allow_domains,
+            allow_cidrs=allow_cidrs,
+            intercept_https=intercept_https,
+            allowed_ports=allowed_ports,
+            public_egress=public_egress,
+            http_rules=http_rules,
+            egress_policies=egress_policies,
+            max_duration=max_duration,
+            idle_timeout_minutes=idle_timeout_minutes,
+            pause_retention=pause_retention,
+            cpu_cores=cpu_cores,
+            memory_mb=memory_mb,
+            disk_size_gb=disk_size_gb,
+            metadata=metadata,
+            tags=tags,
+            env=env,
+            ssh_authorized_keys=ssh_authorized_keys,
+            snapshot_id=snapshot_id,
+            image=image,
+            from_template_spec=from_template_spec,
+            setup_env=setup_env,
+            setup_secrets=setup_secrets,
+            direct_runtime=direct_runtime,
+            secret_files=secret_files,
+            secret_policies=secret_policies,
+            secret_overrides=secret_overrides,
+            enable_opencode=enable_opencode,
+            clone_repo_url=clone_repo_url,
+            volumes=volumes,
+            storage_mounts=storage_mounts,
+            disable_storage_defaults=disable_storage_defaults,
+            excluded_default_mount_ids=excluded_default_mount_ids,
+            github_token=github_token,
+            github_token_injection=github_token_injection,
+            sticky=sticky,
+            wait_for_runtime=wait_for_runtime,
+            tailnet=tailnet,
+            disable_tailnet=disable_tailnet,
+            _owns_client=_owns_client,
+        )
+
+    async def _create(
+        self,
+        credentials: list[InjectionCredentialInput] | None,
+        *,
+        workspace_id: str | None = None,
+        name: str | None = None,
+        wait: bool = True,
+        timeout: float | None = None,
+        allow_inbound: bool = True,
+        allow_outbound: bool = True,
+        allow_domains: list[str] | None = None,
+        allow_cidrs: list[str] | None = None,
+        intercept_https: bool = False,
+        allowed_ports: list[int] | None = None,
+        public_egress: PublicEgressSpec | None = None,
+        http_rules: list[EgressHttpRule] | None = None,
+        egress_policies: list[str] | None = None,
+        max_duration: float | int | object | None = None,
+        idle_timeout_minutes: int | None = None,
+        pause_retention: float | int | object | None = None,
+        cpu_cores: int | None = None,
+        memory_mb: int | None = None,
+        disk_size_gb: int | None = None,
+        metadata: dict[str, str] | None = None,
+        tags: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        ssh_authorized_keys: list[str] | None = None,
+        snapshot_id: str | None = None,
+        image: str | Image | None = None,
+        from_template_spec: str | Template | None = None,
+        setup_env: dict[str, str] | None = None,
+        setup_secrets: dict[str, str] | None = None,
+        direct_runtime: TemplateSpec | None = None,
+        secret_files: list[RuntimeSecretFile] | None = None,
+        secret_policies: list[str] | None = None,
+        secret_overrides: dict[str, str] | None = None,
+        enable_opencode: bool = False,
+        clone_repo_url: str | None = None,
+        volumes: list[dict | tuple] | None = None,
+        storage_mounts: list[StorageMountSpec | dict] | None = None,
+        disable_storage_defaults: bool = False,
+        excluded_default_mount_ids: list[str] | None = None,
+        github_token: str | None = None,
+        github_token_injection: bool = False,
+        sticky: bool = False,
+        wait_for_runtime: bool = False,
+        tailnet: TailnetAttachment | None = None,
+        disable_tailnet: bool = False,
+        _owns_client: bool = False,
+    ) -> tuple[AsyncSandbox, list[InjectionCredentialMetadata]]:
         req = build_create_session_request(
             workspace_id=workspace_id,
             name=name,
@@ -214,9 +424,9 @@ class AsyncClient:
             setup_env=setup_env,
             setup_secrets=setup_secrets,
             direct_runtime=direct_runtime,
-            secret_overrides=secret_overrides,
             secret_files=secret_files,
             secret_policies=secret_policies,
+            secret_overrides=secret_overrides,
             enable_opencode=enable_opencode,
             clone_repo_url=clone_repo_url,
             volumes=volumes,
@@ -225,25 +435,53 @@ class AsyncClient:
             excluded_default_mount_ids=excluded_default_mount_ids,
             github_token=github_token,
             sticky=sticky,
-            # Normal readiness waits client-side so WaitSession can expose and
-            # prewarm the data plane while provisioning continues.
-            wait_ready=wait and wait_for_runtime,
             wait_for_runtime=wait_for_runtime,
             tailnet=tailnet,
             disable_tailnet=disable_tailnet,
+            wait_ready=wait and wait_for_runtime,
         )
 
+        if github_token_injection:
+            inputs = github_injection_credentials(github_token or "")
+            if clone_repo_url:
+                raise ValueError("GitHub token injection requires cloning after creation")
+            github_injection_env(req.env)
+            if any(target in req.env for target in req.runtime.secret_env):
+                raise ValueError("secret target conflicts with session environment")
+            credentials = [*(credentials or []), *inputs]
+
+        credential_request = None if credentials is None else pb.CreateSessionWithInjectionCredentialsRequest(
+            session=req, credentials=[injection_input(item) for item in credentials],
+        )
         try:
-            if public_egress is not None:
-                resp = (await self._rpc.create_session_with_public_egress(pb.CreateSessionWithPublicEgressRequest(request=req))).response
+            credential_metadata = []
+            if credentials is None:
+                if public_egress is not None:
+                    resp = (await self._rpc.create_session_with_public_egress(pb.CreateSessionWithPublicEgressRequest(request=req))).response
+                else:
+                    resp = await self._rpc.create_session(req)
             else:
-                resp = await self._rpc.create_session(req)
+                result = await self._rpc.create_session_with_injection_credentials(
+                    credential_request
+                )
+                resp = result.created
+                credential_metadata = [injection_metadata(item) for item in result.credentials]
         except Exception as err:
-            mapped = map_rpc_error(err)
+            mapped = map_rpc_error(err) if credentials is None else safe_injection_error(err)
             if isinstance(mapped, TemplateRuntimeFailedError) and mapped.sandbox is not None:
+                if credentials is not None:
+                    mapped.credentials = credential_metadata
                 session = mapped.sandbox
                 if session.id and not public_egress_acknowledged(public_egress, session.egress.public_egress):
-                    await cleanup_unsupported_public_egress_async(self._rpc, session.id)
+                    try:
+                        await cleanup_unsupported_public_egress_async(self._rpc, session.id)
+                    except Exception as cleanup_error:
+                        if credentials is not None:
+                            cleanup_error.credentials = credential_metadata
+                            raise cleanup_error from mapped
+                        raise
+            if credentials is not None:
+                raise mapped from None
             raise mapped from err
 
         if any(
@@ -268,7 +506,12 @@ class AsyncClient:
 
         info = sandbox_info(resp.session)
         if not public_egress_acknowledged(public_egress, info.egress.public_egress):
-            await cleanup_unsupported_public_egress_async(self._rpc, resp.session.id)
+            try:
+                await cleanup_unsupported_public_egress_async(self._rpc, resp.session.id)
+            except Exception as cleanup_error:
+                if credentials is not None:
+                    cleanup_error.credentials = credential_metadata
+                raise
 
         warm_data_plane_endpoints(resp.data_plane_warm_endpoints)
         warnings = sandbox_warnings_from_proto(resp.warnings)
@@ -282,7 +525,7 @@ class AsyncClient:
             data_plane_route_status=resp.route_status,
         )
         emit_warnings(
-            warnings, self._warning_handler, stacklevel=5 if _owns_client else 4
+            warnings, self._warning_handler, stacklevel=6 if _owns_client else 5
         )
         if wait and sandbox.state != "RUNNING":
             try:
@@ -290,11 +533,14 @@ class AsyncClient:
             except Exception as err:
                 if sandbox.state in {"TERMINATING", "TERMINATED"}:
                     raise
-                raise WaitReadyFailedError(
+                failure = WaitReadyFailedError(
                     f"sandbox {sandbox.id} created but not ready within wait budget",
                     sandbox,
-                ) from err
-        return sandbox
+                )
+                if credentials is not None:
+                    failure.credentials = credential_metadata
+                raise failure from err
+        return sandbox, credential_metadata
 
     async def get(self, sandbox_id: str) -> AsyncSandbox:
         try:

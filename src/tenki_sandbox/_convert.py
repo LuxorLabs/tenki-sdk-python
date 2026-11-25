@@ -323,6 +323,7 @@ def sandbox_info(proto) -> SandboxInfo:
         source_template_id=proto.source_template_id
         if proto.HasField("source_template_id")
         else None,
+        guest_control_denied=proto.guest_control_denied,
         has_runtime_secrets=proto.has_runtime_secrets,
         runtime_state=template_pb.TemplateRuntimeState.Name(proto.runtime_state).removeprefix(
             "TEMPLATE_RUNTIME_STATE_"

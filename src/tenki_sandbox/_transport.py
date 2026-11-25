@@ -172,6 +172,9 @@ class GrpcSandboxRPC:
     _accepts_call_timeout = True
     _methods = {
         "create_session": "CreateSession",
+        "create_session_with_injection_credentials": "CreateSessionWithInjectionCredentials",
+        "set_session_injection_credential": "SetSessionInjectionCredential",
+        "revoke_session_injection_credential": "RevokeSessionInjectionCredential",
         "create_session_with_public_egress": "CreateSessionWithPublicEgress",
         "create_session_credential": "CreateSessionCredential",
         "get_session": "GetSession",

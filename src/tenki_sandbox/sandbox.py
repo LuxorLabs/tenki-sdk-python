@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from .github_token import github_injection_credentials
+
+from .injection_credentials import InjectionCredentialInput, InjectionCredentialMetadata, credentials_pb, injection_input, injection_metadata, injection_revision, safe_injection_error
+
 import dataclasses
 import threading
 import time
@@ -331,6 +335,7 @@ class Sandbox:
         disable_storage_defaults: bool = False,
         excluded_default_mount_ids: list[str] | None = None,
         github_token: str | None = None,
+        github_token_injection: bool = False,
         sticky: bool = False,
         wait_for_runtime: bool = False,
         tailnet: TailnetAttachment | None = None,
@@ -394,6 +399,7 @@ class Sandbox:
                 disable_storage_defaults=disable_storage_defaults,
                 excluded_default_mount_ids=excluded_default_mount_ids,
                 github_token=github_token,
+                github_token_injection=github_token_injection,
                 sticky=sticky,
                 wait_for_runtime=wait_for_runtime,
                 tailnet=tailnet,
@@ -426,6 +432,10 @@ class Sandbox:
     @property
     def name(self) -> str:
         return self._info.name
+
+    @property
+    def guest_control_denied(self) -> bool:
+        return self._info.guest_control_denied
 
     @property
     def has_runtime_secrets(self) -> bool:
@@ -772,6 +782,42 @@ class Sandbox:
 
     def update_tags(self, *tags: str) -> None:
         self.update(tags=list(tags))
+
+    def rotate_github_token(self, token: str) -> None:
+        """Update API then Git credentials sequentially; errors identify partial completion."""
+        inputs = github_injection_credentials(token)
+        for i, input in enumerate(inputs):
+            try:
+                self.set_injection_credential(input)
+            except Exception as err:
+                partial = f" ({inputs[0].name} already rotated)" if i > 0 else ""
+                err.args = (f"rotate {input.name} failed{partial}: {err}",)
+                raise
+
+    def set_injection_credential(
+        self, input: InjectionCredentialInput, expected_revision: int | None = None,
+    ) -> InjectionCredentialMetadata:
+        req = credentials_pb.SetSessionInjectionCredentialRequest(
+            session_id=self.id, credential=injection_input(input),
+            expected_revision=injection_revision(expected_revision),
+        )
+        try:
+            result = self._client._rpc.set_session_injection_credential(req)
+            return injection_metadata(result.credential)
+        except Exception as err:
+            raise safe_injection_error(err) from None
+
+    def revoke_injection_credential(
+        self, name: str, expected_revision: int | None = None,
+    ) -> InjectionCredentialMetadata:
+        req = credentials_pb.RevokeSessionInjectionCredentialRequest(
+            session_id=self.id, name=name, expected_revision=injection_revision(expected_revision),
+        )
+        try:
+            result = self._client._rpc.revoke_session_injection_credential(req)
+            return injection_metadata(result.credential)
+        except Exception as err:
+            raise safe_injection_error(err) from None
 
     def refresh_secrets(self) -> SecretsRefresh:
         """Re-delivers the session's secret bindings at the workspace's current versions and restarts its

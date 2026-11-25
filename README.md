@@ -837,6 +837,96 @@ Every referenced location must match a selected policy before the request is for
 
 HTTPS interception requires a capable node and guest trust in the managed CA. Permit only trusted origins and paths: an upstream that echoes credentials can expose a value to the guest. See the [workspace secrets guide](../../../docs/src/product/workspace-secrets.md) for location limits and lifecycle behavior.
 
+## Session injection credentials
+
+This feature is gated per workspace (`sandbox-session-credentials`); it defaults to off.
+Use credential create explicitly, even with an empty list, to bind session ownership atomically.
+Ordinary create and the existing GitHub token option keep their current behavior. There is no
+fallback to guest environment variables or to ordinary create if the RPC is unavailable.
+
+Rules specify an origin, methods, path prefix, and destination header. Values are bytes;
+returned metadata contains only credential ID, name, revision, and revoked status. Keep the
+returned revision for conditional updates: omitted means unconditional, zero means create-only,
+and a positive revision means compare-and-set. Revoke accepts the same revision presence.
+
+The guest sends `secrets://NAME` in the configured header. For git, store the **base64-encoded
+bytes of `user:token`** and configure the guest header as `Authorization: Basic secrets://GIT`.
+The proxy replaces the marker with the pre-encoded value; it does not decode Basic credentials.
+The examples below assume `gitCredentialBytes` (Python: `git_credential_bytes`) already contains
+that base64 text, obtained outside the guest.
+
+```python
+from luxor_ai import InjectionCredentialInput, InjectionRule
+
+input = InjectionCredentialInput("GIT", git_credential_bytes, [
+    InjectionRule("https://github.com", ["GET", "POST"], "/your-org/your-repo.git", "Authorization"),
+])
+session, credentials = client.create_with_injection_credentials([input], name="review")
+updated = session.set_injection_credential(input, credentials[0].revision)
+session.revoke_injection_credential("GIT", updated.revision)
+```
+
+Pass `None` (or omit the argument), `0`, or a positive integer for the three revision states.
+Create accepts the existing keyword options and uses the normal readiness wait and partial-result
+errors. `WaitReadyFailedError.sandbox` holds the admitted handle; a
+`TemplateRuntimeFailedError.sandbox` holds the existing sandbox information for cleanup by ID.
+On credential creates, these errors also have a `credentials` attribute containing returned metadata,
+including revisions after a readiness failure. Template runtime failure details do not include
+credential metadata, so that attribute is empty for those failures.
+`AsyncClient` and `AsyncSandbox` expose the same operations with `await`.
+
+## GitHub token injection (opt-in)
+
+```python
+session = client.create(github_token=token, github_token_injection=True)
+session.rotate_github_token(replacement_token)
+# AsyncClient / AsyncSandbox use the same options and awaited methods.
+```
+
+The option defaults to false: absent or false preserves the existing raw `GH_TOKEN` and
+`GIT_TOKEN` environment behavior. Opting in requires the workspace feature
+`sandbox-session-credentials` and nodes supporting HTTPS interception. All of the
+session's HTTPS traffic is intercepted, including traffic to unrelated hosts; clients
+must trust the guest CA and be compatible with the interceptor. Unsupported servers,
+disabled features, or unavailable capable nodes fail creation without falling back to
+raw tokens. RPC error status is preserved through the SDK's existing redacted errors.
+
+The guest sees `GH_TOKEN=secrets://SDK_GITHUB_API` and the same `GIT_TOKEN` value.
+The SDK stores a raw API credential named `SDK_GITHUB_API` and a pre-encoded Git
+credential named `SDK_GITHUB_GIT`. Neither actual value is placed in the guest environment.
+`gh` uses the API placeholder; SDK Git helpers and direct `git clone`, `git fetch`,
+and `git push` inherit `GIT_CONFIG_*` session environment settings for
+`Authorization: Basic secrets://SDK_GITHUB_GIT`, HTTP/1.1, an empty credential helper,
+and disabled redirects, scoped to `https://github.com/`. Do not override those settings
+or use `gh auth setup-git` / `gh auth login` to replace this configuration. Processes
+that discard the session environment must supply the same Git settings themselves.
+
+Only github.com is supported; a non-default `GH_HOST` is rejected. No token is granted
+to Enterprise, redirects, LFS storage hosts, or other hosts. Repositories are selected
+by Git helpers after creation, so credential rules are host-scoped: API methods
+GET/POST/PUT/PATCH/DELETE/HEAD/OPTIONS at `https://api.github.com/`, and GET/POST at
+`https://github.com/`. The current injection selector only supports path prefixes, so
+it cannot restrict an unknown repository to the `info/refs`, `git-upload-pack`, and
+`git-receive-pack` suffixes. The Git rule covers those endpoints but also other paths
+on that host. Use explicit injection credentials with repository path prefixes if
+narrower scope is required.
+
+A nonempty token is required. Caller-supplied `GIT_CONFIG*` environment entries are
+rejected to prevent ambiguous authentication. Create-time `cloneRepoUrl` (Go
+`WithCloneRepo`, Python `clone_repo_url`) is rejected with this option because older
+node-side cloning embeds the token in a URL; call the SDK Git clone helper after
+creation instead. The option does not rewrite credentials independently supplied in
+other environment variables, URLs, setup scripts, or template secrets.
+
+Rotation is for sessions created with this opt-in. It updates API then Git credentials
+using two audited RPCs and does not change the guest environment. The updates are not
+atomic: on failure, the first may already have succeeded. Retry the method with the
+same replacement token to update both; no automatic retry or environment fallback occurs.
+Keep the `SDK_GITHUB_API` and `SDK_GITHUB_GIT` names reserved when combining this option
+with explicit injection credentials.
+
+## Managed tailnet DNS
+
 Set `TailnetAttachment(accept_dns=True, ...)` to resolve short MagicDNS names through the attachment.
 This requires a guest with the unchanged Tenki systemd-resolved configuration.
 Omitting the option preserves existing DNS behavior; explicit `false` disables managed short-name search.

@@ -4,6 +4,7 @@ import grpc
 
 from tenki_sandbox._internal.proto.tenki.sandbox.v1 import registry_pb2 as tenki_dot_sandbox_dot_v1_dot_registry__pb2
 from tenki_sandbox._internal.proto.tenki.sandbox.v1 import sandbox_pb2 as tenki_dot_sandbox_dot_v1_dot_sandbox__pb2
+from tenki_sandbox._internal.proto.tenki.sandbox.v1 import session_injection_credentials_pb2 as tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2
 from tenki_sandbox._internal.proto.tenki.sandbox.v1 import tailnet_connection_pb2 as tenki_dot_sandbox_dot_v1_dot_tailnet__connection__pb2
 from tenki_sandbox._internal.proto.tenki.sandbox.v1 import template_pb2 as tenki_dot_sandbox_dot_v1_dot_template__pb2
 
@@ -65,6 +66,21 @@ class SandboxServiceStub(object):
                 '/tenki.sandbox.v1.SandboxService/CreateSession',
                 request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionRequest.SerializeToString,
                 response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionResponse.FromString,
+                _registered_method=True)
+        self.CreateSessionWithInjectionCredentials = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/CreateSessionWithInjectionCredentials',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithInjectionCredentialsRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithInjectionCredentialsResponse.FromString,
+                _registered_method=True)
+        self.SetSessionInjectionCredential = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/SetSessionInjectionCredential',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.SetSessionInjectionCredentialRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.SetSessionInjectionCredentialResponse.FromString,
+                _registered_method=True)
+        self.RevokeSessionInjectionCredential = channel.unary_unary(
+                '/tenki.sandbox.v1.SandboxService/RevokeSessionInjectionCredential',
+                request_serializer=tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.RevokeSessionInjectionCredentialRequest.SerializeToString,
+                response_deserializer=tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.RevokeSessionInjectionCredentialResponse.FromString,
                 _registered_method=True)
         self.CreateSessionWithPublicEgress = channel.unary_unary(
                 '/tenki.sandbox.v1.SandboxService/CreateSessionWithPublicEgress',
@@ -609,6 +625,24 @@ class SandboxServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def CreateSession(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateSessionWithInjectionCredentials(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetSessionInjectionCredential(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RevokeSessionInjectionCredential(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -1256,6 +1290,21 @@ def add_SandboxServiceServicer_to_server(servicer, server):
                     servicer.CreateSession,
                     request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionRequest.FromString,
                     response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionResponse.SerializeToString,
+            ),
+            'CreateSessionWithInjectionCredentials': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateSessionWithInjectionCredentials,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithInjectionCredentialsRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithInjectionCredentialsResponse.SerializeToString,
+            ),
+            'SetSessionInjectionCredential': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetSessionInjectionCredential,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.SetSessionInjectionCredentialRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.SetSessionInjectionCredentialResponse.SerializeToString,
+            ),
+            'RevokeSessionInjectionCredential': grpc.unary_unary_rpc_method_handler(
+                    servicer.RevokeSessionInjectionCredential,
+                    request_deserializer=tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.RevokeSessionInjectionCredentialRequest.FromString,
+                    response_serializer=tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.RevokeSessionInjectionCredentialResponse.SerializeToString,
             ),
             'CreateSessionWithPublicEgress': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateSessionWithPublicEgress,
@@ -1990,6 +2039,87 @@ class SandboxService(object):
             '/tenki.sandbox.v1.SandboxService/CreateSession',
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionRequest.SerializeToString,
             tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateSessionWithInjectionCredentials(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/CreateSessionWithInjectionCredentials',
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithInjectionCredentialsRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_sandbox__pb2.CreateSessionWithInjectionCredentialsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetSessionInjectionCredential(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/SetSessionInjectionCredential',
+            tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.SetSessionInjectionCredentialRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.SetSessionInjectionCredentialResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RevokeSessionInjectionCredential(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/tenki.sandbox.v1.SandboxService/RevokeSessionInjectionCredential',
+            tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.RevokeSessionInjectionCredentialRequest.SerializeToString,
+            tenki_dot_sandbox_dot_v1_dot_session__injection__credentials__pb2.RevokeSessionInjectionCredentialResponse.FromString,
             options,
             channel_credentials,
             insecure,

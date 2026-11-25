@@ -1,3 +1,4 @@
+from .injection_credentials import InjectionRule, InjectionCredentialInput, InjectionCredentialMetadata
 from ._resource_validation import validate_create_resources
 from .aio import AsyncClient, AsyncSandbox
 from .client import Client
@@ -139,6 +140,7 @@ from .secret_files import RuntimeSecretFile, RuntimeSecretReference
 from .warning import SandboxWarning, SandboxWarningCode, SandboxWarningNotification, WarningHandler
 
 __all__ = [
+    "InjectionRule", "InjectionCredentialInput", "InjectionCredentialMetadata",
     "Client",
     "Sandbox",
     "SandboxWarning",

@@ -360,6 +360,7 @@ class SandboxInfo:
     network_mode: str = "UNSPECIFIED"
     # "NEVER_PURCHASED" when the workspace has not purchased credits; "UNSPECIFIED" unless restricted.
     network_restriction_reason: str = "UNSPECIFIED"
+    guest_control_denied: bool = False
 
 
 # Numeric durations use seconds, matching Python timeout and TTL APIs.
