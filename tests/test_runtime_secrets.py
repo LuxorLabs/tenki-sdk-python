@@ -2,11 +2,12 @@ import inspect
 
 import pytest
 from tenki import AsyncClient, AsyncSandbox, Client, Sandbox, TemplateSpec
-from tenki_sandbox._convert import snapshot
-from tenki_sandbox._pb import pb
+from tenki_sandbox._convert import registry_image_detail, snapshot
+from tenki_sandbox._pb import pb, registry_pb
 from tenki_sandbox.client import build_create_session_request
 
 REFS = {"API_TOKEN": "shared-token"}
+VARS = {"API_URL": "PROD_API_URL"}
 
 
 @pytest.mark.parametrize("kind", ["start", "argv", "compose"])
@@ -32,6 +33,36 @@ def test_runtime_references_roundtrip(kind):
         )
         == REFS
     )
+
+
+@pytest.mark.parametrize("kind", ["start", "argv", "compose"])
+def test_runtime_variable_references_roundtrip(kind):
+    spec = (
+        TemplateSpec().process_compose("compose.yaml", variable_env=VARS)
+        if kind == "compose"
+        else TemplateSpec().start(["app"] if kind == "argv" else "app", variable_env=VARS)
+    )
+    spec.validate()
+    assert dict(TemplateSpec.from_json(spec.to_json())._to_direct_runtime_proto().variable_env) == VARS
+
+
+def test_runtime_variable_reference_validation():
+    too_many = {f"VARIABLE_{i}": "NAME" for i in range(65)}
+    for spec in [
+        TemplateSpec().start("app", variable_env={"BAD-TARGET": "NAME"}),
+        TemplateSpec().start("app", variable_env={"API_URL": "not a name"}),
+        TemplateSpec().start("app", secret_env={"API_URL": "TOKEN"}, variable_env=VARS),
+        TemplateSpec().runtime_env({"API_URL": "plain"}).start("app", variable_env=VARS),
+        TemplateSpec().start("app", variable_env=too_many),
+    ]:
+        with pytest.raises(Exception):
+            spec.validate()
+    with pytest.raises(ValueError, match="variable target conflicts with session environment"):
+        build_create_session_request(
+            direct_runtime=TemplateSpec().start("app", variable_env=VARS), env={"API_URL": "plain"}
+        )
+    detail = registry_image_detail(registry_pb.RegistryImageDetail(runtime_variable_env=VARS))
+    assert dict(detail.runtime_variable_env) == VARS
 
 
 def test_runtime_reference_validation():

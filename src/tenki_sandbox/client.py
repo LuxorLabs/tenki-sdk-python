@@ -845,6 +845,8 @@ def build_create_session_request(
         req.runtime.CopyFrom(direct_runtime._to_direct_runtime_proto())
         if any(target in req.env for target in req.runtime.secret_env):
             raise ValueError("secret target conflicts with session environment")
+        if any(target in req.env for target in req.runtime.variable_env):
+            raise ValueError("variable target conflicts with session environment")
     if disable_tailnet and tailnet is not None:
         raise ValueError("choose a Tailscale connection or disable Tailscale")
     req.disable_tailnet = disable_tailnet

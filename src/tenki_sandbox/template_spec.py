@@ -503,6 +503,7 @@ class TemplateSpec:
         secret_policies: Sequence[str] | None = None,
         secret_env: Mapping[str, str] | None = None,
         secret_files: Sequence[RuntimeSecretFile] | None = None,
+        variable_env: Mapping[str, str] | None = None,
     ) -> "TemplateSpec":
         """Declare a single start command as the runtime entrypoint.
 
@@ -532,6 +533,9 @@ class TemplateSpec:
             if secret_env is not None:
                 p.runtime.secret_env.clear()
                 p.runtime.secret_env.update(dict(secret_env))
+            if variable_env is not None:
+                p.runtime.variable_env.clear()
+                p.runtime.variable_env.update(dict(variable_env))
 
         return self._evolve(mutate)
 
@@ -549,6 +553,7 @@ class TemplateSpec:
         secret_policies: Sequence[str] | None = None,
         secret_env: Mapping[str, str] | None = None,
         secret_files: Sequence[RuntimeSecretFile] | None = None,
+        variable_env: Mapping[str, str] | None = None,
     ) -> "TemplateSpec":
         """Declare a process-compose supervisor as the runtime entrypoint."""
         options = self._runtime_options(
@@ -573,6 +578,9 @@ class TemplateSpec:
             if secret_env is not None:
                 p.runtime.secret_env.clear()
                 p.runtime.secret_env.update(dict(secret_env))
+            if variable_env is not None:
+                p.runtime.variable_env.clear()
+                p.runtime.variable_env.update(dict(variable_env))
 
         return self._evolve(mutate)
 
@@ -953,7 +961,7 @@ def _validate_spec(p) -> list[str]:
 
 
 def _validate_runtime(out: list[str], runtime) -> None:
-    if not valid_secret_files(runtime.secret_files, len(runtime.secret_env)):
+    if not valid_secret_files(runtime.secret_files, len(runtime.secret_env) + len(runtime.variable_env)):
         out.append("runtime.secret_files: invalid secret file declaration")
     if len(runtime.secret_env) > 64:
         out.append("runtime.secret_env: at most 64 secret references")
@@ -964,6 +972,17 @@ def _validate_runtime(out: list[str], runtime) -> None:
             out.append("runtime.secret_env: invalid workspace secret name")
         if target in runtime.env:
             out.append("runtime.secret_env: secret target conflicts with runtime environment")
+    if runtime.variable_env and len(runtime.secret_env) + len(runtime.variable_env) > 64:
+        out.append("runtime.variable_env: at most 64 secret and variable references")
+    for target, name in runtime.variable_env.items():
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,127}", target):
+            out.append("runtime.variable_env: invalid environment target")
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]{0,127}", name):
+            out.append("runtime.variable_env: invalid workspace variable name")
+        if target in runtime.env:
+            out.append("runtime.variable_env: variable target conflicts with runtime environment")
+        if target in runtime.secret_env:
+            out.append("runtime.variable_env: variable target conflicts with secret_env")
     entrypoint = runtime.WhichOneof("entrypoint")
     if entrypoint is None:
         out.append("runtime: exactly one runtime entrypoint is required")

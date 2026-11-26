@@ -714,6 +714,7 @@ def registry_image_detail(proto) -> RegistryImageDetail:
         runtime_secret_env=dict(proto.runtime_secret_env),
         runtime_secret_policies=tuple(proto.runtime_secret_policies),
         runtime_secret_files=tuple(MessageToDict(file) for file in proto.runtime_secret_files),
+        runtime_variable_env=dict(proto.runtime_variable_env),
     )
 
 

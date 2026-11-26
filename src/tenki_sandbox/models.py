@@ -740,6 +740,7 @@ class RegistryImageDetail:
     runtime_secret_env: Mapping[str,str] = field(default_factory=dict)
     runtime_secret_policies: tuple[str, ...] = ()
     runtime_secret_files: tuple[RuntimeSecretFile,...] = ()
+    runtime_variable_env: Mapping[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
