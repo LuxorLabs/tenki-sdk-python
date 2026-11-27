@@ -269,7 +269,8 @@ class TailnetAuthKey:
         return self._value
 
 
-TailnetExitPolicy = Literal["tenki_allowlist", "exit_node_managed"]
+# "tenki_allowlist" is the earlier name of "luxor_allowlist" and selects the same policy.
+TailnetExitPolicy = Literal["luxor_allowlist", "tenki_allowlist", "exit_node_managed"]
 TailnetEphemeralPausePolicy = Literal["reject", "recreate_on_resume"]
 TailnetState = Literal["pending", "joining", "online", "offline", "error", "detached"]
 TailnetProvider = Literal["tailscale"]

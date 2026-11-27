@@ -105,6 +105,14 @@ def test_workspace_default_opt_out():
         build_create_session_request(disable_tailnet=True, tailnet=attachment())
 
 
+@pytest.mark.parametrize("policy", ["luxor_allowlist", "tenki_allowlist"])
+def test_tailnet_allowlist_policy_names_select_the_same_policy(policy):
+    req = build_create_session_request(
+        tailnet=TailnetAttachment(auth_key=TailnetAuthKey("tskey-auth-secret"), exit_policy=policy)
+    )
+    assert req.tailnet.exit_policy == pb.TAILNET_EXIT_POLICY_TENKI_ALLOWLIST
+
+
 def test_tailnet_auth_key_repr_is_redacted():
     key = TailnetAuthKey("tskey-auth-secret")
     rendered = f"{key!s} {key!r} {TailnetAttachment(auth_key=key)!r}"

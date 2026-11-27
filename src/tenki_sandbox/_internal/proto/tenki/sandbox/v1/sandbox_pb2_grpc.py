@@ -1237,7 +1237,7 @@ class SandboxServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def ListCIRunnerSizes(self, request, context):
-        """Linux x64 runner sizes Tenki CI can run for the workspace, within its job-size limits.
+        """Linux x64 runner sizes Luxor CI can run for the workspace, within its job-size limits.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')

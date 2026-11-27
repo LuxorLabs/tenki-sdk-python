@@ -868,6 +868,7 @@ def _tailnet_attachment_proto(attachment: TailnetAttachment):
         credential = {"auth_key": attachment.auth_key._wire_value()}
     exit_policies = {
         None: pb.TAILNET_EXIT_POLICY_UNSPECIFIED,
+        "luxor_allowlist": pb.TAILNET_EXIT_POLICY_TENKI_ALLOWLIST,
         "tenki_allowlist": pb.TAILNET_EXIT_POLICY_TENKI_ALLOWLIST,
         "exit_node_managed": pb.TAILNET_EXIT_POLICY_EXIT_NODE_MANAGED,
     }

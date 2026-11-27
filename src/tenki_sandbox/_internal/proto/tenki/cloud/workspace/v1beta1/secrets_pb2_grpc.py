@@ -155,7 +155,7 @@ class WorkspaceSecretsServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def StartSecretImport(self, request, context):
-        """Pushes a temporary branch whose workflow sends the repository's secrets back to Tenki.
+        """Pushes a temporary branch whose workflow sends the repository's secrets back to Luxor.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
