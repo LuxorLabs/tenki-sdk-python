@@ -54,3 +54,11 @@ MiB = 1024**2
 GiB = 1024**3
 TiB = 1024**4
 
+
+def snapshot_ready_poll_delay(elapsed: float) -> float:
+    """Seconds before the next snapshot readiness poll; most snapshots are ready within a few seconds."""
+    if elapsed < 3:
+        return 0.1
+    if elapsed < 15:
+        return 0.25
+    return 1.0

@@ -426,7 +426,7 @@ class Snapshots:
             except SnapshotNotFoundError:
                 if time.monotonic() - started >= constants.SNAPSHOT_NOT_FOUND_GRACE:
                     raise
-                time.sleep(0.5)
+                time.sleep(constants.snapshot_ready_poll_delay(time.monotonic() - started))
                 continue
             if snap.state == "READY":
                 return snap
@@ -438,7 +438,7 @@ class Snapshots:
                 )
             if snap.state in {"DELETING", "DELETED"}:
                 raise RuntimeError(f"snapshot entered terminal state: {snap.state}")
-            time.sleep(0.5)
+            time.sleep(constants.snapshot_ready_poll_delay(time.monotonic() - started))
         raise SnapshotWaitTimeoutError(
             f"timeout waiting for snapshot {snapshot_id}; it is still being created, "
             f"call wait_ready({snapshot_id!r}) to keep waiting"

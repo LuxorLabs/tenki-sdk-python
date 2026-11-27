@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from types import SimpleNamespace
 
 import pytest
 
@@ -134,6 +135,41 @@ async def test_async_snapshot_wait_ready_timeout_explains_how_to_keep_waiting():
             "snap-1", timeout=0.01
         )
     assert isinstance(excinfo.value, TimeoutError)
+
+
+async def test_async_snapshot_wait_ready_notices_readiness_within_one_short_poll(
+    monkeypatch,
+):
+    from tenki_sandbox.aio import resources
+
+    now = 0.0
+    sleeps = []
+    real_sleep = asyncio.sleep
+
+    async def fake_sleep(seconds):
+        nonlocal now
+        sleeps.append(seconds)
+        now += seconds
+        await real_sleep(0)
+
+    monkeypatch.setattr(resources, "time", SimpleNamespace(monotonic=lambda: now))
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+    ready_at = 1.05
+
+    class BecomesReadyRPC(FakeControlRPC):
+        async def get_snapshot(self, req):
+            state = (
+                pb.SNAPSHOT_STATE_READY
+                if now >= ready_at
+                else pb.SNAPSHOT_STATE_CREATING
+            )
+            return pb.GetSnapshotResponse(
+                snapshot=pb.Snapshot(id=req.snapshot_id, state=state)
+            )
+
+    await AsyncClient(rpc=BecomesReadyRPC()).snapshots.wait_ready("snap-1", timeout=30)
+    assert set(sleeps) == {0.1}
+    assert now - ready_at <= 0.1 + 1e-9
 
 
 async def test_async_template_build_forwards_environment_and_secrets():

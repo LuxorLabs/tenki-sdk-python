@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -338,6 +339,61 @@ def test_wait_ready_timeout_explains_how_to_keep_waiting():
     ) as excinfo:
         Client(rpc=rpc).snapshots.wait_ready("snap-1", timeout=0.01)
     assert isinstance(excinfo.value, TimeoutError)
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 0.0
+        self.sleeps = []
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.sleeps.append(seconds)
+        self.now += seconds
+
+
+class BecomesReadyRPC(FakeRPC):
+    """Reports CREATING until the fake clock reaches `ready_at`, then READY."""
+
+    def __init__(self, clock, ready_at):
+        super().__init__()
+        self.clock = clock
+        self.ready_at = ready_at
+
+    def get_snapshot(self, req):
+        state = (
+            pb.SNAPSHOT_STATE_READY
+            if self.clock.now >= self.ready_at
+            else pb.SNAPSHOT_STATE_CREATING
+        )
+        return pb.GetSnapshotResponse(snapshot=_snap(state=state))
+
+
+@pytest.mark.parametrize(
+    ("elapsed", "want"),
+    [(0, 0.1), (2.999, 0.1), (3, 0.25), (14.999, 0.25), (15, 1.0), (60, 1.0)],
+)
+def test_snapshot_ready_poll_delay(elapsed, want):
+    from tenki_sandbox import constants
+
+    assert constants.snapshot_ready_poll_delay(elapsed) == want
+
+
+def test_wait_ready_notices_readiness_within_one_short_poll(monkeypatch):
+    from tenki_sandbox import resources
+
+    clock = FakeClock()
+    monkeypatch.setattr(
+        resources, "time", SimpleNamespace(monotonic=clock.monotonic, sleep=clock.sleep)
+    )
+    ready_at = 1.05
+    Client(rpc=BecomesReadyRPC(clock, ready_at)).snapshots.wait_ready(
+        "snap-1", timeout=30
+    )
+    assert set(clock.sleeps) == {0.1}
+    assert clock.now - ready_at <= 0.1 + 1e-9
 
 
 # ---------------------------------------------------------------------------
