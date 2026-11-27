@@ -5,8 +5,25 @@ from typing import Iterable
 
 from ._convert import file_info
 from ._pb import pb
-from .errors import FileNotFoundError, SandboxError, StreamClosedError, ensure_full_write, map_rpc_error, map_write_error
+from .errors import FileNotFoundError, FileTooLargeError, SandboxError, StreamClosedError, ensure_full_write, map_rpc_error, map_write_error
 from .models import FileInfo
+
+# The data plane refuses unary ReadFile/WriteFile above this, so larger content goes over the stream RPCs.
+MAX_UNARY_FILE_BYTES = 32 << 20
+_WRITE_STREAM_CHUNK_BYTES = 1 << 20
+
+
+def _overwrite_mode(info: FileInfo | None) -> int:
+    """Keeps an existing file's permission bits, which unary WriteFile preserves but the stream's temp-and-rename replaces."""
+    if info is None or info.is_dir:
+        return 0o644
+    return info.mode & 0o777
+
+
+def _write_chunks(data: bytes) -> Iterable[bytes]:
+    view = memoryview(data)
+    for offset in range(0, len(view), _WRITE_STREAM_CHUNK_BYTES):
+        yield bytes(view[offset : offset + _WRITE_STREAM_CHUNK_BYTES])
 
 
 class SandboxFS:
@@ -15,7 +32,14 @@ class SandboxFS:
         self._session_id = session_id
 
     def write_bytes(self, path: str, data: bytes) -> None:
-        """Write up to 32 MiB; larger content raises ``FileTooLargeError``, so write it with ``write_stream``."""
+        """Write content; above 32 MiB it goes over ``write_stream``."""
+        if len(data) > MAX_UNARY_FILE_BYTES:
+            try:
+                info = self.stat(path)
+            except FileNotFoundError:
+                info = None
+            self.write_stream(path, _write_chunks(data), mode=_overwrite_mode(info))
+            return
         try:
             resp = self._rpc.write_file(pb.WriteFileRequest(session_id=self._session_id, path=path, content=data))
         except Exception as err:
@@ -26,12 +50,15 @@ class SandboxFS:
         self.write_bytes(path, text.encode(encoding))
 
     def read_bytes(self, path: str) -> bytes:
-        """Read up to 32 MiB; larger files raise ``FileTooLargeError``, so read them with ``read_stream``."""
+        """Read a file; above 32 MiB it is read over ``read_stream``."""
         try:
             resp = self._rpc.read_file(pb.ReadFileRequest(session_id=self._session_id, path=path))
             return bytes(resp.content)
         except Exception as err:
-            raise map_rpc_error(err) from err
+            mapped = map_rpc_error(err)
+            if not isinstance(mapped, FileTooLargeError):
+                raise mapped from err
+        return b"".join(self.read_stream(path))
 
     def read_text(self, path: str, *, encoding: str = "utf-8") -> str:
         return self.read_bytes(path).decode(encoding, errors="replace")

@@ -40,14 +40,29 @@ class _RpcError(Exception):
         return self._details
 
 
+STREAMED_CONTENT = b"streamed above the unary cap"
+
+
+def _stream_frames():
+    yield pb.ReadFileStreamResponse(data=STREAMED_CONTENT[:10])
+    yield pb.ReadFileStreamResponse(data=STREAMED_CONTENT[10:], eof=True)
+
+
 class _RefusingRpc:
     def read_file(self, _req):
         raise _RpcError("RESOURCE_EXHAUSTED", FILE_TOO_LARGE_WIRE_TEXT)
+
+    def read_file_stream(self, _req):
+        return _stream_frames()
 
 
 class _AsyncRefusingRpc:
     async def read_file(self, _req):
         raise _RpcError("RESOURCE_EXHAUSTED", FILE_TOO_LARGE_WIRE_TEXT)
+
+    async def read_file_stream(self, _req):
+        for frame in _stream_frames():
+            yield frame
 
 
 def _assert_too_large(err: BaseException) -> None:
@@ -90,23 +105,20 @@ def test_other_resource_exhaustion_stays_quota():
     assert not isinstance(mapped, FileTooLargeError)
 
 
-def test_read_bytes_raises_file_too_large():
-    with pytest.raises(FileTooLargeError) as excinfo:
-        SandboxFS(_RefusingRpc(), SESSION_ID).read_bytes("big.bin")
-    _assert_too_large(excinfo.value)
+def test_read_bytes_above_the_cap_falls_back_to_the_stream():
+    assert SandboxFS(_RefusingRpc(), SESSION_ID).read_bytes("big.bin") == STREAMED_CONTENT
 
 
-async def test_async_read_bytes_raises_file_too_large():
+async def test_async_read_bytes_above_the_cap_falls_back_to_the_stream():
     async def resolve():
         return _AsyncRefusingRpc()
 
-    with pytest.raises(FileTooLargeError) as excinfo:
-        await AsyncSandboxFS(resolve, SESSION_ID).read_bytes("big.bin")
-    _assert_too_large(excinfo.value)
+    assert await AsyncSandboxFS(resolve, SESSION_ID).read_bytes("big.bin") == STREAMED_CONTENT
 
 
 # The server-side unary cap (backend sandbox.MaxUnaryFileBytes); grpc-core receives only 4 MiB by default.
 UNARY_CAP_BYTES = 32 << 20
+OVER_CAP_CONTENT = bytes(range(256)) * ((UNARY_CAP_BYTES + (3 << 20)) // 256)
 
 
 @contextmanager
@@ -115,6 +127,13 @@ def _data_plane(content: bytes | None):
         if content is None:
             context.abort(grpc.StatusCode.RESOURCE_EXHAUSTED, FILE_TOO_LARGE_WIRE_TEXT)
         return pb.SandboxSessionDataPlaneServiceReadFileResponse(response=pb.ReadFileResponse(content=content))
+
+    def read_file_stream(_request, _context):
+        for offset in range(0, len(OVER_CAP_CONTENT), 1 << 20):
+            yield pb.SandboxSessionDataPlaneServiceReadFileStreamResponse(
+                response=pb.ReadFileStreamResponse(data=OVER_CAP_CONTENT[offset : offset + (1 << 20)])
+            )
+        yield pb.SandboxSessionDataPlaneServiceReadFileStreamResponse(response=pb.ReadFileStreamResponse(eof=True))
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         server = grpc.server(executor)
@@ -127,7 +146,12 @@ def _data_plane(content: bytes | None):
                             read_file,
                             request_deserializer=pb.SandboxSessionDataPlaneServiceReadFileRequest.FromString,
                             response_serializer=pb.SandboxSessionDataPlaneServiceReadFileResponse.SerializeToString,
-                        )
+                        ),
+                        "ReadFileStream": grpc.unary_stream_rpc_method_handler(
+                            read_file_stream,
+                            request_deserializer=pb.SandboxSessionDataPlaneServiceReadFileStreamRequest.FromString,
+                            response_serializer=pb.SandboxSessionDataPlaneServiceReadFileStreamResponse.SerializeToString,
+                        ),
                     },
                 ),
             )
@@ -177,24 +201,34 @@ async def test_async_read_bytes_up_to_the_cap_over_grpc():
     assert await _async_read(content) == content
 
 
-def test_read_bytes_above_the_cap_over_grpc_raises_file_too_large():
-    with pytest.raises(FileTooLargeError) as excinfo:
-        _sync_read(None)
-    _assert_too_large(excinfo.value)
+def test_read_bytes_above_the_cap_over_grpc_streams():
+    assert _sync_read(None) == OVER_CAP_CONTENT
 
 
-async def test_async_read_bytes_above_the_cap_over_grpc_raises_file_too_large():
-    with pytest.raises(FileTooLargeError) as excinfo:
-        await _async_read(None)
-    _assert_too_large(excinfo.value)
+async def test_async_read_bytes_above_the_cap_over_grpc_streams():
+    assert await _async_read(None) == OVER_CAP_CONTENT
 
 
 @contextmanager
-def _write_data_plane(received: list):
+def _write_data_plane(received: list, existing_mode: int = 0):
+    def stat(_request, _context):
+        return pb.SandboxSessionDataPlaneServiceStatResponse(
+            response=pb.StatResponse(exists=existing_mode != 0, mode=existing_mode)
+        )
+
     def write_file(request, _context):
         received.append(len(request.request.content))
         return pb.SandboxSessionDataPlaneServiceWriteFileResponse(
             response=pb.WriteFileResponse(size_bytes=len(request.request.content))
+        )
+
+    def write_file_stream(request_iterator, _context):
+        requests = list(request_iterator)
+        start_mode = next(r.frame.start.mode for r in requests if r.frame.WhichOneof("payload") == "start")
+        frames = [r.frame.data for r in requests if r.frame.WhichOneof("payload") == "data"]
+        received.append(("stream", sum(len(f) for f in frames), max(len(f) for f in frames), oct(start_mode)))
+        return pb.SandboxSessionDataPlaneServiceWriteFileStreamResponse(
+            response=pb.WriteFileStreamResponse(bytes_written=sum(len(f) for f in frames))
         )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
@@ -204,11 +238,21 @@ def _write_data_plane(received: list):
                 grpc.method_handlers_generic_handler(
                     "tenki.sandbox.v1.SandboxSessionDataPlaneService",
                     {
+                        "Stat": grpc.unary_unary_rpc_method_handler(
+                            stat,
+                            request_deserializer=pb.SandboxSessionDataPlaneServiceStatRequest.FromString,
+                            response_serializer=pb.SandboxSessionDataPlaneServiceStatResponse.SerializeToString,
+                        ),
                         "WriteFile": grpc.unary_unary_rpc_method_handler(
                             write_file,
                             request_deserializer=pb.SandboxSessionDataPlaneServiceWriteFileRequest.FromString,
                             response_serializer=pb.SandboxSessionDataPlaneServiceWriteFileResponse.SerializeToString,
-                        )
+                        ),
+                        "WriteFileStream": grpc.stream_unary_rpc_method_handler(
+                            write_file_stream,
+                            request_deserializer=pb.SandboxSessionDataPlaneServiceWriteFileStreamRequest.FromString,
+                            response_serializer=pb.SandboxSessionDataPlaneServiceWriteFileStreamResponse.SerializeToString,
+                        ),
                     },
                 ),
             )
@@ -250,3 +294,65 @@ async def test_async_write_bytes_up_to_the_cap_over_grpc():
         finally:
             await rpc.close()
     assert received == [UNARY_CAP_BYTES]
+
+
+def test_write_bytes_above_the_cap_over_grpc_streams():
+    received = []
+    with _write_data_plane(received) as (endpoint, credentials):
+        rpc = GrpcDataPlaneRPC(endpoint, credentials, SESSION_ID)
+        try:
+            SandboxFS(rpc, SESSION_ID).write_bytes("big.bin", OVER_CAP_CONTENT)
+        finally:
+            rpc.close()
+    assert received == [("stream", len(OVER_CAP_CONTENT), 1 << 20, oct(0o644))]
+
+
+async def test_async_write_bytes_above_the_cap_over_grpc_streams():
+    received = []
+    with _write_data_plane(received) as (endpoint, credentials):
+        rpc = AsyncGrpcDataPlaneRPC(endpoint, credentials, SESSION_ID)
+
+        async def resolve():
+            return rpc
+
+        try:
+            await AsyncSandboxFS(resolve, SESSION_ID).write_bytes("big.bin", OVER_CAP_CONTENT)
+        finally:
+            await rpc.close()
+    assert received == [("stream", len(OVER_CAP_CONTENT), 1 << 20, oct(0o644))]
+
+
+# Go's os.ModeSetuid bit as the guest reports it.
+_MODE_SETUID = 1 << 23
+
+
+@pytest.mark.parametrize(
+    ("existing_mode", "want"), [(0o600, 0o600), (_MODE_SETUID | 0o750, 0o750)]
+)
+def test_write_bytes_above_the_cap_keeps_an_existing_files_mode(existing_mode, want):
+    received = []
+    with _write_data_plane(received, existing_mode) as (endpoint, credentials):
+        rpc = GrpcDataPlaneRPC(endpoint, credentials, SESSION_ID)
+        try:
+            SandboxFS(rpc, SESSION_ID).write_bytes("big.bin", OVER_CAP_CONTENT)
+        finally:
+            rpc.close()
+    assert received == [("stream", len(OVER_CAP_CONTENT), 1 << 20, oct(want))]
+
+
+@pytest.mark.parametrize(
+    ("existing_mode", "want"), [(0o600, 0o600), (_MODE_SETUID | 0o750, 0o750)]
+)
+async def test_async_write_bytes_above_the_cap_keeps_an_existing_files_mode(existing_mode, want):
+    received = []
+    with _write_data_plane(received, existing_mode) as (endpoint, credentials):
+        rpc = AsyncGrpcDataPlaneRPC(endpoint, credentials, SESSION_ID)
+
+        async def resolve():
+            return rpc
+
+        try:
+            await AsyncSandboxFS(resolve, SESSION_ID).write_bytes("big.bin", OVER_CAP_CONTENT)
+        finally:
+            await rpc.close()
+    assert received == [("stream", len(OVER_CAP_CONTENT), 1 << 20, oct(want))]

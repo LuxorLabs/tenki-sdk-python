@@ -6,7 +6,8 @@ from typing import AsyncIterable, AsyncIterator, Iterable
 
 from .._convert import file_info
 from .._pb import pb
-from ..errors import FileNotFoundError, SandboxError, StreamClosedError, ensure_full_write, map_rpc_error, map_write_error
+from ..fs import MAX_UNARY_FILE_BYTES, _overwrite_mode, _write_chunks
+from ..errors import FileNotFoundError, FileTooLargeError, SandboxError, StreamClosedError, ensure_full_write, map_rpc_error, map_write_error
 from ..models import FileInfo
 
 
@@ -27,7 +28,14 @@ class AsyncSandboxFS:
         self._session_id = session_id
 
     async def write_bytes(self, path: str, data: bytes) -> None:
-        """Write up to 32 MiB; larger content raises ``FileTooLargeError``, so write it with ``write_stream``."""
+        """Write content; above 32 MiB it goes over ``write_stream``."""
+        if len(data) > MAX_UNARY_FILE_BYTES:
+            try:
+                info = await self.stat(path)
+            except FileNotFoundError:
+                info = None
+            await self.write_stream(path, _write_chunks(data), mode=_overwrite_mode(info))
+            return
         try:
             rpc = await self._resolve_rpc()
             resp = await rpc.write_file(pb.WriteFileRequest(session_id=self._session_id, path=path, content=data))
@@ -39,13 +47,16 @@ class AsyncSandboxFS:
         await self.write_bytes(path, text.encode(encoding))
 
     async def read_bytes(self, path: str) -> bytes:
-        """Read up to 32 MiB; larger files raise ``FileTooLargeError``, so read them with ``read_stream``."""
+        """Read a file; above 32 MiB it is read over ``read_stream``."""
         try:
             rpc = await self._resolve_rpc()
             resp = await rpc.read_file(pb.ReadFileRequest(session_id=self._session_id, path=path))
             return bytes(resp.content)
         except Exception as err:
-            raise map_rpc_error(err) from err
+            mapped = map_rpc_error(err)
+            if not isinstance(mapped, FileTooLargeError):
+                raise mapped from err
+        return b"".join([chunk async for chunk in self.read_stream(path)])
 
     async def read_text(self, path: str, *, encoding: str = "utf-8") -> str:
         return (await self.read_bytes(path)).decode(encoding, errors="replace")
